@@ -1,0 +1,7 @@
+// 2. Literals and basic expressions
+let a = 42, b = "Hello", c = true in {
+    print(a + 10 * 2 / 5);
+    print(b @ " World"); // String concatenation
+    print("Escaped quote: \" and newline: \n");
+    print(if (c) "Yes" else "No");
+}
