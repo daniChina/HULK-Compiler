@@ -8,32 +8,37 @@ La suite activa del lexer vive dentro de:
 
 - `tests/phase_00_lexer_errors/`
 
-Ahí hay dos niveles:
+Ahi hay dos niveles:
 
-- casos generales del lexer en la raíz de `phase_00_lexer_errors`
-- fases léxicas por subconjunto en:
+- casos generales del lexer en la raiz de `phase_00_lexer_errors`
+- fases lexicas por subconjunto en:
   - `phase_01_expressions`
   - `phase_02_control`
   - `phase_03_functions`
   - `phase_04_types`
 
-## Convención actual
+## Convencion actual
 
 Para el lexer:
 
-- `valid/`: el archivo debe tokenizarse sin `UNKNOWN` ni errores léxicos
-- `invalid/`: el archivo debe producir un error léxico real, o documentar una mejora léxica pendiente
+- `valid/`: el archivo debe tokenizarse sin `UNKNOWN` ni errores lexicos
+- `invalid/`: el archivo debe producir un error lexico real, o documentar una mejora lexica pendiente
 
-Los errores sintácticos se guardan aparte en:
+Los errores sintacticos se guardan aparte en:
 
 - `tests/pending_parser/`
 
-## Diseño recomendado del lexer
+## Contrato actual del lexer
 
-Pensando en un parser posterior inspirado en el de amabe, la recomendación es:
+El lexer actual ya sigue estas decisiones de diseño:
 
-- `print`, `sin`, `cos`, `sqrt`, `log`, `rand`, `range`, `PI`, `E`: mejor tratarlos como identificadores o nombres globales especiales en semántica, no como tokens léxicos distintos
-- `true` y `false`: mejor separarlos como tokens propios (`TRUE`, `FALSE`) en vez de colapsarlos en un solo `BOOLEAN_LITERAL`
+- `print`, `sin`, `cos`, `sqrt`, `log`, `rand`, `range`, `PI`, `E` se reconocen como `IDENTIFIER`
+- `true` y `false` se reconocen como tokens propios `TRUE` y `FALSE`
+
+Motivo:
+
+- los builtins no deben introducir categorias sintacticas especiales si su forma es la misma que cualquier identificador
+- `TRUE` y `FALSE` encajan mejor con un parser posterior inspirado en gramaticas LL(1) o Bison
 
 ## Uso
 
@@ -43,7 +48,7 @@ Correr los casos generales de lexer:
 ./tests/run_lexer_phase.sh phase_00_lexer_errors
 ```
 
-Correr una fase léxica específica:
+Correr una fase lexica especifica:
 
 ```bash
 ./tests/run_lexer_phase.sh phase_01_expressions
