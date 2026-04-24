@@ -43,8 +43,8 @@ int main(int argc, char* argv[]) {
             case TokenType::NUMBER_LITERAL:
                 std::cout << " => " << lexer.sem.num_val;
                 break;
-            case TokenType::TRUE_LITERAL:
-            case TokenType::FALSE_LITERAL:
+            case TokenType::TRUE:
+            case TokenType::FALSE:
                 std::cout << " => " << (lexer.sem.bool_val ? "true" : "false");
                 break;
             default:

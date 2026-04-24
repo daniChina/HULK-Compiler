@@ -509,12 +509,15 @@ static const flex_int16_t yy_chk[175] =
 /* Guarda la posición inicial del token antes de consumirlo. */
 #define MARK_TOKEN() do { token_line_ = line_; token_col_ = column_; } while(0)
 
+/* Guarda el lexema crudo cuando la regla coincide directamente con yytext. */
+#define SET_LEXEME() do { lexeme_ = yytext; } while(0)
+
 /* Macro interna: marca posición inicial, avanza columna y devuelve token. */
-#define UPD(t) do { MARK_TOKEN(); column_ += yyleng; \
+#define UPD(t) do { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; \
                     return static_cast<int>(TokenType::t); } while(0)
-#line 516 "hulk_lexer.cpp"
+#line 519 "hulk_lexer.cpp"
 /* ── Macros de patrones ──────────────────────────────────── */
-#line 518 "hulk_lexer.cpp"
+#line 521 "hulk_lexer.cpp"
 
 #define INITIAL 0
 
@@ -646,12 +649,12 @@ YY_DECL
 		}
 
 	{
-#line 52 "hulk_lexer.l"
-
-
 #line 55 "hulk_lexer.l"
+
+
+#line 58 "hulk_lexer.l"
  /* ── 1. Espacios ────────────────────────────────────────── */
-#line 655 "hulk_lexer.cpp"
+#line 658 "hulk_lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -706,24 +709,24 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 56 "hulk_lexer.l"
+#line 59 "hulk_lexer.l"
 { column_ += yyleng; }
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 57 "hulk_lexer.l"
+#line 60 "hulk_lexer.l"
 { ++line_; column_ = 1; }
 	YY_BREAK
 /* ── 2. Comentarios ─────────────────────────────────────── */
 case 3:
 YY_RULE_SETUP
-#line 60 "hulk_lexer.l"
+#line 63 "hulk_lexer.l"
 { column_ += yyleng; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 62 "hulk_lexer.l"
+#line 65 "hulk_lexer.l"
 {
                 column_ += yyleng;
                 int c1 = yyinput();
@@ -746,9 +749,11 @@ YY_RULE_SETUP
 /* ── 3. Literales de cadena ─────────────────────────────── */
 case 5:
 YY_RULE_SETUP
-#line 82 "hulk_lexer.l"
+#line 85 "hulk_lexer.l"
 {
                 MARK_TOKEN();
+                lexeme_.clear();
+                lexeme_ += '"';
                 ++column_;
                 std::string buf;
                 int ch;
@@ -760,9 +765,11 @@ YY_RULE_SETUP
                         break;
                     }
                     ++column_;
+                    lexeme_ += static_cast<char>(ch);
                     if (ch == '"') break;
                     if (ch == '\\') {
                         int esc = yyinput(); ++column_;
+                        lexeme_ += static_cast<char>(esc);
                         switch (esc) {
                             case '"':  buf += '"';  break;
                             case '\\': buf += '\\'; break;
@@ -782,16 +789,18 @@ YY_RULE_SETUP
 /* ── 4. Números ─────────────────────────────────────────── */
 case 6:
 YY_RULE_SETUP
-#line 115 "hulk_lexer.l"
+#line 122 "hulk_lexer.l"
 { MARK_TOKEN();
+                SET_LEXEME();
                 column_ += yyleng;
                 sem.num_val = std::stof(yytext);
                 return static_cast<int>(TokenType::NUMBER_LITERAL); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 120 "hulk_lexer.l"
+#line 128 "hulk_lexer.l"
 { MARK_TOKEN();
+                SET_LEXEME();
                 column_ += yyleng;
                 sem.num_val = (float)std::atoi(yytext);
                 return static_cast<int>(TokenType::NUMBER_LITERAL); }
@@ -799,272 +808,273 @@ YY_RULE_SETUP
 /* ── 5. Booleanos ───────────────────────────────────────── */
 case 8:
 YY_RULE_SETUP
-#line 126 "hulk_lexer.l"
-{ MARK_TOKEN(); column_ += yyleng; sem.bool_val = true;
-                return static_cast<int>(TokenType::TRUE_LITERAL); }
+#line 135 "hulk_lexer.l"
+{ MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.bool_val = true;
+                return static_cast<int>(TokenType::TRUE); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 128 "hulk_lexer.l"
-{ MARK_TOKEN(); column_ += yyleng; sem.bool_val = false;
-                return static_cast<int>(TokenType::FALSE_LITERAL); }
+#line 137 "hulk_lexer.l"
+{ MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.bool_val = false;
+                return static_cast<int>(TokenType::FALSE); }
 	YY_BREAK
 /* ── 6. Palabras clave ──────────────────────────────────── */
 case 10:
 YY_RULE_SETUP
-#line 132 "hulk_lexer.l"
-{ UPD(KEYWORD_IF);       }
+#line 141 "hulk_lexer.l"
+{ UPD(IF);         }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 133 "hulk_lexer.l"
-{ UPD(KEYWORD_ELIF);     }
+#line 142 "hulk_lexer.l"
+{ UPD(ELIF);       }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 134 "hulk_lexer.l"
-{ UPD(KEYWORD_ELSE);     }
+#line 143 "hulk_lexer.l"
+{ UPD(ELSE);       }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 135 "hulk_lexer.l"
-{ UPD(KEYWORD_WHILE);    }
+#line 144 "hulk_lexer.l"
+{ UPD(WHILE);      }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 136 "hulk_lexer.l"
-{ UPD(KEYWORD_FOR);      }
+#line 145 "hulk_lexer.l"
+{ UPD(FOR);        }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 137 "hulk_lexer.l"
-{ UPD(KEYWORD_FUNCTION); }
+#line 146 "hulk_lexer.l"
+{ UPD(FUNCTION);   }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 138 "hulk_lexer.l"
-{ UPD(KEYWORD_TYPE);     }
+#line 147 "hulk_lexer.l"
+{ UPD(TYPE);       }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 139 "hulk_lexer.l"
-{ UPD(KEYWORD_PROTOCOL); }
+#line 148 "hulk_lexer.l"
+{ UPD(PROTOCOL);   }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 140 "hulk_lexer.l"
-{ UPD(KEYWORD_DEF);      }
+#line 149 "hulk_lexer.l"
+{ UPD(DEF);        }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 141 "hulk_lexer.l"
-{ UPD(KEYWORD_LET);      }
+#line 150 "hulk_lexer.l"
+{ UPD(LET);        }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 142 "hulk_lexer.l"
-{ UPD(KEYWORD_IN);       }
+#line 151 "hulk_lexer.l"
+{ UPD(IN);         }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 143 "hulk_lexer.l"
-{ UPD(KEYWORD_NEW);      }
+#line 152 "hulk_lexer.l"
+{ UPD(NEW);        }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 144 "hulk_lexer.l"
-{ UPD(KEYWORD_INHERITS); }
+#line 153 "hulk_lexer.l"
+{ UPD(INHERITS);   }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 145 "hulk_lexer.l"
-{ UPD(KEYWORD_SELF);     }
+#line 154 "hulk_lexer.l"
+{ UPD(SELF);       }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 146 "hulk_lexer.l"
-{ UPD(KEYWORD_BASE);     }
+#line 155 "hulk_lexer.l"
+{ UPD(BASE);       }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 147 "hulk_lexer.l"
-{ UPD(KEYWORD_IS);       }
+#line 156 "hulk_lexer.l"
+{ UPD(IS);         }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 148 "hulk_lexer.l"
-{ UPD(KEYWORD_AS);       }
+#line 157 "hulk_lexer.l"
+{ UPD(AS);         }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 149 "hulk_lexer.l"
-{ UPD(KEYWORD_AND);      }
+#line 158 "hulk_lexer.l"
+{ UPD(AND);        }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 150 "hulk_lexer.l"
-{ UPD(KEYWORD_OR);       }
+#line 159 "hulk_lexer.l"
+{ UPD(OR);         }
 	YY_BREAK
 /* ── 7. Identificadores y nombres globales ─────────────── */
 case 29:
 YY_RULE_SETUP
-#line 153 "hulk_lexer.l"
-{ MARK_TOKEN(); column_ += yyleng; sem.str_val = yytext;
+#line 162 "hulk_lexer.l"
+{ MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
                 return static_cast<int>(TokenType::IDENTIFIER); }
 	YY_BREAK
 /* ── 8. Operadores de dos caracteres ────────────────────── */
 case 30:
 YY_RULE_SETUP
-#line 157 "hulk_lexer.l"
+#line 166 "hulk_lexer.l"
 { UPD(ASSIGN);        }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 158 "hulk_lexer.l"
+#line 167 "hulk_lexer.l"
 { UPD(ARROW);         }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 159 "hulk_lexer.l"
+#line 168 "hulk_lexer.l"
 { UPD(EQUAL_EQUAL);   }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 160 "hulk_lexer.l"
+#line 169 "hulk_lexer.l"
 { UPD(BANG_EQUAL);    }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 161 "hulk_lexer.l"
+#line 170 "hulk_lexer.l"
 { UPD(LESS_EQUAL);    }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 162 "hulk_lexer.l"
+#line 171 "hulk_lexer.l"
 { UPD(GREATER_EQUAL); }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 163 "hulk_lexer.l"
+#line 172 "hulk_lexer.l"
 { UPD(CONCAT_WS);     }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 164 "hulk_lexer.l"
+#line 173 "hulk_lexer.l"
 { UPD(EQUAL);         }  
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 165 "hulk_lexer.l"
+#line 174 "hulk_lexer.l"
 { UPD(CONCAT);        }   
 	YY_BREAK
 /* ── 9. Operadores de un carácter ───────────────────────── */
 case 39:
 YY_RULE_SETUP
-#line 168 "hulk_lexer.l"
+#line 177 "hulk_lexer.l"
 { UPD(LPAREN);    }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 169 "hulk_lexer.l"
+#line 178 "hulk_lexer.l"
 { UPD(RPAREN);    }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 170 "hulk_lexer.l"
+#line 179 "hulk_lexer.l"
 { UPD(LBRACE);    }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 171 "hulk_lexer.l"
+#line 180 "hulk_lexer.l"
 { UPD(RBRACE);    }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 172 "hulk_lexer.l"
+#line 181 "hulk_lexer.l"
 { UPD(LBRACKET);  }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 173 "hulk_lexer.l"
+#line 182 "hulk_lexer.l"
 { UPD(RBRACKET);  }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 174 "hulk_lexer.l"
+#line 183 "hulk_lexer.l"
 { UPD(COMMA);     }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 175 "hulk_lexer.l"
+#line 184 "hulk_lexer.l"
 { UPD(SEMICOLON); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 176 "hulk_lexer.l"
+#line 185 "hulk_lexer.l"
 { UPD(DOT);       }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 177 "hulk_lexer.l"
+#line 186 "hulk_lexer.l"
 { UPD(COLON);     }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 178 "hulk_lexer.l"
+#line 187 "hulk_lexer.l"
 { UPD(PLUS);      }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 179 "hulk_lexer.l"
+#line 188 "hulk_lexer.l"
 { UPD(MINUS);     }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 180 "hulk_lexer.l"
+#line 189 "hulk_lexer.l"
 { UPD(STAR);      }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 181 "hulk_lexer.l"
+#line 190 "hulk_lexer.l"
 { UPD(SLASH);     }
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 182 "hulk_lexer.l"
+#line 191 "hulk_lexer.l"
 { UPD(CARET);     }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 183 "hulk_lexer.l"
+#line 192 "hulk_lexer.l"
 { UPD(TILDE);     }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 184 "hulk_lexer.l"
+#line 193 "hulk_lexer.l"
 { UPD(BANG);      }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 185 "hulk_lexer.l"
+#line 194 "hulk_lexer.l"
 { UPD(LESS);      }
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 186 "hulk_lexer.l"
+#line 195 "hulk_lexer.l"
 { UPD(GREATER);   }
 	YY_BREAK
 /* ── 10. EOF ────────────────────────────────────────────── */
 case YY_STATE_EOF(INITIAL):
-#line 189 "hulk_lexer.l"
-{ return static_cast<int>(TokenType::EOF_TOKEN); }
+#line 198 "hulk_lexer.l"
+{ lexeme_.clear(); return static_cast<int>(TokenType::EOF_TOKEN); }
 	YY_BREAK
 /* ── 11. Carácter desconocido ───────────────────────────── */
 case 58:
 YY_RULE_SETUP
-#line 192 "hulk_lexer.l"
+#line 201 "hulk_lexer.l"
 {
                 MARK_TOKEN();
+                SET_LEXEME();
                 column_ += yyleng;
                 std::cerr << "[Lexer] linea " << line_
                           << ", columna " << token_col_
@@ -1076,10 +1086,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 203 "hulk_lexer.l"
+#line 213 "hulk_lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1083 "hulk_lexer.cpp"
+#line 1093 "hulk_lexer.cpp"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2041,7 +2051,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 203 "hulk_lexer.l"
+#line 213 "hulk_lexer.l"
 
 
 /* ================================================================
