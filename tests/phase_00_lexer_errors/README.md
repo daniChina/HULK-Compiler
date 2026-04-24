@@ -1,19 +1,20 @@
 # Phase 00: Lexer Errors
 
-Esta fase contiene casos diseñados para validar exclusivamente el comportamiento del lexer.
+Esta fase contiene casos disenados para validar exclusivamente el comportamiento del lexer.
 
-## Qué debe probar esta fase
+## Que debe probar esta fase
 
 - caracteres desconocidos
 - cadenas sin cerrar
 - comentarios de bloque sin cerrar
-- escapes válidos e inválidos
+- escapes validos e invalidos
 - operadores compuestos del lenguaje
-- separación correcta entre tokens parecidos
+- separacion correcta entre tokens parecidos
+- contrato lexico actual: builtins como `IDENTIFIER`, booleanos como `TRUE` y `FALSE`
 
-## Qué no debe probar esta fase
+## Que no debe probar esta fase
 
-No mezclar aquí errores sintácticos, por ejemplo:
+No mezclar aqui errores sintacticos, por ejemplo:
 
 - `1 + ;`
 - `print((1 + 2);`
@@ -21,6 +22,6 @@ No mezclar aquí errores sintácticos, por ejemplo:
 
 Esos casos pertenecen al parser, no al lexer.
 
-## Convención
+## Convencion
 
-Cada archivo incluye comentarios HULK (`// ...`) explicando qué debería pasar cuando el lexer procese ese input.
+Cada archivo incluye comentarios HULK (`// ...`) explicando que deberia pasar cuando el lexer procese ese input.

@@ -27,7 +27,8 @@ enum class TokenType : int {
     IDENTIFIER,
     NUMBER_LITERAL,
     STRING_LITERAL,
-    BOOLEAN_LITERAL,
+    TRUE_LITERAL,
+    FALSE_LITERAL,
     KEYWORD_IF,
     KEYWORD_ELIF,
     KEYWORD_ELSE,
@@ -47,16 +48,6 @@ enum class TokenType : int {
     KEYWORD_AS,
     KEYWORD_AND,
     KEYWORD_OR,
-    BUILTIN_PI,
-    BUILTIN_E,
-    BUILTIN_RANGE,
-    BUILTIN_PRINT,
-    BUILTIN_SQRT,
-    BUILTIN_SIN,
-    BUILTIN_COS,
-    BUILTIN_EXP,
-    BUILTIN_LOG,
-    BUILTIN_RAND,
     LPAREN, RPAREN,
     LBRACE, RBRACE,
     LBRACKET, RBRACKET,
@@ -114,7 +105,8 @@ public:
             case TokenType::IDENTIFIER:       return "IDENTIFIER";
             case TokenType::NUMBER_LITERAL:   return "NUMBER_LITERAL";
             case TokenType::STRING_LITERAL:   return "STRING_LITERAL";
-            case TokenType::BOOLEAN_LITERAL:  return "BOOLEAN_LITERAL";
+            case TokenType::TRUE_LITERAL:     return "TRUE";
+            case TokenType::FALSE_LITERAL:    return "FALSE";
             case TokenType::KEYWORD_IF:       return "KEYWORD_IF";
             case TokenType::KEYWORD_ELIF:     return "KEYWORD_ELIF";
             case TokenType::KEYWORD_ELSE:     return "KEYWORD_ELSE";
@@ -134,16 +126,6 @@ public:
             case TokenType::KEYWORD_AS:       return "KEYWORD_AS";
             case TokenType::KEYWORD_AND:      return "KEYWORD_AND";
             case TokenType::KEYWORD_OR:       return "KEYWORD_OR";
-            case TokenType::BUILTIN_PI:       return "BUILTIN_PI";
-            case TokenType::BUILTIN_E:        return "BUILTIN_E";
-            case TokenType::BUILTIN_RANGE:    return "BUILTIN_RANGE";
-            case TokenType::BUILTIN_PRINT:    return "BUILTIN_PRINT";
-            case TokenType::BUILTIN_SQRT:     return "BUILTIN_SQRT";
-            case TokenType::BUILTIN_SIN:      return "BUILTIN_SIN";
-            case TokenType::BUILTIN_COS:      return "BUILTIN_COS";
-            case TokenType::BUILTIN_EXP:      return "BUILTIN_EXP";
-            case TokenType::BUILTIN_LOG:      return "BUILTIN_LOG";
-            case TokenType::BUILTIN_RAND:     return "BUILTIN_RAND";
             case TokenType::LPAREN:           return "LPAREN";
             case TokenType::RPAREN:           return "RPAREN";
             case TokenType::LBRACE:           return "LBRACE";

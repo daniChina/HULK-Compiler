@@ -123,9 +123,9 @@ IDENT       {ALPHA}{ALNUM_}*
 
  /* ── 5. Booleanos ───────────────────────────────────────── */
 "true"        { MARK_TOKEN(); column_ += yyleng; sem.bool_val = true;
-                return static_cast<int>(TokenType::BOOLEAN_LITERAL); }
+                return static_cast<int>(TokenType::TRUE_LITERAL); }
 "false"       { MARK_TOKEN(); column_ += yyleng; sem.bool_val = false;
-                return static_cast<int>(TokenType::BOOLEAN_LITERAL); }
+                return static_cast<int>(TokenType::FALSE_LITERAL); }
 
  /* ── 6. Palabras clave ──────────────────────────────────── */
 "if"          { UPD(KEYWORD_IF);       }
@@ -148,23 +148,11 @@ IDENT       {ALPHA}{ALNUM_}*
 "and"         { UPD(KEYWORD_AND);      }
 "or"          { UPD(KEYWORD_OR);       }
 
- /* ── 7. Builtins ────────────────────────────────────────── */
-"print"       { UPD(BUILTIN_PRINT); }
-"sqrt"        { UPD(BUILTIN_SQRT);  }
-"sin"         { UPD(BUILTIN_SIN);   }
-"cos"         { UPD(BUILTIN_COS);   }
-"exp"         { UPD(BUILTIN_EXP);   }
-"log"         { UPD(BUILTIN_LOG);   }
-"rand"        { UPD(BUILTIN_RAND);  }
-"PI"          { UPD(BUILTIN_PI);    }
-"E"           { UPD(BUILTIN_E);     }
-"range"       { UPD(BUILTIN_RANGE); }
-
- /* ── 8. Identificadores ─────────────────────────────────── */
+ /* ── 7. Identificadores y nombres globales ─────────────── */
 {IDENT}       { MARK_TOKEN(); column_ += yyleng; sem.str_val = yytext;
                 return static_cast<int>(TokenType::IDENTIFIER); }
 
- /* ── 9. Operadores de dos caracteres ────────────────────── */
+ /* ── 8. Operadores de dos caracteres ────────────────────── */
 ":="          { UPD(ASSIGN);        }
 "=>"          { UPD(ARROW);         }
 "=="          { UPD(EQUAL_EQUAL);   }
@@ -175,7 +163,7 @@ IDENT       {ALPHA}{ALNUM_}*
 "="           { UPD(EQUAL);         }  
 "@"           { UPD(CONCAT);        }   
 
- /* ── 10. Operadores de un carácter ──────────────────────── */
+ /* ── 9. Operadores de un carácter ───────────────────────── */
 "("           { UPD(LPAREN);    }
 ")"           { UPD(RPAREN);    }
 "{"           { UPD(LBRACE);    }
@@ -196,10 +184,10 @@ IDENT       {ALPHA}{ALNUM_}*
 "<"           { UPD(LESS);      }
 ">"           { UPD(GREATER);   }
 
- /* ── 11. EOF ─────────────────────────────────────────────── */
+ /* ── 10. EOF ────────────────────────────────────────────── */
 <<EOF>>       { return static_cast<int>(TokenType::EOF_TOKEN); }
 
- /* ── 12. Carácter desconocido ───────────────────────────── */
+ /* ── 11. Carácter desconocido ───────────────────────────── */
 .             {
                 MARK_TOKEN();
                 column_ += yyleng;
