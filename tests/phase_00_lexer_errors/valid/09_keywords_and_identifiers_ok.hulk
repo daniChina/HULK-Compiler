@@ -1,0 +1,2 @@
+// El lexer debe reconocer keywords reales del lenguaje y tambien identificadores comunes.
+if else elif while for let in function type new inherits self base is as and or variable;

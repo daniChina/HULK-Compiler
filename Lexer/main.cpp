@@ -30,8 +30,8 @@ int main(int argc, char* argv[]) {
     while ((tok = lexer.yylex()) != EOF_VAL) {
 
         // Imprimir posición y nombre del token
-        std::cout << "[linea " << lexer.line()
-                  << ", col "  << lexer.col()  << "] "
+        std::cout << "[linea " << lexer.token_line()
+                  << ", col "  << lexer.token_col()  << "] "
                   << HulkLexer::token_name(tok);
 
         // Imprimir valor semántico según el tipo

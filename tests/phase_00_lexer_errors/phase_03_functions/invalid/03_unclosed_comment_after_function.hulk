@@ -1,0 +1,3 @@
+// El lexer debe reportar comentario de bloque sin cerrar despues de una definicion de funcion.
+function id(x) => x;
+/* comentario

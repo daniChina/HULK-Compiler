@@ -1,0 +1,2 @@
+// El lexer debe rechazar comillas tipograficas si el lenguaje solo acepta comillas ASCII.
+“hola”;

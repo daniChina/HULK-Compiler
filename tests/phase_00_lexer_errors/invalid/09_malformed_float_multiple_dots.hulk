@@ -1,0 +1,3 @@
+// Idealmente el lexer deberia marcar 1.2.3 como numero mal formado,
+// o partirlo en tokens de forma que luego sea facil detectarlo en parser.
+1.2.3;

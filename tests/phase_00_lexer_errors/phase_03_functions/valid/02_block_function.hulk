@@ -1,0 +1,5 @@
+function operate(x, y) {
+    print(x + y);
+    print(x - y);
+};
+operate(4, 2);

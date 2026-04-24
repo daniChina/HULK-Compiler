@@ -1,0 +1,3 @@
+// El lexer debe reportar cadena sin cerrar al encontrar salto de linea antes de cerrar comillas.
+"hola
+mundo";
