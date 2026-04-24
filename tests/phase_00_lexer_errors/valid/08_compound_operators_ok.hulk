@@ -1,0 +1,2 @@
+// El lexer debe distinguir correctamente operadores de varios caracteres.
+a := b == c != d <= e >= f => g;

@@ -1,0 +1,4 @@
+// El lexer debe reportar cadena sin cerrar dentro del cuerpo de un metodo.
+type Point(x, y) {
+    name() => "Point;
+};

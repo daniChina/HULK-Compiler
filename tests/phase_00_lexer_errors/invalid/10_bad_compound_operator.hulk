@@ -1,0 +1,2 @@
+// El lexer debe rechazar :> porque no es un operador definido del lenguaje.
+a :> b;

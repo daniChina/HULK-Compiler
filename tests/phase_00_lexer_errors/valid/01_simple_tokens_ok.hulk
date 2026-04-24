@@ -1,0 +1,3 @@
+// El lexer debe reconocer correctamente identificadores, numeros,
+// asignacion, operadores y punto y coma sin producir UNKNOWN.
+let x = 42;

@@ -1,0 +1,2 @@
+// El lexer debe reportar $ como caracter desconocido dentro de una expresion let.
+let x = $ in x;

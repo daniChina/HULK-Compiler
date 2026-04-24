@@ -65,6 +65,7 @@ enum class TokenType : int {
     ASSIGN,
     ARROW,
     CONCAT,
+    CONCAT_WS,
     EQUAL_EQUAL, BANG_EQUAL,EQUAL,
     LESS, LESS_EQUAL,
     GREATER, GREATER_EQUAL
@@ -91,6 +92,8 @@ public:
     SemanticValue sem;      /* valor semántico del token actual   */
     int line_   = 1;        /* línea (1-based)                    */
     int column_ = 1;        /* columna (1-based)                  */
+    int token_line_ = 1;    /* línea inicial del token actual     */
+    int token_col_  = 1;    /* columna inicial del token actual   */
 
     explicit HulkLexer(std::istream& in  = std::cin,
                        std::ostream& out = std::cout)
@@ -101,6 +104,8 @@ public:
 
     int  line() const { return line_;   }
     int  col()  const { return column_; }
+    int  token_line() const { return token_line_; }
+    int  token_col()  const { return token_col_;  }
 
     static const char* token_name(int t) {
         switch (static_cast<TokenType>(t)) {
@@ -158,6 +163,7 @@ public:
             case TokenType::BANG:             return "BANG";
             case TokenType::ASSIGN:           return "ASSIGN";
             case TokenType::CONCAT:           return "CONCAT";
+            case TokenType::CONCAT_WS:        return "CONCAT_WS";
             case TokenType::ARROW:            return "ARROW";
             case TokenType::EQUAL:            return "EQUAL";
             case TokenType::EQUAL_EQUAL:      return "EQUAL_EQUAL";

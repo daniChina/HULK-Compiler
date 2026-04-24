@@ -1,0 +1,4 @@
+// El lexer debe reportar $ como caracter desconocido dentro de un miembro de tipo.
+type Point(x, y) {
+    x = $;
+};

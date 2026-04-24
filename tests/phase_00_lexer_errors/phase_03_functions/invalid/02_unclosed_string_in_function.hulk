@@ -1,0 +1,2 @@
+// El lexer debe reportar cadena sin cerrar dentro de una funcion inline.
+function greet() => "hola;
