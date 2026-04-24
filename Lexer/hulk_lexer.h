@@ -27,27 +27,27 @@ enum class TokenType : int {
     IDENTIFIER,
     NUMBER_LITERAL,
     STRING_LITERAL,
-    TRUE_LITERAL,
-    FALSE_LITERAL,
-    KEYWORD_IF,
-    KEYWORD_ELIF,
-    KEYWORD_ELSE,
-    KEYWORD_WHILE,
-    KEYWORD_FOR,
-    KEYWORD_FUNCTION,
-    KEYWORD_TYPE,
-    KEYWORD_PROTOCOL,
-    KEYWORD_DEF,
-    KEYWORD_LET,
-    KEYWORD_IN,
-    KEYWORD_NEW,
-    KEYWORD_INHERITS,
-    KEYWORD_SELF,
-    KEYWORD_BASE,
-    KEYWORD_IS,
-    KEYWORD_AS,
-    KEYWORD_AND,
-    KEYWORD_OR,
+    TRUE,
+    FALSE,
+    IF,
+    ELIF,
+    ELSE,
+    WHILE,
+    FOR,
+    FUNCTION,
+    TYPE,
+    PROTOCOL,
+    DEF,
+    LET,
+    IN,
+    NEW,
+    INHERITS,
+    SELF,
+    BASE,
+    IS,
+    AS,
+    AND,
+    OR,
     LPAREN, RPAREN,
     LBRACE, RBRACE,
     LBRACKET, RBRACKET,
@@ -81,6 +81,7 @@ struct SemanticValue {
 class HulkLexer : public yyFlexLexer {
 public:
     SemanticValue sem;      /* valor semántico del token actual   */
+    std::string lexeme_;    /* lexema crudo del token actual      */
     int line_   = 1;        /* línea (1-based)                    */
     int column_ = 1;        /* columna (1-based)                  */
     int token_line_ = 1;    /* línea inicial del token actual     */
@@ -95,37 +96,38 @@ public:
 
     int  line() const { return line_;   }
     int  col()  const { return column_; }
+    const std::string& lexeme() const { return lexeme_; }
     int  token_line() const { return token_line_; }
     int  token_col()  const { return token_col_;  }
 
     static const char* token_name(int t) {
         switch (static_cast<TokenType>(t)) {
-            case TokenType::EOF_TOKEN:        return "EOF";
+            case TokenType::EOF_TOKEN:        return "EOF_TOKEN";
             case TokenType::UNKNOWN:          return "UNKNOWN";
             case TokenType::IDENTIFIER:       return "IDENTIFIER";
             case TokenType::NUMBER_LITERAL:   return "NUMBER_LITERAL";
             case TokenType::STRING_LITERAL:   return "STRING_LITERAL";
-            case TokenType::TRUE_LITERAL:     return "TRUE";
-            case TokenType::FALSE_LITERAL:    return "FALSE";
-            case TokenType::KEYWORD_IF:       return "KEYWORD_IF";
-            case TokenType::KEYWORD_ELIF:     return "KEYWORD_ELIF";
-            case TokenType::KEYWORD_ELSE:     return "KEYWORD_ELSE";
-            case TokenType::KEYWORD_WHILE:    return "KEYWORD_WHILE";
-            case TokenType::KEYWORD_FOR:      return "KEYWORD_FOR";
-            case TokenType::KEYWORD_FUNCTION: return "KEYWORD_FUNCTION";
-            case TokenType::KEYWORD_TYPE:     return "KEYWORD_TYPE";
-            case TokenType::KEYWORD_PROTOCOL: return "KEYWORD_PROTOCOL";
-            case TokenType::KEYWORD_DEF:      return "KEYWORD_DEF";
-            case TokenType::KEYWORD_LET:      return "KEYWORD_LET";
-            case TokenType::KEYWORD_IN:       return "KEYWORD_IN";
-            case TokenType::KEYWORD_NEW:      return "KEYWORD_NEW";
-            case TokenType::KEYWORD_INHERITS: return "KEYWORD_INHERITS";
-            case TokenType::KEYWORD_SELF:     return "KEYWORD_SELF";
-            case TokenType::KEYWORD_BASE:     return "KEYWORD_BASE";
-            case TokenType::KEYWORD_IS:       return "KEYWORD_IS";
-            case TokenType::KEYWORD_AS:       return "KEYWORD_AS";
-            case TokenType::KEYWORD_AND:      return "KEYWORD_AND";
-            case TokenType::KEYWORD_OR:       return "KEYWORD_OR";
+            case TokenType::TRUE:             return "TRUE";
+            case TokenType::FALSE:            return "FALSE";
+            case TokenType::IF:               return "IF";
+            case TokenType::ELIF:             return "ELIF";
+            case TokenType::ELSE:             return "ELSE";
+            case TokenType::WHILE:            return "WHILE";
+            case TokenType::FOR:              return "FOR";
+            case TokenType::FUNCTION:         return "FUNCTION";
+            case TokenType::TYPE:             return "TYPE";
+            case TokenType::PROTOCOL:         return "PROTOCOL";
+            case TokenType::DEF:              return "DEF";
+            case TokenType::LET:              return "LET";
+            case TokenType::IN:               return "IN";
+            case TokenType::NEW:              return "NEW";
+            case TokenType::INHERITS:         return "INHERITS";
+            case TokenType::SELF:             return "SELF";
+            case TokenType::BASE:             return "BASE";
+            case TokenType::IS:               return "IS";
+            case TokenType::AS:               return "AS";
+            case TokenType::AND:              return "AND";
+            case TokenType::OR:               return "OR";
             case TokenType::LPAREN:           return "LPAREN";
             case TokenType::RPAREN:           return "RPAREN";
             case TokenType::LBRACE:           return "LBRACE";

@@ -36,8 +36,11 @@
 /* Guarda la posición inicial del token antes de consumirlo. */
 #define MARK_TOKEN() do { token_line_ = line_; token_col_ = column_; } while(0)
 
+/* Guarda el lexema crudo cuando la regla coincide directamente con yytext. */
+#define SET_LEXEME() do { lexeme_ = yytext; } while(0)
+
 /* Macro interna: marca posición inicial, avanza columna y devuelve token. */
-#define UPD(t) do { MARK_TOKEN(); column_ += yyleng; \
+#define UPD(t) do { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; \
                     return static_cast<int>(TokenType::t); } while(0)
 %}
 
@@ -80,6 +83,8 @@ IDENT       {ALPHA}{ALNUM_}*
  /* ── 3. Literales de cadena ─────────────────────────────── */
 \"            {
                 MARK_TOKEN();
+                lexeme_.clear();
+                lexeme_ += '"';
                 ++column_;
                 std::string buf;
                 int ch;
@@ -91,9 +96,11 @@ IDENT       {ALPHA}{ALNUM_}*
                         break;
                     }
                     ++column_;
+                    lexeme_ += static_cast<char>(ch);
                     if (ch == '"') break;
                     if (ch == '\\') {
                         int esc = yyinput(); ++column_;
+                        lexeme_ += static_cast<char>(esc);
                         switch (esc) {
                             case '"':  buf += '"';  break;
                             case '\\': buf += '\\'; break;
@@ -112,44 +119,46 @@ IDENT       {ALPHA}{ALNUM_}*
 
  /* ── 4. Números ─────────────────────────────────────────── */
 {FLOAT}       { MARK_TOKEN();
+                SET_LEXEME();
                 column_ += yyleng;
                 sem.num_val = std::stof(yytext);
                 return static_cast<int>(TokenType::NUMBER_LITERAL); }
 
 {INT}         { MARK_TOKEN();
+                SET_LEXEME();
                 column_ += yyleng;
                 sem.num_val = (float)std::atoi(yytext);
                 return static_cast<int>(TokenType::NUMBER_LITERAL); }
 
  /* ── 5. Booleanos ───────────────────────────────────────── */
-"true"        { MARK_TOKEN(); column_ += yyleng; sem.bool_val = true;
-                return static_cast<int>(TokenType::TRUE_LITERAL); }
-"false"       { MARK_TOKEN(); column_ += yyleng; sem.bool_val = false;
-                return static_cast<int>(TokenType::FALSE_LITERAL); }
+"true"        { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.bool_val = true;
+                return static_cast<int>(TokenType::TRUE); }
+"false"       { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.bool_val = false;
+                return static_cast<int>(TokenType::FALSE); }
 
  /* ── 6. Palabras clave ──────────────────────────────────── */
-"if"          { UPD(KEYWORD_IF);       }
-"elif"        { UPD(KEYWORD_ELIF);     }
-"else"        { UPD(KEYWORD_ELSE);     }
-"while"       { UPD(KEYWORD_WHILE);    }
-"for"         { UPD(KEYWORD_FOR);      }
-"function"    { UPD(KEYWORD_FUNCTION); }
-"type"        { UPD(KEYWORD_TYPE);     }
-"protocol"    { UPD(KEYWORD_PROTOCOL); }
-"def"         { UPD(KEYWORD_DEF);      }
-"let"         { UPD(KEYWORD_LET);      }
-"in"          { UPD(KEYWORD_IN);       }
-"new"         { UPD(KEYWORD_NEW);      }
-"inherits"    { UPD(KEYWORD_INHERITS); }
-"self"        { UPD(KEYWORD_SELF);     }
-"base"        { UPD(KEYWORD_BASE);     }
-"is"          { UPD(KEYWORD_IS);       }
-"as"          { UPD(KEYWORD_AS);       }
-"and"         { UPD(KEYWORD_AND);      }
-"or"          { UPD(KEYWORD_OR);       }
+"if"          { UPD(IF);         }
+"elif"        { UPD(ELIF);       }
+"else"        { UPD(ELSE);       }
+"while"       { UPD(WHILE);      }
+"for"         { UPD(FOR);        }
+"function"    { UPD(FUNCTION);   }
+"type"        { UPD(TYPE);       }
+"protocol"    { UPD(PROTOCOL);   }
+"def"         { UPD(DEF);        }
+"let"         { UPD(LET);        }
+"in"          { UPD(IN);         }
+"new"         { UPD(NEW);        }
+"inherits"    { UPD(INHERITS);   }
+"self"        { UPD(SELF);       }
+"base"        { UPD(BASE);       }
+"is"          { UPD(IS);         }
+"as"          { UPD(AS);         }
+"and"         { UPD(AND);        }
+"or"          { UPD(OR);         }
 
  /* ── 7. Identificadores y nombres globales ─────────────── */
-{IDENT}       { MARK_TOKEN(); column_ += yyleng; sem.str_val = yytext;
+{IDENT}       { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
                 return static_cast<int>(TokenType::IDENTIFIER); }
 
  /* ── 8. Operadores de dos caracteres ────────────────────── */
@@ -185,11 +194,12 @@ IDENT       {ALPHA}{ALNUM_}*
 ">"           { UPD(GREATER);   }
 
  /* ── 10. EOF ────────────────────────────────────────────── */
-<<EOF>>       { return static_cast<int>(TokenType::EOF_TOKEN); }
+<<EOF>>       { lexeme_.clear(); return static_cast<int>(TokenType::EOF_TOKEN); }
 
  /* ── 11. Carácter desconocido ───────────────────────────── */
 .             {
                 MARK_TOKEN();
+                SET_LEXEME();
                 column_ += yyleng;
                 std::cerr << "[Lexer] linea " << line_
                           << ", columna " << token_col_
