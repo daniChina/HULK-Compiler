@@ -88,7 +88,38 @@ Aunque ahora el lexer ya usa los mismos nombres de token que el parser, el adapt
 2. conserva `lexeme`, `line` y `col` en cada `Token`
 3. desacopla el parser de la API interna de Flex
 
-## 6. Separacion entre Lexer y Parser
+## 6. Infraestructura minima del parser
+
+La fase 1 del parser se apoya en dos piezas nuevas:
+
+- `ParseError`
+- `TokenStream`
+
+### `ParseError`
+
+Representa un error sintactico con:
+
+- token encontrado
+- linea
+- columna
+- mensaje humano
+
+### `TokenStream`
+
+Es una vista navegable sobre `TokenList` y ofrece:
+
+- `current()`
+- `peek()`
+- `previous()`
+- `advance()`
+- `is(type)`
+- `match(type)`
+- `consume(type, mensaje)`
+- `at_end()`
+
+Estas operaciones son la base practica de cualquier parser recursivo o predictivo.
+
+## 7. Separacion entre Lexer y Parser
 
 Todo este trabajo se deja en `Parser/` para no mezclar:
 

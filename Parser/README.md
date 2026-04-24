@@ -16,6 +16,9 @@ El archivo central es:
 - `Parser/token.hpp`
 - `Parser/token_adapter.hpp`
 - `Parser/token_adapter.cpp`
+- `Parser/parse_error.hpp`
+- `Parser/token_stream.hpp`
+- `Parser/token_stream.cpp`
 
 Ahi se define:
 
@@ -23,6 +26,8 @@ Ahi se define:
 - `parser::Token`: estructura de datos de un token individual
 - `parser::TokenList`: alias para una secuencia de tokens
 - funciones para convertir la salida del lexer en `TokenList`
+- un error sintactico basico (`ParseError`)
+- una secuencia navegable de tokens (`TokenStream`)
 
 ## Decisiones activas
 
@@ -115,3 +120,22 @@ Aunque los nombres del lexer y del parser ya coinciden, el adaptador sigue siend
 - el parser no debe depender directamente de Flex
 - el parser necesita una lista materializada de tokens
 - el parser necesita acceder al `lexeme` y a la posicion de cada token
+
+## Fase 1 del parser
+
+La fase 1 ya queda soportada con:
+
+- `Parser/parse_error.hpp`
+- `Parser/token_stream.hpp`
+- `Parser/token_stream.cpp`
+
+Estas piezas aportan la infraestructura minima para empezar un parser:
+
+- `current()`
+- `peek()`
+- `advance()`
+- `is(type)`
+- `match(type)`
+- `consume(type, mensaje)`
+
+Con eso ya se puede escribir despues un parser recursivo sin tocar la capa del lexer.
