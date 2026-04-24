@@ -1,0 +1,2 @@
+// El lexer debe aceptar escapes validos como \n, \t, \" y \\ dentro de strings.
+"linea\ncolumna\t\"ok\"\\";

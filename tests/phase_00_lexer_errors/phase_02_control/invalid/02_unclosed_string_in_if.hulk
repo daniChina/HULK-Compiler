@@ -1,0 +1,2 @@
+// El lexer debe reportar cadena sin cerrar dentro del cuerpo de un if.
+if (true) "hola else 0;

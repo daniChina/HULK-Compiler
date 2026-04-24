@@ -1,0 +1,4 @@
+// El lexer debe reportar comentario de bloque sin cerrar dentro de un type.
+type Point(x, y) {
+    /* comentario
+};

@@ -1,0 +1,3 @@
+function cot(x) => tan(x);
+function tan(x) => sin(x) / cos(x);
+cot(1);

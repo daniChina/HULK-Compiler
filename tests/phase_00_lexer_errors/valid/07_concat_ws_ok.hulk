@@ -1,0 +1,3 @@
+// El lexer deberia reconocer @@ como un unico operador del lenguaje HULK.
+// Si hoy aparecen dos CONCAT separados, este caso revela un hueco del lexer.
+"a" @@ "b";

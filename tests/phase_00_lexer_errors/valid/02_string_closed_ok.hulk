@@ -1,0 +1,2 @@
+// El lexer debe reconocer una cadena cerrada correctamente como STRING_LITERAL.
+"hola";

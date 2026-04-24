@@ -1,0 +1,3 @@
+// El lexer debe consumir completamente el comentario de bloque y luego reconocer el numero.
+/* comentario de bloque */
+42;

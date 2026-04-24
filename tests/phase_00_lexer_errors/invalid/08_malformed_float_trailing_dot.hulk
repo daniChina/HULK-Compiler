@@ -1,0 +1,3 @@
+// Idealmente el lexer deberia marcar 12. como numero mal formado,
+// o al menos dejar evidencia clara de que no es un FLOAT valido unico.
+12.;

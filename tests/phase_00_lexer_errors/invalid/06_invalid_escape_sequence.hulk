@@ -1,0 +1,3 @@
+// Si el lexer es estricto, debe reportar \q como escape invalido.
+// Si hoy no lo hace, este test documenta una mejora pendiente.
+"hola\q";

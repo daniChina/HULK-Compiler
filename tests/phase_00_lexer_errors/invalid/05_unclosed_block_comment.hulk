@@ -1,0 +1,3 @@
+// El lexer debe reportar comentario de bloque sin cerrar al llegar a EOF.
+/* comentario sin cerrar
+42;

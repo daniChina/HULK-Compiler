@@ -33,8 +33,11 @@
  */
 #include "hulk_lexer.h"
 
-/* Macro interna: avanza columna y devuelve el token como int */
-#define UPD(t) do { column_ += yyleng; \
+/* Guarda la posición inicial del token antes de consumirlo. */
+#define MARK_TOKEN() do { token_line_ = line_; token_col_ = column_; } while(0)
+
+/* Macro interna: marca posición inicial, avanza columna y devuelve token. */
+#define UPD(t) do { MARK_TOKEN(); column_ += yyleng; \
                     return static_cast<int>(TokenType::t); } while(0)
 %}
 
@@ -76,6 +79,7 @@ IDENT       {ALPHA}{ALNUM_}*
 
  /* ── 3. Literales de cadena ─────────────────────────────── */
 \"            {
+                MARK_TOKEN();
                 ++column_;
                 std::string buf;
                 int ch;
@@ -107,18 +111,20 @@ IDENT       {ALPHA}{ALNUM_}*
               }
 
  /* ── 4. Números ─────────────────────────────────────────── */
-{FLOAT}       { column_ += yyleng;
+{FLOAT}       { MARK_TOKEN();
+                column_ += yyleng;
                 sem.num_val = std::stof(yytext);
                 return static_cast<int>(TokenType::NUMBER_LITERAL); }
 
-{INT}         { column_ += yyleng;
+{INT}         { MARK_TOKEN();
+                column_ += yyleng;
                 sem.num_val = (float)std::atoi(yytext);
                 return static_cast<int>(TokenType::NUMBER_LITERAL); }
 
  /* ── 5. Booleanos ───────────────────────────────────────── */
-"true"        { column_ += yyleng; sem.bool_val = true;
+"true"        { MARK_TOKEN(); column_ += yyleng; sem.bool_val = true;
                 return static_cast<int>(TokenType::BOOLEAN_LITERAL); }
-"false"       { column_ += yyleng; sem.bool_val = false;
+"false"       { MARK_TOKEN(); column_ += yyleng; sem.bool_val = false;
                 return static_cast<int>(TokenType::BOOLEAN_LITERAL); }
 
  /* ── 6. Palabras clave ──────────────────────────────────── */
@@ -155,7 +161,7 @@ IDENT       {ALPHA}{ALNUM_}*
 "range"       { UPD(BUILTIN_RANGE); }
 
  /* ── 8. Identificadores ─────────────────────────────────── */
-{IDENT}       { column_ += yyleng; sem.str_val = yytext;
+{IDENT}       { MARK_TOKEN(); column_ += yyleng; sem.str_val = yytext;
                 return static_cast<int>(TokenType::IDENTIFIER); }
 
  /* ── 9. Operadores de dos caracteres ────────────────────── */
@@ -165,6 +171,7 @@ IDENT       {ALPHA}{ALNUM_}*
 "!="          { UPD(BANG_EQUAL);    }
 "<="          { UPD(LESS_EQUAL);    }
 ">="          { UPD(GREATER_EQUAL); }
+"@@"          { UPD(CONCAT_WS);     }
 "="           { UPD(EQUAL);         }  
 "@"           { UPD(CONCAT);        }   
 
@@ -194,9 +201,10 @@ IDENT       {ALPHA}{ALNUM_}*
 
  /* ── 12. Carácter desconocido ───────────────────────────── */
 .             {
+                MARK_TOKEN();
                 column_ += yyleng;
                 std::cerr << "[Lexer] linea " << line_
-                          << ", columna " << (column_ - yyleng)
+                          << ", columna " << token_col_
                           << ": caracter desconocido '"
                           << yytext[0] << "'\n";
                 sem.str_val = yytext;

@@ -1,0 +1,3 @@
+// El lexer debe ignorar el comentario de linea y luego seguir tokenizando el resto.
+// comentario de prueba
+42;

@@ -1,0 +1,3 @@
+type Point(x, y) {
+    getX() => ;
+};

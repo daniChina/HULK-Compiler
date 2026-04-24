@@ -1,0 +1,2 @@
+// El lexer debe reportar cadena sin cerrar al llegar a EOF.
+"hola
