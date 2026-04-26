@@ -13,12 +13,17 @@ La idea es que el parser no dependa de detalles internos del lexer mas de lo nec
 
 El archivo central es:
 
-- `Parser/token.hpp`
-- `Parser/token_adapter.hpp`
-- `Parser/token_adapter.cpp`
-- `Parser/parse_error.hpp`
-- `Parser/token_stream.hpp`
-- `Parser/token_stream.cpp`
+- `Parser/core/token.hpp`
+- `Parser/core/token_adapter.hpp`
+- `Parser/core/token_adapter.cpp`
+- `Parser/core/parse_error.hpp`
+- `Parser/core/token_stream.hpp`
+- `Parser/core/token_stream.cpp`
+- `Parser/ast/expr.hpp`
+- `Parser/ast/expr.cpp`
+- `Parser/syntax/parser.hpp`
+- `Parser/syntax/parser.cpp`
+- `Parser/tests/parser_phase2_smoke.cpp`
 
 Ahi se define:
 
@@ -28,6 +33,18 @@ Ahi se define:
 - funciones para convertir la salida del lexer en `TokenList`
 - un error sintactico basico (`ParseError`)
 - una secuencia navegable de tokens (`TokenStream`)
+- un AST minimo de expresiones (`Expr` y derivados)
+- un parser recursivo inicial para expresiones primarias (`Parser`)
+
+## Organizacion actual
+
+La carpeta `Parser/` ahora queda separada por responsabilidad:
+
+- `Parser/core/`: contrato de tokens, adaptador lexer -> parser, error sintactico y `TokenStream`
+- `Parser/ast/`: nodos del AST del parser
+- `Parser/syntax/`: funciones y clases del parser recursivo
+- `Parser/tests/`: pruebas pequenas aisladas del parser
+- `Parser/README.md`, `Parser/plan_parser.md`, `Parser/explicacion.md`: documentacion y plan de trabajo
 
 ## Decisiones activas
 
@@ -101,8 +118,8 @@ Se eligio un conjunto final pensando en el parser, no en la implementacion inter
 
 El adaptador ya vive en:
 
-- `Parser/token_adapter.hpp`
-- `Parser/token_adapter.cpp`
+- `Parser/core/token_adapter.hpp`
+- `Parser/core/token_adapter.cpp`
 
 Su trabajo es:
 
@@ -125,9 +142,9 @@ Aunque los nombres del lexer y del parser ya coinciden, el adaptador sigue siend
 
 La fase 1 ya queda soportada con:
 
-- `Parser/parse_error.hpp`
-- `Parser/token_stream.hpp`
-- `Parser/token_stream.cpp`
+- `Parser/core/parse_error.hpp`
+- `Parser/core/token_stream.hpp`
+- `Parser/core/token_stream.cpp`
 
 Estas piezas aportan la infraestructura minima para empezar un parser:
 
@@ -139,3 +156,69 @@ Estas piezas aportan la infraestructura minima para empezar un parser:
 - `consume(type, mensaje)`
 
 Con eso ya se puede escribir despues un parser recursivo sin tocar la capa del lexer.
+
+## Fase 2 del parser
+
+La fase 2 queda iniciada con:
+
+- `Parser/ast/expr.hpp`
+- `Parser/ast/expr.cpp`
+- `Parser/syntax/parser.hpp`
+- `Parser/syntax/parser.cpp`
+- `Parser/tests/parser_phase2_smoke.cpp`
+
+Por ahora replica el nivel mas pequeno de la gramatica de referencia:
+
+- `Expr -> Primary`
+- `Primary -> NUMBER | STRING | TRUE | FALSE | IDENTIFIER | LPAREN Expr RPAREN`
+
+Los nodos soportados en esta etapa son:
+
+- `NumberExpr`
+- `StringExpr`
+- `BoolExpr`
+- `IdentifierExpr`
+- `GroupedExpr`
+
+Y la prueba smoke cubre:
+
+- `42;`
+- `"hola";`
+- `true;`
+- `x;`
+- `(42);`
+
+## Fase 3 del parser
+
+La fase 3 extiende el parser recursivo de `Parser/syntax/parser.cpp` para soportar precedencia por niveles.
+
+Los niveles implementados son:
+
+- `parse_or()`
+- `parse_and()`
+- `parse_comparison()`
+- `parse_concat()`
+- `parse_add()`
+- `parse_mul()`
+- `parse_power()`
+- `parse_unary()`
+- `parse_primary()`
+
+Los nodos nuevos del AST son:
+
+- `UnaryExpr`
+- `BinaryExpr`
+
+La prueba smoke de esta fase vive en:
+
+- `Parser/tests/parser_phase3_smoke.cpp`
+
+Y cubre:
+
+- `1 + 2 * 3;`
+- `a and b or c;`
+- `"a" @ "b";`
+- `x < y == z;`
+- `-x;`
+- `(1 + 2) * 3;`
+- `2 ^ 3 ^ 4;`

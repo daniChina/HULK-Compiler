@@ -1,436 +1,507 @@
-La ruta correcta es construir el parser por capas, no intentar portar todo `parser.y` o toda la gramática LL(1) de golpe.
+La meta principal ya no debe ser seguir creciendo el parser recursivo manual como si fuera el parser final del compilador.
 
-## Idea base
-Del proyecto de amabe viste que hay realmente tres niveles:
+En este punto del proyecto, la direccion correcta es:
 
-1. contrato de tokens
-2. parser
-3. construcción de árbol
+1. mantener el parser recursivo actual solo como prototipo de aprendizaje y validacion
+2. mover el trabajo principal al pipeline de un generador LL(1)
+3. usar `grammar.ll1` como fuente formal de la sintaxis
+4. construir primero CST
+5. dejar la transformacion a AST como paso posterior y separado
 
-Y en su repo eso aparece como dos variantes:
-- `parser.y`: parser tipo Bison con acciones semánticas
-- `grammar.ll1` + `ll1_parser.*`: parser predictivo
-- `cst_to_ast.*`: conversión de CST a AST
+Ese flujo es el que mas se parece al repo de amabe cuando usa:
 
-Para entenderlo y replicarlo en tu proyecto, yo seguiría este orden.
-
----
-
-# Fase 1. Infraestructura mínima del parser
-
-## Objetivo
-Tener una base sobre la que ya puedas leer `TokenList` y consumir tokens de forma controlada.
-
-## Qué hacer
-1. crear un `TokenStream` en `Parser/`
-2. implementar operaciones mínimas:
-   - `current()`
-   - `peek()`
-   - `advance()`
-   - `is(type)`
-   - `match(type)`
-   - `consume(type, mensaje)`
-3. crear un error sintáctico básico con:
-   - token encontrado
-   - línea
-   - columna
-
-## Qué se aprende aquí
-- cómo consume tokens un parser
-- qué significa “lookahead”
-- cómo se reporta un error sintáctico
-
-## Qué debes probar
-- leer una lista de tokens y avanzar correctamente
-- detectar fin de archivo
-- fallar si `consume(...)` recibe otro token
-
----
-
-# Fase 2. Parser de expresiones mínimas
-
-## Objetivo
-Parsear lo más simple posible:
-- números
-- strings
-- identificadores
-- `true`, `false`
-- paréntesis
-
-## Qué producciones tomar primero
-Empieza por el equivalente de:
-
-- `Primary`
-- `Expr -> Primary`
-
-Todavía sin operadores.
-
-## Qué construir
-Un AST muy pequeño o incluso temporalmente nodos básicos:
-- `NumberExpr`
-- `StringExpr`
-- `BoolExpr`
-- `IdentifierExpr`
-- `GroupedExpr`
-
-## Qué se aprende aquí
-- cómo una función del parser representa una producción
-- cómo `parse_primary()` suele ser el punto de entrada más simple
-- diferencia entre reconocer tokens y construir estructura
-
-## Qué probar
-- `42;`
-- `"hola";`
-- `true;`
-- `x;`
-- `(42);`
-
----
-
-# Fase 3. Precedencia de operadores
-
-## Objetivo
-Replicar la parte más importante del parser de amabe: la jerarquía de expresiones.
-
-## Qué tomar como referencia
-De `grammar.ll1` o del `parser.y`, en este orden:
-
-- `OrExpr`
-- `AndExpr`
-- `CmpExpr`
-- `ConcatExpr`
-- `AddExpr`
-- `Term`
-- `Factor`
-- `Unary`
-- `Primary`
-
-## Cómo hacerlo
-Hay dos caminos:
-
-### Opción A. Parser recursivo por precedencia
-Una función por nivel:
-- `parse_or()`
-- `parse_and()`
-- `parse_cmp()`
-- `parse_concat()`
-- `parse_add()`
-- `parse_mul()`
-- `parse_unary()`
-- `parse_primary()`
-
-### Opción B. Seguir literalmente la LL(1)
-Con funciones tipo:
-- `parse_or_expr()`
-- `parse_or_expr_prime()`
-
-Para aprender, la A es más clara.
-Para parecerte más a `grammar.ll1`, la B es más fiel.
-
-Yo te recomiendo:
-- implementar primero la A
-- luego comparar con la B para entender la transformación LL(1)
-
-## Qué se aprende aquí
-- precedencia
-- asociatividad
-- cómo una gramática ambigua se convierte en parser correcto
-
-## Qué probar
-- `1 + 2 * 3;`
-- `a and b or c;`
-- `"a" @@ "b";`
-- `x < y == z;`
-- `-x;`
-
----
-
-# Fase 4. Calls, acceso y expresiones postfix
-
-## Objetivo
-Añadir lo que en amabe aparece en `Primary` y `PrimaryTail`.
-
-## Qué incluir
-- llamadas `f(...)`
-- acceso `expr.id`
-- `new T(...)`
-- `self`
-- `base(...)`
-
-## Por qué esta fase va aparte
-Porque aquí ya no basta con parsear operadores binarios:
-- aparecen secuencias postfix
-- el parser debe encadenar cosas como:
-  - `obj.metodo()`
-  - `new Point(1,2).x`
-  - `self.name()`
-
-## Qué se aprende aquí
-- cómo parsear postfix encadenado
-- cómo modelar llamadas y acceso a miembros
-
-## Qué probar
-- `print(42);`
-- `obj.x;`
-- `obj.f(a, b);`
-- `new Point(1,2);`
-- `self.x;`
-- `base();`
-
----
-
-# Fase 5. `let`, bloques e `if`
-
-## Objetivo
-Salir del nivel “expresión simple” y pasar a expresiones compuestas del lenguaje.
-
-## Qué incluir
-- `let ... in ...`
-- bloques `{ ... }`
-- `if ... else ...`
-- `elif`
-
-## Referencia en amabe
-Esta parte está muy clara en:
 - `grammar.ll1`
-- `parser.y`
+- `ll1_parser.*`
+- `cst_to_ast.*`
 
-## Orden recomendado
-1. bloques
+---
+
+# Estado actual
+
+## Ya implementado
+
+### Fase 1. Infraestructura minima
+
+Ya existe en `Parser/core/`:
+
+- `token.hpp`
+- `parse_error.hpp`
+- `token_stream.hpp`
+- `token_stream.cpp`
+- `token_adapter.hpp`
+- `token_adapter.cpp`
+
+Eso ya resuelve:
+
+- contrato `TokenList`
+- conversion lexer -> parser
+- `TokenStream`
+- error sintactico basico
+
+### Fase 2. Primarias
+
+Ya existe un parser recursivo pequeno que reconoce:
+
+- numeros
+- strings
+- `true`
+- `false`
+- identificadores
+- parentesis
+
+### Fase 3. Precedencia
+
+Ya existe un parser recursivo de expresiones con:
+
+- `or`
+- `and`
+- comparacion
+- concatenacion
+- suma y resta
+- multiplicacion y division
+- potencia
+- unarios
+
+Y `^` ya quedo con asociatividad correcta por la derecha.
+
+## Como debe interpretarse lo actual
+
+Lo actual no es trabajo perdido.
+
+Sirve para:
+
+- entender el lenguaje
+- validar el contrato de tokens
+- comprobar precedencia y asociatividad
+- tener casos de prueba pequenos
+
+Pero no debe ser el parser final si el objetivo del proyecto es hacer un generador LL(1).
+
+---
+
+# Relacion correcta entre las piezas
+
+La arquitectura objetivo del compilador debe ser esta:
+
+## 1. `TokenList`
+
+Sale del lexer y entra al parser.
+
+El lexer produce tokens materializados con:
+
+- tipo
+- lexema
+- linea
+- columna
+
+## 2. Gramatica LL(1)
+
+La sintaxis formal del lenguaje debe vivir en un archivo como:
+
+- `Parser/grammar/grammar.ll1`
+
+Esa gramatica debe estar:
+
+- sin recursion izquierda
+- factorizada cuando haga falta
+- preparada para construir tabla LL(1)
+
+Ejemplo:
+
+```text
+Power      -> Unary PowerTail
+PowerTail  -> CARET Power | ε
+```
+
+o cualquier forma equivalente que conserve asociatividad correcta y sea apta para LL(1).
+
+## 3. Generador LL(1)
+
+Debe leer la gramatica y construir:
+
+- producciones
+- conjunto de no terminales
+- conjunto de terminales
+- FIRST
+- FOLLOW
+- tabla LL(1)
+
+## 4. Parser predictivo generado
+
+Debe usar la tabla LL(1) para:
+
+- expandir no terminales
+- consumir tokens
+- detectar errores sintacticos
+- construir CST
+
+## 5. CST o arbol de derivacion
+
+El CST refleja literalmente la gramatica.
+
+Eso lo hace la mejor estructura intermedia para un parser generado, porque:
+
+- conserva cada produccion aplicada
+- permite debuggear derivaciones
+- desacopla reconocimiento de construccion semantica
+
+## 6. AST
+
+El AST no reemplaza la gramatica.
+
+El AST se construye despues, a partir del CST, para:
+
+- eliminar ruido sintactico
+- compactar la estructura
+- preparar analisis semantico
+- preparar interpretacion o compilacion
+
+La relacion correcta es:
+
+- la gramatica dice como reconocer
+- el CST conserva la forma exacta reconocida
+- el AST conserva solo la estructura util
+
+---
+
+# Nuevo plan de trabajo
+
+La prioridad ahora debe cambiar desde:
+
+- "seguir agregando funciones manuales en `parser.cpp`"
+
+hacia:
+
+- "empezar la infraestructura del generador LL(1)"
+
+---
+
+# Fase 4. Formalizar la gramatica LL(1)
+
+## Objetivo
+
+Crear la fuente formal de la sintaxis en un archivo `.ll1`.
+
+## Que hacer
+
+1. crear `Parser/grammar/grammar.ll1`
+2. llevar al archivo el subconjunto ya validado:
+   - expresiones primarias
+   - precedencia de operadores
+3. escribir las producciones en forma LL(1):
+   - sin recursion izquierda
+   - con factorizacion cuando haga falta
+4. separar claramente:
+   - terminales
+   - no terminales
+   - epsilon
+
+## Resultado esperado
+
+Una primera gramatica LL(1) valida para expresiones.
+
+## Que probar
+
+- que la gramatica pueda leerse como archivo
+- que sus producciones se carguen correctamente
+- que no haya ambiguedades obvias en el subconjunto inicial
+
+---
+
+# Fase 5. Modelo interno de producciones y lector de gramatica
+
+## Objetivo
+
+Convertir `grammar.ll1` en estructuras de datos del compilador.
+
+## Archivos objetivo
+
+- `Parser/generator/production.hpp`
+- `Parser/generator/grammar_reader.hpp`
+- `Parser/generator/grammar_reader.cpp`
+
+## Que hacer
+
+1. definir una estructura `Production`
+2. representar:
+   - lado izquierdo
+   - lado derecho
+   - epsilon
+3. leer el archivo `grammar.ll1`
+4. cargar todas las producciones en memoria
+5. identificar:
+   - simbolo inicial
+   - no terminales
+   - terminales
+
+## Que se aprende aqui
+
+- como pasar de texto formal a estructuras internas
+- como representar una gramatica de forma neutral
+
+## Que probar
+
+- leer producciones simples
+- leer alternativas
+- leer epsilon
+- detectar errores de formato basicos
+
+---
+
+# Fase 6. Calculo de FIRST y FOLLOW
+
+## Objetivo
+
+Construir los algoritmos centrales del generador LL(1).
+
+## Archivos objetivo
+
+- `Parser/generator/first_follow.hpp`
+- `Parser/generator/first_follow.cpp`
+
+## Que hacer
+
+1. calcular `FIRST(X)` para cada simbolo
+2. calcular `FIRST(alpha)` para secuencias
+3. calcular `FOLLOW(A)` para cada no terminal
+4. manejar correctamente epsilon
+
+## Que se aprende aqui
+
+- la base teorica real de un parser LL(1)
+- como justificar si una gramatica es apta o no
+
+## Que probar
+
+- FIRST de terminales
+- FIRST de no terminales con epsilon
+- FOLLOW del simbolo inicial
+- FOLLOW en producciones encadenadas
+
+---
+
+# Fase 7. Construccion de la tabla LL(1)
+
+## Objetivo
+
+Generar la tabla predictiva a partir de la gramatica.
+
+## Archivos objetivo
+
+- `Parser/generator/ll1_table.hpp`
+- `Parser/generator/ll1_table.cpp`
+
+## Que hacer
+
+1. usar producciones + FIRST + FOLLOW
+2. llenar `M[A, a]`
+3. detectar conflictos
+4. reportar si la gramatica no es LL(1)
+
+## Resultado esperado
+
+Una tabla que permita parseo predictivo generico.
+
+## Que probar
+
+- entradas correctas para gramaticas simples
+- celdas epsilon cuando corresponda
+- deteccion de conflicto multiple en la misma celda
+
+---
+
+# Fase 8. Parser predictivo generico
+
+## Objetivo
+
+Crear el parser LL(1) que use la tabla en vez de funciones manuales.
+
+## Archivos objetivo
+
+- `Parser/syntax/ll1_parser.hpp`
+- `Parser/syntax/ll1_parser.cpp`
+
+## Que hacer
+
+1. consumir `TokenList`
+2. mapear `TokenType` a simbolos terminales de la gramatica
+3. mantener una pila de parseo
+4. expandir no terminales usando la tabla
+5. consumir terminales
+6. reportar errores sintacticos utiles
+
+## Importante
+
+Este parser no debe estar codificado para una sola produccion concreta.
+
+Debe ser un parser predictivo generico controlado por:
+
+- gramatica
+- FIRST/FOLLOW
+- tabla LL(1)
+
+## Que probar
+
+- parseo correcto de expresiones ya cubiertas por el parser recursivo
+- error cuando no exista entrada en la tabla
+- error cuando el terminal esperado no coincida
+
+---
+
+# Fase 9. Construccion de CST
+
+## Objetivo
+
+Construir el arbol de derivacion durante el parseo predictivo.
+
+## Archivos objetivo
+
+- `Parser/ast/cst_nodes.hpp`
+- `Parser/ast/cst_nodes.cpp`
+
+## Que hacer
+
+1. modelar nodos de CST
+2. distinguir:
+   - nodo no terminal
+   - nodo terminal
+3. al expandir una produccion, crear hijos en el CST
+4. al consumir un token, asociarlo al terminal correspondiente
+
+## Por que va antes del AST
+
+Porque en un parser generado el CST es la representacion natural de la derivacion.
+
+## Que probar
+
+- estructura correcta del arbol para expresiones simples
+- presencia de nodos intermedios de la gramatica
+- correspondencia entre derivacion y tokens consumidos
+
+---
+
+# Fase 10. Transformacion CST -> AST
+
+## Objetivo
+
+Reducir el CST a una estructura semantica compacta.
+
+## Archivos objetivo
+
+- `Parser/ast/expr.hpp`
+- `Parser/ast/expr.cpp`
+- `Parser/ast/cst_to_ast.hpp`
+- `Parser/ast/cst_to_ast.cpp`
+
+## Que hacer
+
+1. recorrer el CST
+2. eliminar nodos puramente sintacticos
+3. reconstruir precedencia y estructura semantica
+4. producir AST util para fases posteriores
+
+## Importante
+
+El AST deja de ser "algo que el parser manual construye directamente" y pasa a ser:
+
+- una salida derivada del CST
+
+## Que probar
+
+- CST de `1 + 2 * 3` convertido a AST correcto
+- unarios
+- parentesis
+- comparaciones
+
+---
+
+# Fase 11. Extender la gramatica del lenguaje
+
+## Objetivo
+
+Una vez funcionando el pipeline LL(1), crecer el lenguaje desde la gramatica, no desde codigo hardcodeado.
+
+## Subconjuntos siguientes
+
+1. llamadas y postfix
 2. `let`
-3. `if/else`
-4. `elif`
+3. bloques
+4. `if / elif / else`
+5. `while`
+6. `for`
+7. programa completo y lista de sentencias
+8. funciones
+9. `type`, herencia, atributos, metodos, `self`, `base`, `new`
 
-## Por qué así
-- bloques y `let` te obligan a manejar más de una expresión
-- `if` introduce bifurcación
-- `elif` introduce desazucarado o anidación
+## Regla de trabajo
 
-## Qué se aprende aquí
-- cómo una construcción grande se apoya en parseos de expresiones pequeñas
-- cómo un `if` realmente se vuelve estructura anidada
+Cada nueva construccion debe pasar por este orden:
 
-## Qué probar
-- `let x = 42 in x;`
-- `{ print(1); print(2); }`
-- `if (x) 1 else 0;`
-- `if (a) x elif (b) y else z;`
-
----
-
-# Fase 6. `while` y `for`
-
-## Objetivo
-Agregar control de flujo repetitivo.
-
-## Qué incluir
-- `while (expr) expr`
-- `while (expr) { ... }`
-- `for (id in expr) expr`
-- `for (id in expr) { ... }`
-
-## Qué se aprende aquí
-- cómo manejar producciones con cuerpo flexible
-- cómo reutilizar parseo de expresiones y bloques
-
-## Qué probar
-- `while (x > 0) x := x - 1;`
-- `for (x in range(0,10)) print(x);`
+1. actualizar `grammar.ll1`
+2. recalcular FIRST/FOLLOW
+3. regenerar o reconstruir tabla LL(1)
+4. verificar parseo predictivo
+5. verificar CST
+6. verificar conversion a AST
 
 ---
 
-# Fase 7. Programa completo y lista de sentencias
+# Estructura objetivo del directorio `Parser/`
 
-## Objetivo
-Pasar de “parseo de una expresión” a “parseo de programa”.
-
-## Qué incluir
-- `Program`
-- lista de sentencias/declaraciones
-- expresión global final
-- manejo de `;`
-
-## Referencia en amabe
-Aquí es importante mirar:
-- `program`
-- `stmt`
-- `stmt_list`
-
-## Qué se aprende aquí
-- diferencia entre parsear una expresión y parsear una unidad de compilación completa
-- cómo organizar top-level declarations
-
-## Qué probar
-- varias expresiones consecutivas
-- función + expresión global
-- tipo + expresión global
-
----
-
-# Fase 8. Funciones
-
-## Objetivo
-Soportar definiciones de funciones globales.
-
-## Qué incluir
-- `function id(args) => expr;`
-- `function id(args) { ... };`
-
-Más adelante:
-- parámetros con tipos si ya decides meter anotaciones
-
-## Qué se aprende aquí
-- diferencia entre declaración y expresión
-- parsear encabezado + cuerpo
-
-## Qué probar
-- inline
-- bloque
-- varias funciones
-- llamadas entre funciones
+```text
+Parser/
+  README.md
+  plan_parser.md
+  explicacion.md
+  core/
+    token.hpp
+    parse_error.hpp
+    token_stream.hpp
+    token_stream.cpp
+    token_adapter.hpp
+    token_adapter.cpp
+  grammar/
+    grammar.ll1
+  generator/
+    production.hpp
+    grammar_reader.hpp
+    grammar_reader.cpp
+    first_follow.hpp
+    first_follow.cpp
+    ll1_table.hpp
+    ll1_table.cpp
+  syntax/
+    parser.hpp
+    parser.cpp
+    ll1_parser.hpp
+    ll1_parser.cpp
+  ast/
+    expr.hpp
+    expr.cpp
+    cst_nodes.hpp
+    cst_nodes.cpp
+    cst_to_ast.hpp
+    cst_to_ast.cpp
+  tests/
+    parser_phase2_smoke.cpp
+    parser_phase3_smoke.cpp
+```
 
 ---
 
-# Fase 9. `type`, herencia, métodos y atributos
+# Decision tecnica activa
 
-## Objetivo
-Replicar el bloque OO básico del parser de amabe.
+Desde este punto:
 
-## Qué incluir
-- `type T(...) { ... }`
-- `type T inherits Base { ... }`
-- atributos
-- métodos
-- `self`
-- `base()`
-- `new`
+- `Parser/syntax/parser.cpp` se conserva como referencia manual y banco de pruebas
+- el desarrollo principal debe migrar a `grammar.ll1` + generador LL(1) + `ll1_parser`
 
-## Qué se aprende aquí
-- producciones grandes y anidadas
-- miembros heterogéneos dentro de un cuerpo de tipo
-- cómo representar estructura OO en AST
+Si hay que elegir entre:
 
-## Qué probar
-- tipo simple
-- tipo con método
-- herencia
-- llamada a `base()`
+- agregar mas reglas manuales al parser recursivo
 
----
+o:
 
-# Fase 10. Decidir CST o AST directo
+- empezar `grammar_reader`, `FIRST/FOLLOW` y tabla LL(1)
 
-## Aquí hay una decisión importante
-El proyecto de amabe tiene dos estilos mezclados según la variante:
-
-- Bison con acciones que construyen AST más directo
-- LL(1) con CST y luego `cst_to_ast`
-
-## Mi recomendación para entenderlo mejor
-Hazlo en dos etapas conceptuales:
-
-### Etapa 10A. AST directo
-Para las primeras fases:
-- expresiones
-- bloques
-- `if`
-- loops
-
-haz AST directo.
-Es más fácil de entender y más rápido para avanzar.
-
-### Etapa 10B. Si quieres parecerte más al LL(1) de amabe
-Luego puedes:
-- construir un CST
-- hacer `cst_to_ast`
-
-Pero no empezaría por ahí.
-
-## Qué se aprende aquí
-- diferencia entre árbol concreto y abstracto
-- por qué a veces conviene separar parseo y construcción semántica
-
----
-
-# Fase 11. Errores sintácticos y recovery
-
-## Objetivo
-Dejar de fallar “feo” al primer error.
-
-## Qué incluir
-- mensajes con token esperado vs token encontrado
-- línea y columna
-- quizá recuperación básica por `;` o `}`
-
-## Qué se aprende aquí
-- un parser útil no solo reconoce programas válidos
-- también debe explicar bien los inválidos
-
----
-
-# Cómo estudiarlo usando amabe sin copiar ciegamente
-
-## Usa `grammar.ll1` para entender forma
-Te dice:
-- qué subconjunto soporta
-- cómo está factorizada la gramática
-- qué precedencia usa
-
-## Usa `parser.y` para entender intención
-Te muestra:
-- cómo se traduce cada producción a AST
-- qué nodos quiere construir
-- cómo resuelve casos concretos
-
-## Usa `cst_to_ast.*` solo cuando ya tengas parser básico
-Eso te servirá para entender:
-- cómo transformar árbol sintáctico en AST más limpio
-- cómo desazucarar expresiones
-
----
-
-# Orden exacto que yo seguiría
-1. `TokenStream`
-2. `parse_primary()`
-3. precedencia completa
-4. llamadas y acceso
-5. bloques
-6. `let`
-7. `if/elif/else`
-8. `while`
-9. `for`
-10. programa completo
-11. funciones
-12. tipos y herencia
-13. errores sintácticos mejores
-14. si hace falta, CST -> AST
-
----
-
-# Qué NO haría todavía
-1. no empezar por `type`
-2. no empezar por CST completo
-3. no intentar portar `parser.y` entero de una vez
-4. no meter protocolos, vectores, macros o `match` antes de cerrar el subconjunto base
-
----
-
-# Meta de entendimiento por fase
-Cada fase debería responder una pregunta concreta:
-
-1. `TokenStream`
-   - ¿cómo se mueve el parser por la entrada?
-2. expresiones mínimas
-   - ¿cómo una función reconoce una producción?
-3. precedencia
-   - ¿cómo se codifica la jerarquía de operadores?
-4. postfix
-   - ¿cómo se parsean llamadas y accesos?
-5. compuestas
-   - ¿cómo se construyen expresiones grandes a partir de pequeñas?
-6. top-level
-   - ¿cómo se parsea un programa completo?
-7. OO
-   - ¿cómo se representan declaraciones complejas?
-
-Si quieres, el siguiente paso te lo puedo dejar ya aterrizado como plan técnico de implementación dentro de `Parser/`, archivo por archivo, empezando por `TokenStream` y el parser de expresiones.
+la opcion correcta para el objetivo final del proyecto es la segunda.
