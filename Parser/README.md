@@ -21,6 +21,8 @@ El archivo central es:
 - `Parser/core/token_stream.cpp`
 - `Parser/ast/expr.hpp`
 - `Parser/ast/expr.cpp`
+- `Parser/ast/cst_nodes.hpp`
+- `Parser/ast/cst_nodes.cpp`
 - `Parser/syntax/parser.hpp`
 - `Parser/syntax/parser.cpp`
 - `Parser/syntax/ll1_parser.hpp`
@@ -43,6 +45,7 @@ Ahi se define:
 - un error sintactico basico (`ParseError`)
 - una secuencia navegable de tokens (`TokenStream`)
 - un AST minimo de expresiones (`Expr` y derivados)
+- nodos de CST para el parser generado
 - un parser recursivo inicial para expresiones primarias (`Parser`)
 - un parser predictivo LL(1) generico (`Ll1Parser`)
 - una representacion interna de producciones LL(1)
@@ -55,7 +58,7 @@ Ahi se define:
 La carpeta `Parser/` ahora queda separada por responsabilidad:
 
 - `Parser/core/`: contrato de tokens, adaptador lexer -> parser, error sintactico y `TokenStream`
-- `Parser/ast/`: nodos del AST del parser
+- `Parser/ast/`: nodos de AST manual y nodos de CST del parser LL(1)
 - `Parser/grammar/`: fuente formal de la gramatica LL(1)
 - `Parser/generator/`: lectura y procesamiento de la gramatica
 - `Parser/syntax/`: parser recursivo manual y parser LL(1)
@@ -362,3 +365,28 @@ La prueba smoke de esta fase verifica:
 
 - aceptacion de una expresion valida
 - rechazo de una expresion incompleta
+
+## Fase 9 del parser
+
+La fase 9 queda iniciada con:
+
+- `Parser/ast/cst_nodes.hpp`
+- `Parser/ast/cst_nodes.cpp`
+- integracion del CST dentro de `Parser/syntax/ll1_parser.cpp`
+- `Parser/tests/ll1_cst_smoke.cpp`
+
+Estas piezas permiten:
+
+- modelar nodos terminales y no terminales de un CST
+- construir el arbol de derivacion durante el parseo LL(1)
+- materializar epsilon como hijo explicito cuando una produccion deriva vacio
+- asociar tokens reales a los nodos terminales consumidos
+- inspeccionar la forma del arbol en pruebas
+
+La prueba smoke de esta fase verifica:
+
+- existencia del nodo raiz del CST
+- simbolo raiz `Program`
+- presencia de nodos intermedios como `ExprStmt`
+- almacenamiento del token consumido en un nodo terminal
+- rechazo correcto del caso sintacticamente invalido

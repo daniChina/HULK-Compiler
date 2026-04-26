@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "../ast/cst_nodes.hpp"
 #include "../core/parse_error.hpp"
 #include "../core/token_stream.hpp"
 #include "../generator/ll1_table.hpp"
@@ -12,6 +13,7 @@ namespace parser {
 // Guarda una traza simple de las producciones aplicadas durante el parseo.
 struct Ll1ParseResult {
     std::vector<generator::Production> derivation;
+    CstNodePtr cst_root;
 };
 
 class Ll1Parser {

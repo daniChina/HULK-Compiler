@@ -15,6 +15,7 @@ El flujo actual es este:
 - `Parser/generator/first_follow.cpp` calcula FIRST/FOLLOW sobre esa gramática
 - `Parser/generator/ll1_table.cpp` construye la tabla predictiva y detecta conflictos
 - `Parser/syntax/ll1_parser.cpp` consume tokens usando la tabla predictiva
+- `Parser/ast/cst_nodes.*` modela el CST y `Ll1Parser` lo construye durante el parseo
 
 ---
 
@@ -586,13 +587,11 @@ Detalle importante:
 - `EOF_TOKEN` se trata como terminal logico de cierre.
   El parser lo valida, pero no intenta avanzar despues de el.
 
-Todavia no construye CST.
+Desde la fase 9, ademas de reconocer con la tabla:
 
-En esta fase solo:
-
-- reconoce con la tabla
 - valida entrada
 - registra la derivacion aplicada
+- construye el CST mientras expande producciones y consume terminales
 
 ---
 
@@ -807,6 +806,103 @@ Ya puede:
 - decidir expansiones
 - consumir tokens
 - fallar correctamente cuando el lookahead no permite ninguna produccion
+
+---
+
+**12. Nodos de CST**
+
+[Parser/ast/cst_nodes.hpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/ast/cst_nodes.hpp)  
+[Parser/ast/cst_nodes.cpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/ast/cst_nodes.cpp)
+
+Esta capa modela el arbol de derivacion que produce el parser LL(1).
+
+Piezas principales:
+
+- `CstNode`
+  Representa un simbolo del arbol.
+  Guarda:
+  - `symbol`
+  - `has_token`
+  - `token`
+  - `children`
+
+- `add_child(...)`
+  Agrega un hijo al nodo actual y devuelve un puntero crudo estable para seguir construyendo el arbol.
+
+- `cst_to_string(...)`
+  Imprime el arbol de forma jerarquica para debug.
+
+Detalle importante:
+
+- los nodos terminales pueden guardar el token real que se consumio
+- las producciones epsilon crean un hijo explicito con simbolo `ε`
+
+Eso hace que el CST refleje la derivacion de forma literal.
+
+---
+
+**13. Cómo se integra el CST en `Ll1Parser`**
+
+Ahora la pila del parser LL(1) ya no guarda solo simbolos.
+
+Guarda pares:
+
+- simbolo gramatical
+- nodo del CST asociado a ese simbolo
+
+Cuando el parser expande un no terminal:
+
+1. selecciona la produccion desde la tabla
+2. crea nodos hijos en el CST para cada simbolo del lado derecho
+3. empuja esos hijos a la pila en orden inverso
+
+Cuando el parser consume un terminal:
+
+1. verifica que el lookahead coincida
+2. marca el nodo del CST con `has_token = true`
+3. copia el token consumido en ese nodo
+4. avanza el `TokenStream`
+
+Cuando la produccion es epsilon:
+
+1. no empuja nuevos simbolos a la pila
+2. crea un hijo explicito `ε` bajo el no terminal actual
+
+De ese modo, la misma ejecucion del parser:
+
+- reconoce la entrada
+- registra la derivacion
+- arma el arbol completo
+
+---
+
+**14. Cómo funciona `ll1_cst_smoke.cpp`**
+
+[Parser/tests/ll1_cst_smoke.cpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/tests/ll1_cst_smoke.cpp)
+
+Esta prueba:
+
+1. lee `grammar.ll1`
+2. calcula `FIRST/FOLLOW`
+3. construye la tabla LL(1)
+4. ejecuta el parser LL(1) con construccion de CST
+5. valida propiedades basicas del arbol
+
+Checks principales:
+
+- existe `cst_root`
+- la raiz se llama `Program`
+- el arbol contiene `ExprStmt`
+- el arbol contiene un nodo `NUMBER_LITERAL`
+- ese nodo terminal guarda el token consumido
+- el lexema almacenado coincide con el original
+- el caso invalido `1 + ;` sigue rechazandose
+
+Esto ya demuestra que el parser generado no solo decide producciones correctamente.
+
+Tambien deja una estructura de arbol util para la futura fase de conversion:
+
+- `CST -> AST`
 
 ---
 

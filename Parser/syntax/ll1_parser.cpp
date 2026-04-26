@@ -1,8 +1,18 @@
 #include "ll1_parser.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 namespace parser {
+namespace {
+
+// Item de pila: el simbolo a procesar y el nodo del CST asociado a ese simbolo.
+struct StackItem {
+    std::string symbol;
+    CstNode* node = nullptr;
+};
+
+}  // namespace
 
 Ll1Parser::Ll1Parser(
     TokenList tokens,
@@ -13,17 +23,21 @@ Ll1Parser::Ll1Parser(
       table_(table) {}
 
 Ll1ParseResult Ll1Parser::parse() {
-    // La pila arranca con el simbolo inicial y se procesa en orden LIFO.
-    std::vector<std::string> stack;
-    stack.push_back(grammar_.start_symbol);
-
     Ll1ParseResult result;
+    result.cst_root = std::make_unique<CstNode>(grammar_.start_symbol);
+
+    // La pila arranca con el simbolo inicial y el nodo raiz del CST.
+    std::vector<StackItem> stack;
+    stack.push_back(StackItem{grammar_.start_symbol, result.cst_root.get()});
 
     while (!stack.empty()) {
-        const std::string top = stack.back();
+        const StackItem current = stack.back();
         stack.pop_back();
+        const std::string& top = current.symbol;
 
         if (is_terminal(top)) {
+            current.node->has_token = true;
+            current.node->token = tokens_.current();
             match_terminal(top);
             continue;
         }
@@ -35,8 +49,23 @@ Ll1ParseResult Ll1Parser::parse() {
         const auto& production = select_production(top);
         result.derivation.push_back(production);
 
+        // El epsilon se materializa como un hijo explicito para reflejar la derivacion.
+        if (production.is_epsilon()) {
+            current.node->add_child(std::make_unique<CstNode>(generator::kEpsilonSymbol));
+            continue;
+        }
+
+        std::vector<StackItem> children_to_push;
+
+        // Los hijos se crean en orden natural para preservar el arbol.
+        for (const auto& symbol : production.rhs) {
+            CstNode* child =
+                current.node->add_child(std::make_unique<CstNode>(symbol));
+            children_to_push.push_back(StackItem{symbol, child});
+        }
+
         // El lado derecho se empuja al reves para que el primer simbolo quede arriba.
-        for (auto it = production.rhs.rbegin(); it != production.rhs.rend(); ++it) {
+        for (auto it = children_to_push.rbegin(); it != children_to_push.rend(); ++it) {
             stack.push_back(*it);
         }
     }
