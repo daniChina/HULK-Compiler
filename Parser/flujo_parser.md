@@ -14,6 +14,7 @@ El flujo actual es este:
 - `Parser/generator/grammar_reader.cpp` lee esa gramática y la convierte en estructuras internas
 - `Parser/generator/first_follow.cpp` calcula FIRST/FOLLOW sobre esa gramática
 - `Parser/generator/ll1_table.cpp` construye la tabla predictiva y detecta conflictos
+- `Parser/syntax/ll1_parser.cpp` consume tokens usando la tabla predictiva
 
 ---
 
@@ -530,6 +531,282 @@ Comprueba tambien que:
 - se insertaron bien producciones normales
 - se insertaron bien producciones epsilon
 - la gramatica actual no genera conflictos LL(1)
+
+---
+
+**10. Parser LL(1)**
+
+[Parser/syntax/ll1_parser.hpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/syntax/ll1_parser.hpp)  
+[Parser/syntax/ll1_parser.cpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/syntax/ll1_parser.cpp)
+
+Esta capa usa:
+
+- `TokenList`
+- `Grammar`
+- tabla LL(1)
+
+para hacer parseo predictivo generico sin hardcodear producciones del lenguaje.
+
+Piezas principales:
+
+- `Ll1ParseResult`
+  Guarda una traza simple de la derivacion, es decir, las producciones aplicadas.
+
+- `Ll1Parser`
+  Implementa el algoritmo de pila LL(1).
+
+Metodos importantes:
+
+- `parse()`
+  Ejecuta el ciclo principal:
+  1. inicializa una pila con el simbolo inicial
+  2. mira el simbolo de arriba
+  3. si es terminal, intenta consumirlo
+  4. si es no terminal, consulta la tabla y expande
+  5. repite hasta vaciar la pila
+
+- `current_terminal()`
+  Convierte el token actual a su nombre terminal usando `token_name(...)`.
+
+- `is_terminal(...)`
+  Revisa si un simbolo pertenece a `grammar.terminals`.
+
+- `is_non_terminal(...)`
+  Revisa si un simbolo pertenece a `grammar.non_terminals`.
+
+- `match_terminal(...)`
+  Verifica que el lookahead actual coincida con el terminal esperado.
+
+- `select_production(...)`
+  Busca la produccion en `M[A, a]`.
+  Si no existe, lanza `ParseError`.
+
+Detalle importante:
+
+- `EOF_TOKEN` se trata como terminal logico de cierre.
+  El parser lo valida, pero no intenta avanzar despues de el.
+
+Todavia no construye CST.
+
+En esta fase solo:
+
+- reconoce con la tabla
+- valida entrada
+- registra la derivacion aplicada
+
+---
+
+**11. Cómo funciona `ll1_parser_smoke.cpp`**
+
+[Parser/tests/ll1_parser_smoke.cpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/tests/ll1_parser_smoke.cpp)
+
+Esta prueba:
+
+1. lee `grammar.ll1`
+2. calcula `FIRST/FOLLOW`
+3. construye la tabla LL(1)
+4. instancia `Ll1Parser`
+5. prueba un caso valido y uno invalido
+
+Checks principales:
+
+- `1 + 2 * 3;` debe aceptarse
+- `1 + ;` debe rechazarse con `ParseError`
+
+**Flujo real del caso valido**
+
+Tomemos esta entrada de prueba:
+
+```text
+1 + 2 * 3 ;
+```
+
+El `TokenList` equivalente es, conceptualmente:
+
+```text
+NUMBER_LITERAL PLUS NUMBER_LITERAL STAR NUMBER_LITERAL SEMICOLON EOF_TOKEN
+```
+
+El parser LL(1) no mira la cadena completa de una vez.
+
+Trabaja con dos cosas al mismo tiempo:
+
+1. una pila de simbolos gramaticales
+2. un lookahead, que es el token actual del `TokenStream`
+
+La pila empieza con:
+
+```text
+[ Program ]
+```
+
+Y el lookahead inicial es:
+
+```text
+NUMBER_LITERAL
+```
+
+Entonces el flujo es este:
+
+1. el tope de la pila es `Program`
+   No es terminal, asi que el parser consulta la tabla en `M[Program, NUMBER_LITERAL]`
+   La tabla devuelve:
+   `Program -> ExprStmt EOF_TOKEN`
+
+2. el parser saca `Program` de la pila y empuja el lado derecho al reves:
+
+```text
+[ EOF_TOKEN, ExprStmt ]
+```
+
+3. el tope ahora es `ExprStmt`
+   Consulta `M[ExprStmt, NUMBER_LITERAL]`
+   Obtiene:
+   `ExprStmt -> Expr SEMICOLON`
+
+4. empuja al reves:
+
+```text
+[ EOF_TOKEN, SEMICOLON, Expr ]
+```
+
+5. el tope es `Expr`
+   Consulta `M[Expr, NUMBER_LITERAL]`
+   Obtiene:
+   `Expr -> OrExpr`
+
+6. a partir de ahi pasa por la jerarquia de expresiones:
+   `OrExpr -> AndExpr OrExprTail`
+   `AndExpr -> CmpExpr AndExprTail`
+   `CmpExpr -> ConcatExpr CmpExprTail`
+   `ConcatExpr -> AddExpr ConcatExprTail`
+   `AddExpr -> MulExpr AddExprTail`
+   `MulExpr -> PowerExpr MulExprTail`
+   `PowerExpr -> UnaryExpr PowerExprTail`
+   `UnaryExpr -> Primary`
+   `Primary -> NUMBER_LITERAL`
+
+7. cuando el tope de la pila finalmente es el terminal `NUMBER_LITERAL`, el parser ya no expande nada:
+   compara el terminal esperado con el lookahead actual
+   como coinciden, consume el token `1`
+
+8. el nuevo lookahead pasa a ser `PLUS`
+   el parser sigue con los simbolos que quedaron en la pila, en particular los tails:
+   - `PowerExprTail`
+   - `MulExprTail`
+   - `AddExprTail`
+   etc.
+
+9. ahora la tabla decide si cada tail continua o se va por epsilon:
+   - `M[PowerExprTail, PLUS] = PowerExprTail -> ε`
+   - `M[MulExprTail, PLUS] = MulExprTail -> ε`
+   - `M[AddExprTail, PLUS] = AddExprTail -> PLUS MulExpr AddExprTail`
+
+   Eso significa:
+   - la potencia actual termino
+   - la multiplicacion actual termino
+   - pero la suma debe continuar
+
+10. como `AddExprTail` eligio la produccion con `PLUS`, el parser termina esperando el terminal `PLUS`, lo consume y sigue parseando el `MulExpr` de la derecha
+
+11. el mismo mecanismo se repite con `2 * 3`
+   Cuando el lookahead es `STAR`, la tabla elige:
+   `M[MulExprTail, STAR] = MulExprTail -> STAR PowerExpr MulExprTail`
+
+   Eso es exactamente lo que hace que `*` tenga mas precedencia que `+`:
+   el `MulExpr` del lado derecho de la suma sigue creciendo antes de que `AddExprTail` cierre
+
+12. cuando el lookahead pasa a `SEMICOLON`, la mayoria de tails se van por epsilon:
+   - `MulExprTail -> ε`
+   - `AddExprTail -> ε`
+   - `ConcatExprTail -> ε`
+   - `CmpExprTail -> ε`
+   - `AndExprTail -> ε`
+   - `OrExprTail -> ε`
+
+13. al terminar la expresion, la pila todavia contiene `SEMICOLON` y luego `EOF_TOKEN`
+   El parser consume `SEMICOLON`
+   Luego valida `EOF_TOKEN`
+
+14. cuando la pila queda vacia y no quedan tokens reales por consumir, el parseo termina con exito
+
+**Como decide el parser que la expresion es valida**
+
+La entrada es valida si durante todo el proceso pasan estas dos condiciones:
+
+1. para cada no terminal `A` y lookahead `a`, existe una entrada valida en la tabla `M[A, a]`
+2. para cada terminal esperado, el token actual coincide exactamente
+
+Si ambas cosas se cumplen hasta vaciar la pila, entonces la secuencia de tokens pertenece a la gramatica.
+
+Dicho de otra forma:
+
+- la tabla decide que produccion aplicar
+- el `TokenStream` decide si los terminales reales coinciden con lo esperado
+- la pila asegura que el orden de derivacion se respete
+
+**Como detecta que `1 + ;` es invalida**
+
+En el caso invalido:
+
+```text
+NUMBER_LITERAL PLUS SEMICOLON EOF_TOKEN
+```
+
+el parser logra consumir:
+
+- `NUMBER_LITERAL`
+- `PLUS`
+
+pero luego necesita comenzar el `MulExpr` que viene despues del `PLUS`.
+
+Eso obliga a bajar hasta algo como:
+
+- `MulExpr`
+- `PowerExpr`
+- `UnaryExpr`
+- `Primary`
+
+El problema es que el lookahead en ese momento es `SEMICOLON`.
+
+La tabla no tiene una entrada valida como:
+
+```text
+M[Primary, SEMICOLON]
+```
+
+porque una primaria no puede empezar con `;`.
+
+Entonces `select_production(...)` falla y lanza `ParseError`.
+
+Esa es exactamente la idea del parser LL(1):
+
+- si el lookahead no pertenece al conjunto de terminales validos para expandir un no terminal dado
+- entonces la entrada no puede derivarse desde la gramatica
+
+**Qué demuestra realmente esta prueba**
+
+Esta smoke test demuestra que ya funciona el ciclo completo:
+
+- tokens
+- gramática
+- FIRST/FOLLOW
+- tabla LL(1)
+- parser predictivo
+
+Y demuestra, además, algo importante sobre precedencia:
+
+- la validez de `1 + 2 * 3;` no depende de funciones hardcodeadas como `parse_add()` o `parse_mul()`
+- depende de que la gramatica LL(1) y la tabla resultante codifican correctamente la jerarquia de expresiones
+
+Eso comprueba que el parser LL(1) ya no solo tiene datos teoricos.
+
+Ya puede:
+
+- consultar la tabla
+- decidir expansiones
+- consumir tokens
+- fallar correctamente cuando el lookahead no permite ninguna produccion
 
 ---
 

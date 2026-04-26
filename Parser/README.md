@@ -23,6 +23,8 @@ El archivo central es:
 - `Parser/ast/expr.cpp`
 - `Parser/syntax/parser.hpp`
 - `Parser/syntax/parser.cpp`
+- `Parser/syntax/ll1_parser.hpp`
+- `Parser/syntax/ll1_parser.cpp`
 - `Parser/generator/production.hpp`
 - `Parser/generator/grammar_reader.hpp`
 - `Parser/generator/grammar_reader.cpp`
@@ -42,6 +44,7 @@ Ahi se define:
 - una secuencia navegable de tokens (`TokenStream`)
 - un AST minimo de expresiones (`Expr` y derivados)
 - un parser recursivo inicial para expresiones primarias (`Parser`)
+- un parser predictivo LL(1) generico (`Ll1Parser`)
 - una representacion interna de producciones LL(1)
 - un lector de `grammar.ll1`
 - calculo de conjuntos FIRST y FOLLOW
@@ -55,7 +58,7 @@ La carpeta `Parser/` ahora queda separada por responsabilidad:
 - `Parser/ast/`: nodos del AST del parser
 - `Parser/grammar/`: fuente formal de la gramatica LL(1)
 - `Parser/generator/`: lectura y procesamiento de la gramatica
-- `Parser/syntax/`: funciones y clases del parser recursivo
+- `Parser/syntax/`: parser recursivo manual y parser LL(1)
 - `Parser/tests/`: pruebas pequenas aisladas del parser
 - `Parser/README.md`, `Parser/plan_parser.md`, `Parser/explicacion.md`: documentacion y plan de trabajo
 
@@ -337,3 +340,25 @@ La prueba smoke de esta fase verifica:
 - celdas concretas para `Primary`
 - celdas concretas para `OrExprTail`
 - celdas concretas para `PowerExprTail`
+
+## Fase 8 del parser
+
+La fase 8 queda iniciada con:
+
+- `Parser/syntax/ll1_parser.hpp`
+- `Parser/syntax/ll1_parser.cpp`
+- `Parser/tests/ll1_parser_smoke.cpp`
+
+Estas piezas permiten:
+
+- consumir `TokenList` usando la tabla LL(1)
+- mapear `TokenType` al vocabulario terminal de la gramatica
+- expandir no terminales con lookahead
+- consumir terminales esperados
+- reportar errores sintacticos cuando no exista entrada valida en la tabla
+- guardar una derivacion simple de las producciones aplicadas
+
+La prueba smoke de esta fase verifica:
+
+- aceptacion de una expresion valida
+- rechazo de una expresion incompleta
