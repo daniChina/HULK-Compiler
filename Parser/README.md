@@ -23,6 +23,13 @@ El archivo central es:
 - `Parser/ast/expr.cpp`
 - `Parser/syntax/parser.hpp`
 - `Parser/syntax/parser.cpp`
+- `Parser/generator/production.hpp`
+- `Parser/generator/grammar_reader.hpp`
+- `Parser/generator/grammar_reader.cpp`
+- `Parser/generator/first_follow.hpp`
+- `Parser/generator/first_follow.cpp`
+- `Parser/generator/ll1_table.hpp`
+- `Parser/generator/ll1_table.cpp`
 - `Parser/tests/parser_phase2_smoke.cpp`
 
 Ahi se define:
@@ -35,6 +42,10 @@ Ahi se define:
 - una secuencia navegable de tokens (`TokenStream`)
 - un AST minimo de expresiones (`Expr` y derivados)
 - un parser recursivo inicial para expresiones primarias (`Parser`)
+- una representacion interna de producciones LL(1)
+- un lector de `grammar.ll1`
+- calculo de conjuntos FIRST y FOLLOW
+- construccion y validacion de la tabla LL(1)
 
 ## Organizacion actual
 
@@ -42,6 +53,8 @@ La carpeta `Parser/` ahora queda separada por responsabilidad:
 
 - `Parser/core/`: contrato de tokens, adaptador lexer -> parser, error sintactico y `TokenStream`
 - `Parser/ast/`: nodos del AST del parser
+- `Parser/grammar/`: fuente formal de la gramatica LL(1)
+- `Parser/generator/`: lectura y procesamiento de la gramatica
 - `Parser/syntax/`: funciones y clases del parser recursivo
 - `Parser/tests/`: pruebas pequenas aisladas del parser
 - `Parser/README.md`, `Parser/plan_parser.md`, `Parser/explicacion.md`: documentacion y plan de trabajo
@@ -222,3 +235,105 @@ Y cubre:
 - `-x;`
 - `(1 + 2) * 3;`
 - `2 ^ 3 ^ 4;`
+
+## Fase 4 del parser
+
+La fase 4 queda iniciada con una gramatica LL(1) formal en:
+
+- `Parser/grammar/grammar.ll1`
+
+Por ahora esa gramatica cubre exactamente el subconjunto ya validado en el parser manual:
+
+- una sentencia de expresion terminada en `SEMICOLON`
+- primarias
+- unarios
+- potencia con asociatividad derecha
+- multiplicacion y division
+- suma y resta
+- concatenacion
+- comparacion
+- `and`
+- `or`
+
+Las decisiones activas en esta primera version son:
+
+- los terminales usan exactamente los nombres de `Parser/core/token.hpp`
+- `ε` representa epsilon
+- la entrada actual es `Program -> ExprStmt EOF_TOKEN`
+
+El siguiente paso natural sobre esta base es implementar:
+
+- `Parser/generator/production.hpp`
+- `Parser/generator/grammar_reader.*`
+
+## Fase 5 del parser
+
+La fase 5 queda iniciada con:
+
+- `Parser/generator/production.hpp`
+- `Parser/generator/grammar_reader.hpp`
+- `Parser/generator/grammar_reader.cpp`
+- `Parser/tests/grammar_reader_smoke.cpp`
+
+Estas piezas permiten:
+
+- representar producciones LL(1) de forma neutral
+- cargar `grammar.ll1` desde archivo o stream
+- identificar simbolo inicial
+- separar no terminales y terminales
+- materializar epsilon como produccion con `rhs` vacio
+
+La prueba smoke de esta fase verifica:
+
+- lectura correcta del simbolo inicial
+- carga de producciones importantes
+- deteccion de terminales y no terminales
+- lectura correcta de alternativas epsilon
+
+## Fase 6 del parser
+
+La fase 6 queda iniciada con:
+
+- `Parser/generator/first_follow.hpp`
+- `Parser/generator/first_follow.cpp`
+- `Parser/tests/first_follow_smoke.cpp`
+
+Estas piezas permiten:
+
+- calcular `FIRST(X)` para simbolos terminales y no terminales
+- calcular `FIRST(alpha)` para secuencias de simbolos
+- calcular `FOLLOW(A)` para cada no terminal
+- manejar epsilon de forma explicita
+- dejar lista la informacion base para construir la tabla LL(1)
+
+La prueba smoke de esta fase verifica:
+
+- `FIRST(Primary)`
+- `FIRST(UnaryExpr)`
+- epsilon en `FIRST(OrExprTail)`
+- simbolos importantes dentro de `FOLLOW(Expr)`
+- simbolos importantes dentro de `FOLLOW(Primary)`
+- `FIRST` de una secuencia de simbolos
+
+## Fase 7 del parser
+
+La fase 7 queda iniciada con:
+
+- `Parser/generator/ll1_table.hpp`
+- `Parser/generator/ll1_table.cpp`
+- `Parser/tests/ll1_table_smoke.cpp`
+
+Estas piezas permiten:
+
+- construir la tabla predictiva `M[A, a]`
+- llenar celdas usando `FIRST(alpha)`
+- llenar celdas epsilon usando `FOLLOW(A)`
+- detectar conflictos cuando dos producciones compiten por la misma celda
+- dejar lista la informacion que consumira el parser LL(1)
+
+La prueba smoke de esta fase verifica:
+
+- ausencia de conflictos en la gramatica actual
+- celdas concretas para `Primary`
+- celdas concretas para `OrExprTail`
+- celdas concretas para `PowerExprTail`

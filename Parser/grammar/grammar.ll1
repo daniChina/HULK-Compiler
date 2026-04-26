@@ -1,0 +1,60 @@
+// Primera gramatica LL(1) formal del proyecto.
+// Alcance actual:
+// - expresiones
+// - precedencia de operadores
+// - asociatividad derecha para CARET
+// - una sentencia de expresion terminada en SEMICOLON
+//
+// Convenciones:
+// - Los terminales usan exactamente los nombres expuestos por Parser/core/token.hpp
+// - ε representa epsilon
+
+Program         -> ExprStmt EOF_TOKEN
+ExprStmt        -> Expr SEMICOLON
+
+Expr            -> OrExpr
+
+OrExpr          -> AndExpr OrExprTail
+OrExprTail      -> OR AndExpr OrExprTail | ε
+
+AndExpr         -> CmpExpr AndExprTail
+AndExprTail     -> AND CmpExpr AndExprTail | ε
+
+CmpExpr         -> ConcatExpr CmpExprTail
+CmpExprTail     -> LESS ConcatExpr CmpExprTail
+                | LESS_EQUAL ConcatExpr CmpExprTail
+                | GREATER ConcatExpr CmpExprTail
+                | GREATER_EQUAL ConcatExpr CmpExprTail
+                | EQUAL_EQUAL ConcatExpr CmpExprTail
+                | BANG_EQUAL ConcatExpr CmpExprTail
+                | ε
+
+ConcatExpr      -> AddExpr ConcatExprTail
+ConcatExprTail  -> CONCAT AddExpr ConcatExprTail
+                | CONCAT_WS AddExpr ConcatExprTail
+                | ε
+
+AddExpr         -> MulExpr AddExprTail
+AddExprTail     -> PLUS MulExpr AddExprTail
+                | MINUS MulExpr AddExprTail
+                | ε
+
+MulExpr         -> PowerExpr MulExprTail
+MulExprTail     -> STAR PowerExpr MulExprTail
+                | SLASH PowerExpr MulExprTail
+                | ε
+
+PowerExpr       -> UnaryExpr PowerExprTail
+PowerExprTail   -> CARET PowerExpr | ε
+
+UnaryExpr       -> MINUS UnaryExpr
+                | BANG UnaryExpr
+                | TILDE UnaryExpr
+                | Primary
+
+Primary         -> NUMBER_LITERAL
+                | STRING_LITERAL
+                | TRUE
+                | FALSE
+                | IDENTIFIER
+                | LPAREN Expr RPAREN
