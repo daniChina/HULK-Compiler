@@ -29,6 +29,7 @@ El archivo central es:
 - `Parser/syntax/parser.cpp`
 - `Parser/syntax/ll1_parser.hpp`
 - `Parser/syntax/ll1_parser.cpp`
+- `Compiler/main.cpp`
 - `Parser/generator/production.hpp`
 - `Parser/generator/grammar_reader.hpp`
 - `Parser/generator/grammar_reader.cpp`
@@ -51,6 +52,7 @@ Ahi se define:
 - conversion CST -> AST del subconjunto actual
 - un parser recursivo inicial para expresiones primarias (`Parser`)
 - un parser predictivo LL(1) generico (`Ll1Parser`)
+- un driver de extremo a extremo lexer -> parser -> CST/AST
 - una representacion interna de producciones LL(1)
 - un lector de `grammar.ll1`
 - calculo de conjuntos FIRST y FOLLOW
@@ -413,3 +415,30 @@ La prueba smoke de esta fase verifica:
 
 - conversion correcta de `1 + 2 * 3;`
 - conversion correcta de agrupacion y potencia
+
+## Flujo de extremo a extremo
+
+Ya existe un punto de entrada real para ejecutar:
+
+- lexer
+- lectura de gramatica
+- calculo de `FIRST/FOLLOW`
+- construccion de tabla LL(1)
+- parseo LL(1)
+- impresion opcional de tokens, CST y AST
+
+El driver vive en:
+
+- `Compiler/main.cpp`
+
+Uso general:
+
+```bash
+./hulk_parser [--tokens] [--cst] [--ast] [archivo.hulk]
+```
+
+Si no se pasa archivo, lee desde `stdin`.
+
+Un ejemplo minimo compatible con la gramatica actual vive en:
+
+- `Parser/tests/valid_expr_pipeline.hulk`

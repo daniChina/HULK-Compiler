@@ -17,6 +17,7 @@ El flujo actual es este:
 - `Parser/syntax/ll1_parser.cpp` consume tokens usando la tabla predictiva
 - `Parser/ast/cst_nodes.*` modela el CST y `Ll1Parser` lo construye durante el parseo
 - `Parser/ast/cst_to_ast.cpp` reduce el CST a un AST util para semantica
+- `Compiler/main.cpp` conecta todo el pipeline desde codigo HULK real
 
 ---
 
@@ -978,6 +979,51 @@ Eso demuestra que la conversion ya:
 - conserva precedencia
 - conserva agrupacion
 - conserva asociatividad correcta de la potencia
+
+---
+
+**17. Flujo de extremo a extremo**
+
+[Compiler/main.cpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Compiler/main.cpp)
+
+Este archivo es el primer punto de entrada real que une todas las piezas del proyecto.
+
+El flujo que ejecuta es:
+
+1. lee `Parser/grammar/grammar.ll1`
+2. calcula `FIRST/FOLLOW`
+3. construye la tabla LL(1)
+4. valida que no existan conflictos LL(1)
+5. tokeniza el codigo HULK de entrada con `tokenize_file(...)` o `tokenize_stream(...)`
+6. ejecuta `Ll1Parser`
+7. si el parseo fue exitoso, opcionalmente imprime:
+   - tokens
+   - CST
+   - AST
+
+Opciones disponibles:
+
+- `--tokens`
+- `--cst`
+- `--ast`
+
+Si no se pasa archivo, el driver lee desde `stdin`.
+
+Esto no significa que ya soporte todo HULK.
+
+Significa que ya existe un flujo real:
+
+- codigo fuente HULK
+- lexer
+- parser LL(1)
+- CST
+- AST
+
+para el subconjunto cubierto por la gramatica actual.
+
+Hay un ejemplo minimo compatible en:
+
+[Parser/tests/valid_expr_pipeline.hulk](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/tests/valid_expr_pipeline.hulk)
 
 ---
 
