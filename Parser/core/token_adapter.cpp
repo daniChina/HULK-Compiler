@@ -3,7 +3,7 @@
 #include <fstream>
 #include <stdexcept>
 
-#include "../Lexer/hulk_lexer.h"
+#include "../../Lexer/hulk_lexer.h"
 
 namespace parser {
 
