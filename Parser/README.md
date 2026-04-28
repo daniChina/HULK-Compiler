@@ -257,6 +257,7 @@ Por ahora esa gramatica cubre exactamente el subconjunto ya validado en el parse
 
 - una sentencia de expresion terminada en `SEMICOLON`
 - primarias
+- postfix encadenado (`call` y acceso con `.`)
 - unarios
 - potencia con asociatividad derecha
 - multiplicacion y division
@@ -321,6 +322,7 @@ La prueba smoke de esta fase verifica:
 
 - `FIRST(Primary)`
 - `FIRST(UnaryExpr)`
+- `FIRST(PostfixTail)` con `LPAREN`, `DOT` y epsilon
 - epsilon en `FIRST(OrExprTail)`
 - simbolos importantes dentro de `FOLLOW(Expr)`
 - simbolos importantes dentro de `FOLLOW(Primary)`
@@ -348,6 +350,7 @@ La prueba smoke de esta fase verifica:
 - celdas concretas para `Primary`
 - celdas concretas para `OrExprTail`
 - celdas concretas para `PowerExprTail`
+- celdas concretas para `PostfixTail`
 
 ## Fase 8 del parser
 
@@ -410,6 +413,12 @@ Estas piezas permiten:
 - eliminar nodos puramente sintacticos como `Expr`, `Tail`, `SEMICOLON` y `EOF_TOKEN`
 - reconstruir precedencia y asociatividad desde la forma del CST
 - obtener nodos `NumberExpr`, `StringExpr`, `BoolExpr`, `IdentifierExpr`, `GroupedExpr`, `UnaryExpr` y `BinaryExpr`
+- aceptar `PostfixExpr` en el CST sin romper las conversiones anteriores del AST
+
+Nota activa:
+
+- los sufijos postfix nuevos (`call` y acceso con `.`) ya existen en `grammar.ll1`
+- la conversion CST -> AST para esos sufijos se completa en el siguiente paso de la iteracion 1
 
 La prueba smoke de esta fase verifica:
 

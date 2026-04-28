@@ -264,6 +264,7 @@ Qué contiene:
   - `MulExpr`
   - `PowerExpr`
   - `UnaryExpr`
+  - `PostfixExpr`
   - `Primary`
 
 Patrón importante:
@@ -443,6 +444,7 @@ Checks principales:
 
 - `FIRST(Primary)` contiene todos los inicios validos de una primaria
 - `FIRST(UnaryExpr)` contiene operadores unarios y tambien los inicios de `Primary`
+- `FIRST(PostfixTail)` contiene `LPAREN`, `DOT` y epsilon
 - `FIRST(OrExprTail)` contiene epsilon
 - `FOLLOW(Expr)` contiene `SEMICOLON`, `RPAREN` y `EOF_TOKEN`
 - `FOLLOW(Primary)` contiene operadores y cierres que pueden venir despues de una primaria
@@ -526,6 +528,8 @@ Checks principales:
 - `M[OrExprTail, SEMICOLON] = OrExprTail -> ε`
 - `M[PowerExprTail, CARET] = PowerExprTail -> CARET PowerExpr`
 - `M[PowerExprTail, PLUS] = PowerExprTail -> ε`
+- `M[PostfixTail, LPAREN] = PostfixTail -> LPAREN ArgListOpt RPAREN PostfixTail`
+- `M[PostfixTail, DOT] = PostfixTail -> DOT IDENTIFIER PostfixTail`
 
 Eso no solo comprueba que la tabla existe.
 
@@ -947,8 +951,10 @@ Detalles importantes:
 - los nodos terminales aportan los `Token` reales para construir los nodos del AST
 - `PowerExprTail` conserva asociatividad derecha porque reconstruye el lado derecho como `PowerExpr` completo
 - `Primary -> LPAREN Expr RPAREN` se convierte en `GroupedExpr`
+- `PostfixExpr` ya es reconocido por la conversion para no romper el AST anterior
+- los sufijos postfix (`LPAREN ... RPAREN`, `DOT IDENTIFIER`) quedan marcados como siguiente extension del AST
 
-En esta fase la conversion cubre exactamente el subconjunto que ya existe en `grammar.ll1`.
+En esta fase la conversion cubre completamente el subconjunto previo y deja preparado el salto a llamadas/postfix.
 
 ---
 

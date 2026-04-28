@@ -46,6 +46,8 @@ ExprPtr build_mul_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_power_expr(const CstNode& node);
 ExprPtr build_power_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_unary_expr(const CstNode& node);
+ExprPtr build_postfix_expr(const CstNode& node);
+ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_primary(const CstNode& node);
 
 ExprPtr build_expr_stmt(const CstNode& node) {
@@ -188,12 +190,34 @@ ExprPtr build_unary_expr(const CstNode& node) {
     expect_symbol(node, "UnaryExpr");
 
     if (node.children.size() == 1) {
-        return build_primary(child(node, 0));
+        const auto& only_child = child(node, 0);
+        if (only_child.symbol == "PostfixExpr") {
+            return build_postfix_expr(only_child);
+        }
+        return build_primary(only_child);
     }
 
     Token op = child(node, 0).token;
     auto right = build_unary_expr(child(node, 1));
     return std::make_unique<UnaryExpr>(std::move(op), std::move(right));
+}
+
+ExprPtr build_postfix_expr(const CstNode& node) {
+    expect_symbol(node, "PostfixExpr");
+    auto left = build_primary(child(node, 0));
+    return build_postfix_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "PostfixTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    // La fase actual solo necesitaba abrir el nivel PostfixExpr sin romper el AST existente.
+    // Los nodos AST de llamadas/acceso de miembro se agregan en el siguiente paso de iteracion 1.
+    throw std::runtime_error(
+        "Conversion CST -> AST para sufijos postfix aun no implementada");
 }
 
 ExprPtr build_primary(const CstNode& node) {

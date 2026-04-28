@@ -97,6 +97,30 @@ int main() {
                 "PowerExprTail -> ε"),
             "M[PowerExprTail, PLUS] uses epsilon after a power expression");
 
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "PostfixTail",
+                "LPAREN",
+                "PostfixTail -> LPAREN ArgListOpt RPAREN PostfixTail"),
+            "M[PostfixTail, LPAREN] uses call suffix production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "PostfixTail",
+                "DOT",
+                "PostfixTail -> DOT IDENTIFIER PostfixTail"),
+            "M[PostfixTail, DOT] uses member suffix production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "PostfixTail",
+                "STAR",
+                "PostfixTail -> ε"),
+            "M[PostfixTail, STAR] uses epsilon after completing postfix chain");
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] LL(1) table smoke threw exception: " << error.what() << "\n";

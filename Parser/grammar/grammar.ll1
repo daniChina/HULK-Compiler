@@ -50,7 +50,18 @@ PowerExprTail   -> CARET PowerExpr | ε
 UnaryExpr       -> MINUS UnaryExpr
                 | BANG UnaryExpr
                 | TILDE UnaryExpr
-                | Primary
+                | PostfixExpr
+
+PostfixExpr     -> Primary PostfixTail
+PostfixTail     -> LPAREN ArgListOpt RPAREN PostfixTail
+                | DOT IDENTIFIER PostfixTail
+                | ε
+
+ArgListOpt      -> ArgList
+                | ε
+ArgList         -> Expr ArgListTail
+ArgListTail     -> COMMA Expr ArgListTail
+                | ε
 
 Primary         -> NUMBER_LITERAL
                 | STRING_LITERAL

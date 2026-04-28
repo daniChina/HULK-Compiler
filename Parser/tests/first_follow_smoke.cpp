@@ -51,6 +51,12 @@ int main() {
             "FIRST(UnaryExpr) contains unary operators and primary starters");
 
         ok &= expect(
+            contains_all(
+                first_follow.first_sets.at("PostfixTail"),
+                {"LPAREN", "DOT", parser::generator::kEpsilonSymbol}),
+            "FIRST(PostfixTail) contains call, member access and epsilon");
+
+        ok &= expect(
             first_follow.first_sets.at("OrExprTail").count(parser::generator::kEpsilonSymbol) == 1,
             "FIRST(OrExprTail) contains epsilon");
 
@@ -69,9 +75,15 @@ int main() {
         ok &= expect(
             contains_all(
                 first_follow.follow_sets.at("Primary"),
-                {"CARET", "STAR", "SLASH", "PLUS", "MINUS", "CONCAT", "CONCAT_WS", "LESS", "LESS_EQUAL",
+                {"LPAREN", "DOT", "CARET", "STAR", "SLASH", "PLUS", "MINUS", "CONCAT", "CONCAT_WS", "LESS", "LESS_EQUAL",
                  "GREATER", "GREATER_EQUAL", "EQUAL_EQUAL", "BANG_EQUAL", "AND", "OR", "SEMICOLON", "RPAREN"}),
             "FOLLOW(Primary) contains the expected operator and closing symbols");
+
+        ok &= expect(
+            contains_all(
+                first_follow.follow_sets.at("Expr"),
+                {"COMMA", "RPAREN", "SEMICOLON"}),
+            "FOLLOW(Expr) contains separators used in calls and statements");
 
         {
             const auto first_sequence = parser::generator::compute_first_of_sequence(
