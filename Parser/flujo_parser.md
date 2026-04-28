@@ -16,6 +16,7 @@ El flujo actual es este:
 - `Parser/generator/ll1_table.cpp` construye la tabla predictiva y detecta conflictos
 - `Parser/syntax/ll1_parser.cpp` consume tokens usando la tabla predictiva
 - `Parser/ast/cst_nodes.*` modela el CST y `Ll1Parser` lo construye durante el parseo
+- `Parser/ast/cst_to_ast.cpp` reduce el CST a un AST util para semantica
 
 ---
 
@@ -903,6 +904,80 @@ Esto ya demuestra que el parser generado no solo decide producciones correctamen
 Tambien deja una estructura de arbol util para la futura fase de conversion:
 
 - `CST -> AST`
+
+---
+
+**15. Conversión `CST -> AST`**
+
+[Parser/ast/cst_to_ast.hpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/ast/cst_to_ast.hpp)  
+[Parser/ast/cst_to_ast.cpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/ast/cst_to_ast.cpp)
+
+Esta capa toma el arbol de derivacion literal y lo reduce a la estructura semantica de expresiones.
+
+La idea central es:
+
+- el CST conserva exactamente la forma de la gramatica
+- el AST elimina nodos de ayuda como `Expr`, `OrExprTail`, `MulExprTail`, `SEMICOLON`, `EOF_TOKEN`
+
+Piezas importantes:
+
+- `cst_to_ast(...)`
+  Punto de entrada. Espera una raiz `Program` y devuelve el AST de la expresion principal.
+
+- helpers `build_*`
+  Hay una funcion por no terminal relevante del subconjunto actual:
+  - `build_expr`
+  - `build_or_expr`
+  - `build_and_expr`
+  - `build_cmp_expr`
+  - `build_concat_expr`
+  - `build_add_expr`
+  - `build_mul_expr`
+  - `build_power_expr`
+  - `build_unary_expr`
+  - `build_primary`
+
+- helpers `build_*_tail`
+  Recorren los nodos `Tail` del CST y reconstruyen las operaciones binarias acumuladas.
+
+Detalles importantes:
+
+- los nodos epsilon del CST no aparecen en el AST final
+- los nodos terminales aportan los `Token` reales para construir los nodos del AST
+- `PowerExprTail` conserva asociatividad derecha porque reconstruye el lado derecho como `PowerExpr` completo
+- `Primary -> LPAREN Expr RPAREN` se convierte en `GroupedExpr`
+
+En esta fase la conversion cubre exactamente el subconjunto que ya existe en `grammar.ll1`.
+
+---
+
+**16. Cómo funciona `cst_to_ast_smoke.cpp`**
+
+[Parser/tests/cst_to_ast_smoke.cpp](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Parser/tests/cst_to_ast_smoke.cpp)
+
+Esta prueba:
+
+1. lee la gramatica
+2. calcula `FIRST/FOLLOW`
+3. construye la tabla LL(1)
+4. ejecuta el parser LL(1) para obtener el CST
+5. convierte el CST al AST
+6. compara el AST final con la forma esperada usando `expr_to_string(...)`
+
+Checks principales:
+
+- `1 + 2 * 3;` debe producir:
+  `Binary(Number(1), +, Binary(Number(2), *, Number(3)))`
+
+- `(2 + 3) ^ 4;` debe producir:
+  `Binary(Grouped(Binary(Number(2), +, Number(3))), ^, Number(4))`
+
+Eso demuestra que la conversion ya:
+
+- elimina ruido sintactico del CST
+- conserva precedencia
+- conserva agrupacion
+- conserva asociatividad correcta de la potencia
 
 ---
 

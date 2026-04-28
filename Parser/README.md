@@ -23,6 +23,8 @@ El archivo central es:
 - `Parser/ast/expr.cpp`
 - `Parser/ast/cst_nodes.hpp`
 - `Parser/ast/cst_nodes.cpp`
+- `Parser/ast/cst_to_ast.hpp`
+- `Parser/ast/cst_to_ast.cpp`
 - `Parser/syntax/parser.hpp`
 - `Parser/syntax/parser.cpp`
 - `Parser/syntax/ll1_parser.hpp`
@@ -46,6 +48,7 @@ Ahi se define:
 - una secuencia navegable de tokens (`TokenStream`)
 - un AST minimo de expresiones (`Expr` y derivados)
 - nodos de CST para el parser generado
+- conversion CST -> AST del subconjunto actual
 - un parser recursivo inicial para expresiones primarias (`Parser`)
 - un parser predictivo LL(1) generico (`Ll1Parser`)
 - una representacion interna de producciones LL(1)
@@ -390,3 +393,23 @@ La prueba smoke de esta fase verifica:
 - presencia de nodos intermedios como `ExprStmt`
 - almacenamiento del token consumido en un nodo terminal
 - rechazo correcto del caso sintacticamente invalido
+
+## Fase 10 del parser
+
+La fase 10 queda iniciada con:
+
+- `Parser/ast/cst_to_ast.hpp`
+- `Parser/ast/cst_to_ast.cpp`
+- `Parser/tests/cst_to_ast_smoke.cpp`
+
+Estas piezas permiten:
+
+- convertir la raiz `Program` del CST al AST de expresiones ya existente
+- eliminar nodos puramente sintacticos como `Expr`, `Tail`, `SEMICOLON` y `EOF_TOKEN`
+- reconstruir precedencia y asociatividad desde la forma del CST
+- obtener nodos `NumberExpr`, `StringExpr`, `BoolExpr`, `IdentifierExpr`, `GroupedExpr`, `UnaryExpr` y `BinaryExpr`
+
+La prueba smoke de esta fase verifica:
+
+- conversion correcta de `1 + 2 * 3;`
+- conversion correcta de agrupacion y potencia
