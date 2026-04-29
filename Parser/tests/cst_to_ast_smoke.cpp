@@ -86,6 +86,52 @@ int main() {
                 "CST converts grouped expression and power to the expected AST");
         }
 
+        {
+            // Caso valido postfix: llamada simple con argumentos.
+            TokenList tokens = {
+                make_token(TokenType::IDENTIFIER, "f", 1),
+                make_token(TokenType::LPAREN, "(", 2),
+                make_token(TokenType::NUMBER_LITERAL, "1", 3),
+                make_token(TokenType::COMMA, ",", 4),
+                make_token(TokenType::NUMBER_LITERAL, "2", 5),
+                make_token(TokenType::RPAREN, ")", 6),
+                make_token(TokenType::SEMICOLON, ";", 7),
+                make_token(TokenType::EOF_TOKEN, "", 8),
+            };
+
+            parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
+            const auto parse_result = parser.parse();
+            auto ast = parser::cst_to_ast(*parse_result.cst_root);
+
+            ok &= expect(
+                parser::expr_to_string(*ast) ==
+                    "Call(Identifier(f), [Number(1), Number(2)])",
+                "CST converts function call postfix to CallExpr AST");
+        }
+
+        {
+            // Caso valido postfix encadenado: acceso + llamada.
+            TokenList tokens = {
+                make_token(TokenType::IDENTIFIER, "a", 1),
+                make_token(TokenType::DOT, ".", 2),
+                make_token(TokenType::IDENTIFIER, "b", 3),
+                make_token(TokenType::LPAREN, "(", 4),
+                make_token(TokenType::IDENTIFIER, "c", 5),
+                make_token(TokenType::RPAREN, ")", 6),
+                make_token(TokenType::SEMICOLON, ";", 7),
+                make_token(TokenType::EOF_TOKEN, "", 8),
+            };
+
+            parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
+            const auto parse_result = parser.parse();
+            auto ast = parser::cst_to_ast(*parse_result.cst_root);
+
+            ok &= expect(
+                parser::expr_to_string(*ast) ==
+                    "Call(GetAttr(Identifier(a), b), [Identifier(c)])",
+                "CST converts member access + call chain to nested AST");
+        }
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] CST to AST smoke threw exception: " << error.what() << "\n";

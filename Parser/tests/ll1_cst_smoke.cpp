@@ -101,6 +101,30 @@ int main() {
             }
         }
 
+        {
+            // Caso valido postfix: a.b(c); debe reflejar PostfixExpr y sufijos en el CST.
+            TokenList tokens = {
+                make_token(TokenType::IDENTIFIER, "a", 1),
+                make_token(TokenType::DOT, ".", 2),
+                make_token(TokenType::IDENTIFIER, "b", 3),
+                make_token(TokenType::LPAREN, "(", 4),
+                make_token(TokenType::IDENTIFIER, "c", 5),
+                make_token(TokenType::RPAREN, ")", 6),
+                make_token(TokenType::SEMICOLON, ";", 7),
+                make_token(TokenType::EOF_TOKEN, "", 8),
+            };
+
+            parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
+            const auto result = parser.parse();
+
+            ok &= expect(find_symbol(*result.cst_root, "PostfixExpr") != nullptr,
+                         "CST contains PostfixExpr for postfix chains");
+            ok &= expect(find_symbol(*result.cst_root, "DOT") != nullptr,
+                         "CST contains DOT terminal for member access");
+            ok &= expect(find_symbol(*result.cst_root, "LPAREN") != nullptr,
+                         "CST contains LPAREN terminal for call suffix");
+        }
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] LL(1) CST smoke threw exception: " << error.what() << "\n";

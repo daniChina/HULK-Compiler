@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 #include "../generator/production.hpp"
 
@@ -49,6 +50,9 @@ ExprPtr build_unary_expr(const CstNode& node);
 ExprPtr build_postfix_expr(const CstNode& node);
 ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_primary(const CstNode& node);
+std::vector<ExprPtr> build_arg_list_opt(const CstNode& node);
+std::vector<ExprPtr> build_arg_list(const CstNode& node);
+void append_arg_list_tail(const CstNode& node, std::vector<ExprPtr>& args);
 
 ExprPtr build_expr_stmt(const CstNode& node) {
     expect_symbol(node, "ExprStmt");
@@ -214,10 +218,47 @@ ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node) {
         return left;
     }
 
-    // La fase actual solo necesitaba abrir el nivel PostfixExpr sin romper el AST existente.
-    // Los nodos AST de llamadas/acceso de miembro se agregan en el siguiente paso de iteracion 1.
-    throw std::runtime_error(
-        "Conversion CST -> AST para sufijos postfix aun no implementada");
+    if (child(node, 0).symbol == "LPAREN") {
+        Token lparen = child(node, 0).token;
+        auto args = build_arg_list_opt(child(node, 1));
+        auto call = std::make_unique<CallExpr>(std::move(left), std::move(lparen), std::move(args));
+        return build_postfix_tail(std::move(call), child(node, 3));
+    }
+
+    if (child(node, 0).symbol == "DOT") {
+        Token dot = child(node, 0).token;
+        Token name = child(node, 1).token;
+        auto access = std::make_unique<GetAttrExpr>(std::move(left), std::move(dot), std::move(name));
+        return build_postfix_tail(std::move(access), child(node, 2));
+    }
+
+    throw std::runtime_error("Forma de PostfixTail no soportada en la conversion CST -> AST");
+}
+
+std::vector<ExprPtr> build_arg_list_opt(const CstNode& node) {
+    expect_symbol(node, "ArgListOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return {};
+    }
+    return build_arg_list(child(node, 0));
+}
+
+std::vector<ExprPtr> build_arg_list(const CstNode& node) {
+    expect_symbol(node, "ArgList");
+    std::vector<ExprPtr> args;
+    args.push_back(build_expr(child(node, 0)));
+    append_arg_list_tail(child(node, 1), args);
+    return args;
+}
+
+void append_arg_list_tail(const CstNode& node, std::vector<ExprPtr>& args) {
+    expect_symbol(node, "ArgListTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+
+    args.push_back(build_expr(child(node, 1)));
+    append_arg_list_tail(child(node, 2), args);
 }
 
 ExprPtr build_primary(const CstNode& node) {
