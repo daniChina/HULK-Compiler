@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "../core/token.hpp"
 
@@ -14,7 +15,9 @@ enum class ExprKind {
     IDENTIFIER,
     GROUPED,
     UNARY,
-    BINARY
+    BINARY,
+    CALL,
+    GET_ATTR
 };
 
 struct Expr {
@@ -71,6 +74,22 @@ struct BinaryExpr final : Expr {
     ExprPtr left;
     Token op;
     ExprPtr right;
+};
+
+struct CallExpr final : Expr {
+    CallExpr(ExprPtr callee, Token lparen, std::vector<ExprPtr> args);
+
+    ExprPtr callee;
+    Token lparen;
+    std::vector<ExprPtr> args;
+};
+
+struct GetAttrExpr final : Expr {
+    GetAttrExpr(ExprPtr object, Token dot, Token name);
+
+    ExprPtr object;
+    Token dot;
+    Token name;
 };
 
 std::string expr_to_string(const Expr& expr);

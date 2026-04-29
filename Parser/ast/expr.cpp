@@ -1,5 +1,6 @@
 #include "expr.hpp"
 
+#include <sstream>
 #include <utility>
 
 namespace parser {
@@ -32,6 +33,18 @@ BinaryExpr::BinaryExpr(ExprPtr left, Token op, ExprPtr right)
       op(std::move(op)),
       right(std::move(right)) {}
 
+CallExpr::CallExpr(ExprPtr callee, Token lparen, std::vector<ExprPtr> args)
+    : Expr(ExprKind::CALL),
+      callee(std::move(callee)),
+      lparen(std::move(lparen)),
+      args(std::move(args)) {}
+
+GetAttrExpr::GetAttrExpr(ExprPtr object, Token dot, Token name)
+    : Expr(ExprKind::GET_ATTR),
+      object(std::move(object)),
+      dot(std::move(dot)),
+      name(std::move(name)) {}
+
 std::string expr_to_string(const Expr& expr) {
     switch (expr.kind) {
         case ExprKind::NUMBER: {
@@ -62,6 +75,24 @@ std::string expr_to_string(const Expr& expr) {
             const auto& binary = static_cast<const BinaryExpr&>(expr);
             return "Binary(" + expr_to_string(*binary.left) + ", " + binary.op.lexeme +
                    ", " + expr_to_string(*binary.right) + ")";
+        }
+        case ExprKind::CALL: {
+            const auto& call = static_cast<const CallExpr&>(expr);
+            std::ostringstream out;
+            out << "Call(" << expr_to_string(*call.callee) << ", [";
+            for (std::size_t i = 0; i < call.args.size(); ++i) {
+                if (i > 0) {
+                    out << ", ";
+                }
+                out << expr_to_string(*call.args[i]);
+            }
+            out << "])";
+            return out.str();
+        }
+        case ExprKind::GET_ATTR: {
+            const auto& get_attr = static_cast<const GetAttrExpr&>(expr);
+            return "GetAttr(" + expr_to_string(*get_attr.object) + ", " +
+                   get_attr.name.lexeme + ")";
         }
     }
 
