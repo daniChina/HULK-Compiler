@@ -9,12 +9,14 @@ verificar CST
 verificar conversion a AST
 
 Estado actual:
-- Iteracion 1 en progreso.
+- Iteracion 1 completada.
 - Paso 1 (actualizar `grammar.ll1`) completado.
 - Paso 2 (recalcular `FIRST/FOLLOW`) completado con smoke test.
 - Paso 3 (reconstruir tabla LL(1)) validado sin conflictos.
 - Gramatica de postfix cerrada en forma LL(1): `DOT IDENTIFIER` y `LPAREN ... RPAREN` como sufijos encadenables.
-- Pasos 4, 5 y 6 pendientes en esta iteracion.
+- Paso 4 (verificar parseo predictivo) completado con casos postfix validos e invalidos.
+- Paso 5 (verificar CST) completado con chequeos de `PostfixExpr`, `DOT` y `LPAREN`.
+- Paso 6 (verificar conversion a AST) completado con `CallExpr` y `GetAttrExpr`.
 
 
 Iteración 1 — llamadas y postfix (tu punto 1)

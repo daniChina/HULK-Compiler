@@ -373,6 +373,8 @@ La prueba smoke de esta fase verifica:
 
 - aceptacion de una expresion valida
 - rechazo de una expresion incompleta
+- aceptacion de una cadena postfix valida (`a.b(c);`)
+- rechazo de un postfix mal formado (`a.;`)
 
 ## Fase 9 del parser
 
@@ -398,6 +400,7 @@ La prueba smoke de esta fase verifica:
 - presencia de nodos intermedios como `ExprStmt`
 - almacenamiento del token consumido en un nodo terminal
 - rechazo correcto del caso sintacticamente invalido
+- presencia de nodos `PostfixExpr`, `DOT` y `LPAREN` en una cadena postfix
 
 ## Fase 10 del parser
 
@@ -412,18 +415,15 @@ Estas piezas permiten:
 - convertir la raiz `Program` del CST al AST de expresiones ya existente
 - eliminar nodos puramente sintacticos como `Expr`, `Tail`, `SEMICOLON` y `EOF_TOKEN`
 - reconstruir precedencia y asociatividad desde la forma del CST
-- obtener nodos `NumberExpr`, `StringExpr`, `BoolExpr`, `IdentifierExpr`, `GroupedExpr`, `UnaryExpr` y `BinaryExpr`
-- aceptar `PostfixExpr` en el CST sin romper las conversiones anteriores del AST
-
-Nota activa:
-
-- los sufijos postfix nuevos (`call` y acceso con `.`) ya existen en `grammar.ll1`
-- la conversion CST -> AST para esos sufijos se completa en el siguiente paso de la iteracion 1
+- obtener nodos `NumberExpr`, `StringExpr`, `BoolExpr`, `IdentifierExpr`, `GroupedExpr`, `UnaryExpr`, `BinaryExpr`, `CallExpr` y `GetAttrExpr`
+- convertir cadenas postfix del CST (`(...)` y `.IDENTIFIER`) a AST real
 
 La prueba smoke de esta fase verifica:
 
 - conversion correcta de `1 + 2 * 3;`
 - conversion correcta de agrupacion y potencia
+- conversion correcta de llamada `f(1, 2);`
+- conversion correcta de cadena `a.b(c);`
 
 ## Flujo de extremo a extremo
 

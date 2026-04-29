@@ -75,6 +75,43 @@ int main() {
             }
         }
 
+        {
+            // Caso valido: cadena postfix con acceso y llamada a metodo: a.b(c);
+            TokenList tokens = {
+                make_token(TokenType::IDENTIFIER, "a", 1),
+                make_token(TokenType::DOT, ".", 2),
+                make_token(TokenType::IDENTIFIER, "b", 3),
+                make_token(TokenType::LPAREN, "(", 4),
+                make_token(TokenType::IDENTIFIER, "c", 5),
+                make_token(TokenType::RPAREN, ")", 6),
+                make_token(TokenType::SEMICOLON, ";", 7),
+                make_token(TokenType::EOF_TOKEN, "", 8),
+            };
+
+            parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
+            const auto result = parser.parse();
+            ok &= expect(!result.derivation.empty(), "LL(1) parser accepts chained postfix expression");
+        }
+
+        {
+            // Caso invalido postfix: a. ; falta identificador miembro tras DOT.
+            TokenList tokens = {
+                make_token(TokenType::IDENTIFIER, "a", 1),
+                make_token(TokenType::DOT, ".", 2),
+                make_token(TokenType::SEMICOLON, ";", 3),
+                make_token(TokenType::EOF_TOKEN, "", 4),
+            };
+
+            try {
+                parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
+                const auto result = parser.parse();
+                (void)result;
+                ok &= expect(false, "LL(1) parser rejects malformed postfix member access");
+            } catch (const parser::ParseError&) {
+                ok &= expect(true, "LL(1) parser rejects malformed postfix member access");
+            }
+        }
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] LL(1) parser smoke threw exception: " << error.what() << "\n";

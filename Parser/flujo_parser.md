@@ -593,6 +593,11 @@ Detalle importante:
 - `EOF_TOKEN` se trata como terminal logico de cierre.
   El parser lo valida, pero no intenta avanzar despues de el.
 
+En la iteracion 1 de postfix, este parser ya valida casos reales como:
+
+- `a.b(c);`
+- rechazo de `a.;`
+
 Desde la fase 9, ademas de reconocer con la tabla:
 
 - valida entrada
@@ -951,10 +956,11 @@ Detalles importantes:
 - los nodos terminales aportan los `Token` reales para construir los nodos del AST
 - `PowerExprTail` conserva asociatividad derecha porque reconstruye el lado derecho como `PowerExpr` completo
 - `Primary -> LPAREN Expr RPAREN` se convierte en `GroupedExpr`
-- `PostfixExpr` ya es reconocido por la conversion para no romper el AST anterior
-- los sufijos postfix (`LPAREN ... RPAREN`, `DOT IDENTIFIER`) quedan marcados como siguiente extension del AST
+- `PostfixTail -> LPAREN ArgListOpt RPAREN ...` se convierte en `CallExpr`
+- `PostfixTail -> DOT IDENTIFIER ...` se convierte en `GetAttrExpr`
+- una cadena como `a.b(c)` se reconstruye como `Call(GetAttr(Identifier(a), b), [Identifier(c)])`
 
-En esta fase la conversion cubre completamente el subconjunto previo y deja preparado el salto a llamadas/postfix.
+En esta fase la conversion cubre el subconjunto anterior y tambien llamadas/postfix de la iteracion 1.
 
 ---
 
@@ -978,6 +984,12 @@ Checks principales:
 
 - `(2 + 3) ^ 4;` debe producir:
   `Binary(Grouped(Binary(Number(2), +, Number(3))), ^, Number(4))`
+
+- `f(1,2);` debe producir:
+  `Call(Identifier(f), [Number(1), Number(2)])`
+
+- `a.b(c);` debe producir:
+  `Call(GetAttr(Identifier(a), b), [Identifier(c)])`
 
 Eso demuestra que la conversion ya:
 
