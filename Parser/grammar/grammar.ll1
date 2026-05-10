@@ -9,7 +9,13 @@
 // - Los terminales usan exactamente los nombres expuestos por Parser/core/token.hpp
 // - ε representa epsilon
 
-Program         -> ExprStmt EOF_TOKEN
+Program         -> StmtList EOF_TOKEN
+
+StmtList        -> Stmt StmtList
+                | ε
+
+Stmt            -> ExprStmt
+
 ExprStmt        -> Expr SEMICOLON
 
 Expr            -> IfExpr

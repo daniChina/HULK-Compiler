@@ -66,9 +66,18 @@ std::vector<ExprPtr> build_arg_list_opt(const CstNode& node);
 std::vector<ExprPtr> build_arg_list(const CstNode& node);
 void append_arg_list_tail(const CstNode& node, std::vector<ExprPtr>& args);
 
-ExprPtr build_expr_stmt(const CstNode& node) {
+void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts);
+StmtPtr build_stmt(const CstNode& node);
+StmtPtr build_expr_stmt(const CstNode& node);
+
+StmtPtr build_stmt(const CstNode& node) {
+    expect_symbol(node, "Stmt");
+    return build_expr_stmt(child(node, 0));
+}
+
+StmtPtr build_expr_stmt(const CstNode& node) {
     expect_symbol(node, "ExprStmt");
-    return build_expr(child(node, 0));
+    return std::make_unique<ExprStmt>(build_expr(child(node, 0)));
 }
 
 ExprPtr build_expr(const CstNode& node) {
@@ -427,11 +436,22 @@ void extract_block_list(const CstNode& node, std::vector<ExprPtr>& exprs) {
     extract_block_list(child(node, 2), exprs);
 }
 
+void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts) {
+    expect_symbol(node, "StmtList");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+    stmts.push_back(build_stmt(child(node, 0)));
+    extract_stmt_list(child(node, 1), stmts);
+}
+
 }  // namespace
 
-ExprPtr cst_to_ast(const CstNode& root) {
+ProgramPtr cst_to_ast(const CstNode& root) {
     expect_symbol(root, "Program");
-    return build_expr_stmt(child(root, 0));
+    auto prog = std::make_unique<Program>();
+    extract_stmt_list(child(root, 0), prog->stmts);
+    return prog;
 }
 
 }  // namespace parser

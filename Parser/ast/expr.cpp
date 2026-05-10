@@ -5,6 +5,29 @@
 
 namespace parser {
 
+ExprStmt::ExprStmt(ExprPtr expr)
+    : Stmt(StmtKind::EXPR), expr(std::move(expr)) {}
+
+std::string stmt_to_string(const Stmt& stmt) {
+    switch (stmt.stmt_kind) {
+        case StmtKind::EXPR: {
+            const auto& expr_stmt = static_cast<const ExprStmt&>(stmt);
+            return "ExprStmt(" + expr_to_string(*expr_stmt.expr) + ")";
+        }
+    }
+    return "Stmt(?)";
+}
+
+std::string program_to_string(const Program& prog) {
+    std::ostringstream out;
+    out << "Program(\n";
+    for (const auto& stmt : prog.stmts) {
+        out << "  " << stmt_to_string(*stmt) << "\n";
+    }
+    out << ")";
+    return out.str();
+}
+
 NumberExpr::NumberExpr(Token token)
     : Expr(ExprKind::NUMBER), token(std::move(token)) {}
 
