@@ -12,8 +12,17 @@
 Program         -> ExprStmt EOF_TOKEN
 ExprStmt        -> Expr SEMICOLON
 
-Expr            -> LetExpr
+Expr            -> IfExpr
+                | LetExpr
                 | OrExpr
+
+IfExpr          -> IF LPAREN Expr RPAREN Expr ElifChainOpt ElseOpt
+
+ElifChainOpt    -> ELIF LPAREN Expr RPAREN Expr ElifChainOpt
+                | ε
+
+ElseOpt         -> ELSE Expr
+                | ε
 
 LetExpr         -> LET BindingList IN Expr
 

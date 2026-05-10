@@ -1245,3 +1245,14 @@ Se incorporó la agrupación de múltiples sentencias bajo un mismo bloque sint�
 - La gramática `BlockExpr -> LBRACE BlockList RBRACE` utiliza una `BlockList` para encadenar las expresiones separadas por `;`.
 - En el AST, se añadió el nodo `BlockExpr` y la etiqueta `ExprKind::BLOCK`, el cual contiene un `std::vector<ExprPtr>` con el flujo ordenado de sentencias/expresiones internas.
 - En `cst_to_ast.cpp`, `extract_block_list` recolecta linealmente las sentencias del `BlockList` y las empuja al vector del nodo principal `BlockExpr`.
+
+---
+
+**14. Iteración 4 — Condicionales `if` / `elif` / `else`**
+
+El control de flujo condicional en HULK se evalúa como una expresión que retorna valores.
+
+- En `grammar.ll1`, se extendió el bloque superior con `IfExpr -> IF LPAREN Expr RPAREN Expr ElifChainOpt ElseOpt`. Esta formulación previene la ambigüedad (no hay problema de *dangling else* aquí ya que la pertenencia al `FOLLOW` y `FIRST` guía predictivamente a la tabla LL(1)).
+- Se crearon los no terminales auxiliares `ElifChainOpt` (para encadenar recursivamente múltiples condiciones adicionales) y `ElseOpt` (opcional).
+- El AST ahora incluye un nodo `IfExpr` compuesto por `condition`, `then_branch`, y `else_branch` (que puede ser nulo si no se especifica el else).
+- La conversión `cst_to_ast.cpp` resuelve elegantemente el encadenamiento arbitrario de `elif` transformándolo topológicamente en condicionales `if` anidados dentro del campo `else_branch`, haciendo que el nodo semántico final no sepa de la existencia sintáctica de los `elif` sino simplemente de condiciones puras.

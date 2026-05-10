@@ -468,3 +468,11 @@ Se ha implementado el soporte para bloques de expresiones `{ ... }`. Los cambios
 - `grammar.ll1`: Se añadió la producción `BlockExpr -> LBRACE BlockList RBRACE` donde `BlockList` es una secuencia de `Expr SEMICOLON` o `ε`. El bloque se incluyó en `Primary`.
 - `Parser/ast/expr.hpp` y `.cpp`: Se incorporó el nodo AST `BlockExpr` que almacena un `std::vector<ExprPtr> exprs`.
 - `Parser/ast/cst_to_ast.cpp`: Se agregó la construcción del bloque extrayendo recursivamente cada expresión desde `BlockList`.
+
+## Iteración 4: If / Elif / Else (Completada)
+
+Se ha implementado el soporte para expresiones condicionales de control de flujo. Los cambios incluyen:
+
+- `grammar.ll1`: Se añadieron las producciones `IfExpr`, `ElifChainOpt`, y `ElseOpt`. La estructura permite bifurcaciones opcionales manejando internamente el LL(1) predictivamente y resolviendo el *dangling else* por medio de la precedencia en la gramática.
+- `Parser/ast/expr.hpp` y `.cpp`: Se integró el nodo AST `IfExpr` el cual posee una condición (`condition`), una rama verdadera (`then_branch`), y una rama falsa opcional (`else_branch`).
+- `Parser/ast/cst_to_ast.cpp`: Se programó el desugaring recursivo de `elif`. Un condicional del tipo `if A then B elif C then D else E` se representa en el AST como `If(A, B, If(C, D, E))`, lo que simplifica en gran medida su evaluación semántica.
