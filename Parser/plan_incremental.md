@@ -18,7 +18,7 @@ Estado actual:
 - Paso 5 (verificar CST) completado con chequeos de `PostfixExpr`, `DOT` y `LPAREN`.
 - Paso 6 (verificar conversion a AST) completado con `CallExpr` y `GetAttrExpr`.
 - Iteración 2 (LetExpr) completada: gramática LL(1) extendida, AST adaptado con nodos LetExpr anidados y cst_to_ast preparado.
-
+- Iteración 3 (Bloques) completada: gramática con BlockExpr (LBRACE BlockList RBRACE), nodo BlockExpr incorporado al AST y conversión desde CST.
 
 Iteración 1 — llamadas y postfix (tu punto 1)
 Objetivo: f(), f(a,b), a.b, a.b(), a.b(c).d

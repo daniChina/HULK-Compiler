@@ -460,3 +460,11 @@ Se ha implementado el soporte de expresiones `let`. Los cambios incluyen:
 - `Parser/ast/expr.hpp` y `.cpp`: Se añadió el nodo `LetExpr` con su nombre, inicializador y cuerpo.
 - `Parser/ast/cst_to_ast.cpp`: Se extendió el proceso de conversión de CST a AST para desugarizar los bindings múltiples en nodos `LetExpr` anidados (de atrás hacia adelante).
 - Con esto, construcciones como `let x = 1, y = 2 in x + y;` ya tienen soporte LL(1) validado.
+
+## Iteración 3: Bloques (Completada)
+
+Se ha implementado el soporte para bloques de expresiones `{ ... }`. Los cambios incluyen:
+
+- `grammar.ll1`: Se añadió la producción `BlockExpr -> LBRACE BlockList RBRACE` donde `BlockList` es una secuencia de `Expr SEMICOLON` o `ε`. El bloque se incluyó en `Primary`.
+- `Parser/ast/expr.hpp` y `.cpp`: Se incorporó el nodo AST `BlockExpr` que almacena un `std::vector<ExprPtr> exprs`.
+- `Parser/ast/cst_to_ast.cpp`: Se agregó la construcción del bloque extrayendo recursivamente cada expresión desde `BlockList`.

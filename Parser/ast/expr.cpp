@@ -51,6 +51,10 @@ LetExpr::LetExpr(Token name, ExprPtr initializer, ExprPtr body)
       initializer(std::move(initializer)),
       body(std::move(body)) {}
 
+BlockExpr::BlockExpr(std::vector<ExprPtr> exprs)
+    : Expr(ExprKind::BLOCK),
+      exprs(std::move(exprs)) {}
+
 std::string expr_to_string(const Expr& expr) {
     switch (expr.kind) {
         case ExprKind::NUMBER: {
@@ -103,6 +107,17 @@ std::string expr_to_string(const Expr& expr) {
         case ExprKind::LET: {
             const auto& let_expr = static_cast<const LetExpr&>(expr);
             return "Let(" + let_expr.name.lexeme + " = " + expr_to_string(*let_expr.initializer) + " in " + expr_to_string(*let_expr.body) + ")";
+        }
+        case ExprKind::BLOCK: {
+            const auto& block = static_cast<const BlockExpr&>(expr);
+            std::ostringstream out;
+            out << "Block(";
+            for (std::size_t i = 0; i < block.exprs.size(); ++i) {
+                if (i > 0) out << ", ";
+                out << expr_to_string(*block.exprs[i]);
+            }
+            out << ")";
+            return out.str();
         }
     }
 

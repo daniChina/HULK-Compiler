@@ -18,7 +18,9 @@ enum class ExprKind {
     BINARY,
     CALL,
     GET_ATTR,
-    LET
+    LET,
+    BLOCK
+};
 
 struct Expr {
     explicit Expr(ExprKind kind) : kind(kind) {}
@@ -98,6 +100,12 @@ struct LetExpr final : Expr {
     Token name;
     ExprPtr initializer;
     ExprPtr body;
+};
+
+struct BlockExpr final : Expr {
+    explicit BlockExpr(std::vector<ExprPtr> exprs);
+
+    std::vector<ExprPtr> exprs;
 };
 
 std::string expr_to_string(const Expr& expr);

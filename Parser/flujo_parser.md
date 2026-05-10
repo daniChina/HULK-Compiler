@@ -1234,3 +1234,14 @@ Se introdujeron las variables locales mediante `LetExpr`.
 - `BindingList` maneja `IDENTIFIER ASSIGN Expr`, separados por comas.
 - En el AST (`ExprKind::LET`), el nodo `LetExpr` solo alberga una variable (`name`), su valor (`initializer`), y el subárbol donde existe (`body`).
 - La magia ocurre en `cst_to_ast.cpp`, donde `extract_bindings` extrae la lista plana de identificadores y expresiones desde el árbol de parseo. Posteriormente, se construyen nodos `LetExpr` anidados de atrás hacia adelante (desugaring de múltiple binding), devolviendo un solo árbol de `Let` enlazados que termina en el cuerpo principal.
+
+---
+
+**13. Iteración 3 — Bloques de código**
+
+Se incorporó la agrupación de múltiples sentencias bajo un mismo bloque sintáctico (`{ ... }`), las cuales devuelven el valor de la última expresión.
+
+- En `grammar.ll1`, se añadió `BlockExpr` como una nueva variante dentro de `Primary`, permitiendo instanciar un bloque en cualquier contexto donde se espere una expresión atómica. 
+- La gramática `BlockExpr -> LBRACE BlockList RBRACE` utiliza una `BlockList` para encadenar las expresiones separadas por `;`.
+- En el AST, se añadió el nodo `BlockExpr` y la etiqueta `ExprKind::BLOCK`, el cual contiene un `std::vector<ExprPtr>` con el flujo ordenado de sentencias/expresiones internas.
+- En `cst_to_ast.cpp`, `extract_block_list` recolecta linealmente las sentencias del `BlockList` y las empuja al vector del nodo principal `BlockExpr`.
