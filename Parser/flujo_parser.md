@@ -1266,3 +1266,13 @@ Se introdujeron los ciclos condicionales a través del nodo `WhileExpr`.
 - En `grammar.ll1`, se colocó `WhileExpr -> WHILE LPAREN Expr RPAREN Expr` como una ramificación en el nivel superior de `Expr`. Gracias a la composición, el último `Expr` puede derivar en un `BlockExpr` (usando `{ }`) o en una instrucción de una sola línea de manera ortogonal.
 - En el AST, se catalogó un nuevo `ExprKind::WHILE` y su nodo `WhileExpr` correspondiente, capturando `condition` y `body`.
 - `cst_to_ast.cpp` simplemente desempaqueta las posiciones `2` (la condición) y `4` (el cuerpo) de sus hijos CST directos sin transformaciones adicionales complejas.
+
+---
+
+**16. Iteración 6 — Ciclos iterativos `for`**
+
+Se han implementado las iteraciones estándar sobre colecciones.
+
+- En la gramática, `ForExpr` es similar a `WhileExpr` pero con la sintaxis de HULK: `ForExpr -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr`. Esta notación obliga a leer el `IDENTIFIER` explícito para la variable del iterador, seguido de `IN`, y finalmente la expresión a ser iterada, cerrando todo con el cuerpo.
+- En el AST, el nodo `ForExpr` guarda el `Token` de la variable de iteración (para luego poder ser declarada localmente en la tabla de símbolos durante el chequeo semántico), el iterable y su cuerpo.
+- El CST al AST sigue la misma simpleza que su contraparte `while`, extrayendo directamente el identificador en índice `2`, el iterable en `4` y el cuerpo en `6`.

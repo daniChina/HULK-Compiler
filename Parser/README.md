@@ -484,3 +484,11 @@ Se ha integrado el soporte para ciclos indeterminados.
 - `grammar.ll1`: Se definió `WhileExpr -> WHILE LPAREN Expr RPAREN Expr`. Al estar embebido en la jerarquía general de `Expr`, el cuerpo del while puede ser desde una simple primaria hasta un `BlockExpr`.
 - `Parser/ast/expr.hpp` y `.cpp`: Creación del nodo `WhileExpr` y del enumerador `ExprKind::WHILE`. Este nodo guarda su `condition` y su `body`.
 - `Parser/ast/cst_to_ast.cpp`: Extracción limpia de la condición y el cuerpo desde el CST.
+
+## Iteración 6: For (Completada)
+
+Se ha integrado el soporte para ciclos iterativos.
+
+- `grammar.ll1`: Se definió `ForExpr -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr`. Al igual que `WhileExpr`, está embebido bajo `Expr`.
+- `Parser/ast/expr.hpp` y `.cpp`: Creación del nodo `ForExpr` que captura el `IDENTIFIER` como variable del ciclo, un `ExprPtr` como objeto iterable, y un `ExprPtr` como cuerpo.
+- `Parser/ast/cst_to_ast.cpp`: Implementada la rutina `build_for_expr` extrayendo secuencialmente los 3 tokens lógicos desde el CST.

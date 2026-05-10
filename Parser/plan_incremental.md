@@ -21,6 +21,7 @@ Estado actual:
 - Iteración 3 (Bloques) completada: gramática con BlockExpr (LBRACE BlockList RBRACE), nodo BlockExpr incorporado al AST y conversión desde CST.
 - Iteración 4 (If/Elif/Else) completada: gramática para control de flujo condicional con y sin else, normalización de elif anidados.
 - Iteración 5 (While) completada: gramática de ciclos condicionales iterativos y su mapeo al nodo WhileExpr en el AST.
+- Iteración 6 (For) completada: gramática de ciclos iterativos por colección, mapeado al nodo ForExpr en el AST.
 
 Iteración 1 — llamadas y postfix (tu punto 1)
 Objetivo: f(), f(a,b), a.b, a.b(), a.b(c).d

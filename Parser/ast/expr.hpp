@@ -20,7 +20,8 @@ enum class ExprKind {
     LET,
     BLOCK,
     IF,
-    WHILE
+    WHILE,
+    FOR
 };
 
 struct Expr {
@@ -121,6 +122,14 @@ struct WhileExpr final : Expr {
     WhileExpr(ExprPtr condition, ExprPtr body);
 
     ExprPtr condition;
+    ExprPtr body;
+};
+
+struct ForExpr final : Expr {
+    ForExpr(Token variable, ExprPtr iterable, ExprPtr body);
+
+    Token variable;
+    ExprPtr iterable;
     ExprPtr body;
 };
 
