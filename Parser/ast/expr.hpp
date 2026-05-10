@@ -17,9 +17,9 @@ enum class ExprKind {
     UNARY,
     BINARY,
     CALL,
-    GET_ATTR,
     LET,
-    BLOCK
+    BLOCK,
+    IF
 };
 
 struct Expr {
@@ -106,6 +106,14 @@ struct BlockExpr final : Expr {
     explicit BlockExpr(std::vector<ExprPtr> exprs);
 
     std::vector<ExprPtr> exprs;
+};
+
+struct IfExpr final : Expr {
+    IfExpr(ExprPtr condition, ExprPtr then_branch, ExprPtr else_branch);
+
+    ExprPtr condition;
+    ExprPtr then_branch;
+    ExprPtr else_branch;
 };
 
 std::string expr_to_string(const Expr& expr);

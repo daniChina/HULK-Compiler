@@ -55,6 +55,12 @@ BlockExpr::BlockExpr(std::vector<ExprPtr> exprs)
     : Expr(ExprKind::BLOCK),
       exprs(std::move(exprs)) {}
 
+IfExpr::IfExpr(ExprPtr condition, ExprPtr then_branch, ExprPtr else_branch)
+    : Expr(ExprKind::IF),
+      condition(std::move(condition)),
+      then_branch(std::move(then_branch)),
+      else_branch(std::move(else_branch)) {}
+
 std::string expr_to_string(const Expr& expr) {
     switch (expr.kind) {
         case ExprKind::NUMBER: {
@@ -115,6 +121,16 @@ std::string expr_to_string(const Expr& expr) {
             for (std::size_t i = 0; i < block.exprs.size(); ++i) {
                 if (i > 0) out << ", ";
                 out << expr_to_string(*block.exprs[i]);
+            }
+            out << ")";
+            return out.str();
+        }
+        case ExprKind::IF: {
+            const auto& if_expr = static_cast<const IfExpr&>(expr);
+            std::ostringstream out;
+            out << "If(" << expr_to_string(*if_expr.condition) << ", " << expr_to_string(*if_expr.then_branch);
+            if (if_expr.else_branch) {
+                out << ", " << expr_to_string(*if_expr.else_branch);
             }
             out << ")";
             return out.str();
