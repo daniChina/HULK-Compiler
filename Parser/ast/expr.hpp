@@ -19,7 +19,8 @@ enum class ExprKind {
     CALL,
     LET,
     BLOCK,
-    IF
+    IF,
+    WHILE
 };
 
 struct Expr {
@@ -114,6 +115,13 @@ struct IfExpr final : Expr {
     ExprPtr condition;
     ExprPtr then_branch;
     ExprPtr else_branch;
+};
+
+struct WhileExpr final : Expr {
+    WhileExpr(ExprPtr condition, ExprPtr body);
+
+    ExprPtr condition;
+    ExprPtr body;
 };
 
 std::string expr_to_string(const Expr& expr);

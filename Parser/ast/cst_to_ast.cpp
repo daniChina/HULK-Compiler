@@ -33,6 +33,7 @@ bool is_epsilon_node(const CstNode& node) {
 
 ExprPtr build_expr(const CstNode& node);
 ExprPtr build_if_expr(const CstNode& node);
+ExprPtr build_while_expr(const CstNode& node);
 ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else);
 ExprPtr build_else_opt(const CstNode& node);
 ExprPtr build_let_expr(const CstNode& node);
@@ -75,10 +76,20 @@ ExprPtr build_expr(const CstNode& node) {
     if (first_child.symbol == "IfExpr") {
         return build_if_expr(first_child);
     }
+    if (first_child.symbol == "WhileExpr") {
+        return build_while_expr(first_child);
+    }
     if (first_child.symbol == "LetExpr") {
         return build_let_expr(first_child);
     }
     return build_or_expr(first_child);
+}
+
+ExprPtr build_while_expr(const CstNode& node) {
+    expect_symbol(node, "WhileExpr");
+    ExprPtr cond = build_expr(child(node, 2));
+    ExprPtr body = build_expr(child(node, 4));
+    return std::make_unique<WhileExpr>(std::move(cond), std::move(body));
 }
 
 ExprPtr build_if_expr(const CstNode& node) {
