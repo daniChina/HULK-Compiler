@@ -17,8 +17,8 @@ enum class ExprKind {
     UNARY,
     BINARY,
     CALL,
-    GET_ATTR
-};
+    GET_ATTR,
+    LET
 
 struct Expr {
     explicit Expr(ExprKind kind) : kind(kind) {}
@@ -90,6 +90,14 @@ struct GetAttrExpr final : Expr {
     ExprPtr object;
     Token dot;
     Token name;
+};
+
+struct LetExpr final : Expr {
+    LetExpr(Token name, ExprPtr initializer, ExprPtr body);
+
+    Token name;
+    ExprPtr initializer;
+    ExprPtr body;
 };
 
 std::string expr_to_string(const Expr& expr);

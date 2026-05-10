@@ -17,6 +17,7 @@ Estado actual:
 - Paso 4 (verificar parseo predictivo) completado con casos postfix validos e invalidos.
 - Paso 5 (verificar CST) completado con chequeos de `PostfixExpr`, `DOT` y `LPAREN`.
 - Paso 6 (verificar conversion a AST) completado con `CallExpr` y `GetAttrExpr`.
+- Iteración 2 (LetExpr) completada: gramática LL(1) extendida, AST adaptado con nodos LetExpr anidados y cst_to_ast preparado.
 
 
 Iteración 1 — llamadas y postfix (tu punto 1)

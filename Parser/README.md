@@ -451,3 +451,12 @@ Si no se pasa archivo, lee desde `stdin`.
 Un ejemplo minimo compatible con la gramatica actual vive en:
 
 - `Parser/tests/valid_expr_pipeline.hulk`
+
+## Iteración 2: LetExpr (Completada)
+
+Se ha implementado el soporte de expresiones `let`. Los cambios incluyen:
+
+- `grammar.ll1`: Se integró la producción `LetExpr -> LET BindingList IN Expr` permitiendo múltiples bindings separados por comas.
+- `Parser/ast/expr.hpp` y `.cpp`: Se añadió el nodo `LetExpr` con su nombre, inicializador y cuerpo.
+- `Parser/ast/cst_to_ast.cpp`: Se extendió el proceso de conversión de CST a AST para desugarizar los bindings múltiples en nodos `LetExpr` anidados (de atrás hacia adelante).
+- Con esto, construcciones como `let x = 1, y = 2 in x + y;` ya tienen soporte LL(1) validado.

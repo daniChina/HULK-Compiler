@@ -1222,3 +1222,15 @@ Si quieres, el siguiente paso puedo hacerlo de dos formas:
 
 1. explicarte también `parser_phase2_smoke.cpp` y `parser_phase3_smoke.cpp` con este mismo nivel de detalle
 2. pasar ya a Fase 6 e implementar `FIRST/FOLLOW` sobre `Grammar`
+
+---
+
+**12. Iteración 2 — Expresiones `let`**
+
+Se introdujeron las variables locales mediante `LetExpr`.
+
+- En `grammar.ll1`, se añadió `LetExpr` al inicio de las expresiones (mismo nivel que `OrExpr`).
+- Una expresión `let` se define como `LET BindingList IN Expr`.
+- `BindingList` maneja `IDENTIFIER ASSIGN Expr`, separados por comas.
+- En el AST (`ExprKind::LET`), el nodo `LetExpr` solo alberga una variable (`name`), su valor (`initializer`), y el subárbol donde existe (`body`).
+- La magia ocurre en `cst_to_ast.cpp`, donde `extract_bindings` extrae la lista plana de identificadores y expresiones desde el árbol de parseo. Posteriormente, se construyen nodos `LetExpr` anidados de atrás hacia adelante (desugaring de múltiple binding), devolviendo un solo árbol de `Let` enlazados que termina en el cuerpo principal.

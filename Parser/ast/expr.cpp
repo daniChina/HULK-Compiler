@@ -45,6 +45,12 @@ GetAttrExpr::GetAttrExpr(ExprPtr object, Token dot, Token name)
       dot(std::move(dot)),
       name(std::move(name)) {}
 
+LetExpr::LetExpr(Token name, ExprPtr initializer, ExprPtr body)
+    : Expr(ExprKind::LET),
+      name(std::move(name)),
+      initializer(std::move(initializer)),
+      body(std::move(body)) {}
+
 std::string expr_to_string(const Expr& expr) {
     switch (expr.kind) {
         case ExprKind::NUMBER: {
@@ -93,6 +99,10 @@ std::string expr_to_string(const Expr& expr) {
             const auto& get_attr = static_cast<const GetAttrExpr&>(expr);
             return "GetAttr(" + expr_to_string(*get_attr.object) + ", " +
                    get_attr.name.lexeme + ")";
+        }
+        case ExprKind::LET: {
+            const auto& let_expr = static_cast<const LetExpr&>(expr);
+            return "Let(" + let_expr.name.lexeme + " = " + expr_to_string(*let_expr.initializer) + " in " + expr_to_string(*let_expr.body) + ")";
         }
     }
 
