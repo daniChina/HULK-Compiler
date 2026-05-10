@@ -69,10 +69,25 @@ void append_arg_list_tail(const CstNode& node, std::vector<ExprPtr>& args);
 void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts);
 StmtPtr build_stmt(const CstNode& node);
 StmtPtr build_expr_stmt(const CstNode& node);
+StmtPtr build_function_decl(const CstNode& node);
+
+std::vector<std::pair<Token, std::optional<Token>>> build_arg_id_list_opt(const CstNode& node);
+std::vector<std::pair<Token, std::optional<Token>>> build_arg_id_list(const CstNode& node);
+void extract_arg_id_list_tail(const CstNode& node, std::vector<std::pair<Token, std::optional<Token>>>& args);
+std::pair<Token, std::optional<Token>> build_arg_id(const CstNode& node);
+std::optional<Token> build_type_annotation_opt(const CstNode& node);
+ExprPtr build_function_body(const CstNode& node);
 
 StmtPtr build_stmt(const CstNode& node) {
     expect_symbol(node, "Stmt");
-    return build_expr_stmt(child(node, 0));
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "ExprStmt") {
+        return build_expr_stmt(first_child);
+    }
+    if (first_child.symbol == "FunctionDecl") {
+        return build_function_decl(first_child);
+    }
+    throw std::runtime_error("Forma no esperada en Stmt");
 }
 
 StmtPtr build_expr_stmt(const CstNode& node) {
@@ -443,6 +458,65 @@ void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts) {
     }
     stmts.push_back(build_stmt(child(node, 0)));
     extract_stmt_list(child(node, 1), stmts);
+}
+
+StmtPtr build_function_decl(const CstNode& node) {
+    expect_symbol(node, "FunctionDecl");
+    // FUNCTION IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
+    Token name = child(node, 1).token;
+    auto params = build_arg_id_list_opt(child(node, 3));
+    auto return_type = build_type_annotation_opt(child(node, 5));
+    auto body = build_function_body(child(node, 6));
+    return std::make_unique<FunctionDecl>(std::move(name), std::move(params), std::move(return_type), std::move(body));
+}
+
+std::vector<std::pair<Token, std::optional<Token>>> build_arg_id_list_opt(const CstNode& node) {
+    expect_symbol(node, "ArgIdListOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return {};
+    }
+    return build_arg_id_list(child(node, 0));
+}
+
+std::vector<std::pair<Token, std::optional<Token>>> build_arg_id_list(const CstNode& node) {
+    expect_symbol(node, "ArgIdList");
+    std::vector<std::pair<Token, std::optional<Token>>> args;
+    args.push_back(build_arg_id(child(node, 0)));
+    extract_arg_id_list_tail(child(node, 1), args);
+    return args;
+}
+
+void extract_arg_id_list_tail(const CstNode& node, std::vector<std::pair<Token, std::optional<Token>>>& args) {
+    expect_symbol(node, "ArgIdListTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+    args.push_back(build_arg_id(child(node, 1)));
+    extract_arg_id_list_tail(child(node, 2), args);
+}
+
+std::pair<Token, std::optional<Token>> build_arg_id(const CstNode& node) {
+    expect_symbol(node, "ArgId");
+    Token name = child(node, 0).token;
+    auto type = build_type_annotation_opt(child(node, 1));
+    return {std::move(name), std::move(type)};
+}
+
+std::optional<Token> build_type_annotation_opt(const CstNode& node) {
+    expect_symbol(node, "TypeAnnotationOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return std::nullopt;
+    }
+    return child(node, 1).token;
+}
+
+ExprPtr build_function_body(const CstNode& node) {
+    expect_symbol(node, "FunctionBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "ARROW") {
+        return build_expr(child(node, 1));
+    }
+    return build_block_expr(first_child);
 }
 
 }  // namespace

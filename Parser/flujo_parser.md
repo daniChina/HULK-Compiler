@@ -1286,3 +1286,13 @@ Para avanzar más allá de evaluar una simple expresión global, se preparó el 
 - En `grammar.ll1`, el axioma o símbolo de entrada `Program` dejó de ser un solo `ExprStmt`. Ahora deriva en `StmtList EOF_TOKEN`, permitiendo cero o múltiples `Stmt`. Cada `Stmt` se evalúa transitoriamente como `ExprStmt -> Expr SEMICOLON`, pero esta jerarquía es extensible inmediatamente para iteraciones futuras de funciones y clases.
 - En el AST, se separaron las aguas introduciendo el concepto fundamental abstracto `Stmt` y su familia vía `StmtKind` (para polimorfismo dinámico), así como la clase `Program` la cual actúa como la verdadera raíz conteniendo múltiples sentencias.
 - `cst_to_ast.cpp` cambió su firma final para retornar `ProgramPtr` encapsulando un vector, donde la extracción secuencial puebla todos los `Stmt`. Además, `main.cpp` fue refactorizado para invocar a `program_to_string` en la etapa de visualización del árbol.
+
+---
+
+**18. Iteración 8 — Declaración de Funciones**
+
+Al tener la jerarquía de sentencias establecida, se implementaron las declaraciones de funciones.
+
+- En la gramática, `Stmt` deriva en `FunctionDecl`. Las funciones incorporan múltiples no terminales auxiliares como `ArgIdListOpt` y `TypeAnnotationOpt` para lidiar con el tipado opcional de los parámetros y del retorno. El cuerpo diferencia claramente la notación *arrow* (`=> expr ;`) de un bloque completo (`{ ... }`).
+- El AST incorporó la clase semántica `FunctionDecl` que, en lugar de vectores crudos de expresiones, usa fuertemente `std::pair` combinando `Token` (para identificadores) y `std::optional<Token>` para retener las inferencias de tipos, encapsulando puramente la semántica HULK.
+- La extracción `build_function_decl` utiliza ayudantes recursivos para "aplanar" las listas enlazadas en forma de árbol que surgen de la recursión por la derecha requerida por LL(1), devolviendo vectores planos listos para iterar durante la fase semántica.

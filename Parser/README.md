@@ -500,3 +500,11 @@ Se ha refactorizado la cima de la gramática y del AST para soportar un programa
 - `grammar.ll1`: La producción `Program` ahora es `StmtList EOF_TOKEN`, donde `StmtList` agrupa recursivamente múltiples `Stmt`. Cada `Stmt` se define actualmente como `ExprStmt`.
 - `Parser/ast/expr.hpp` y `.cpp`: Se introdujo la jerarquía `Stmt` y su enumerador `StmtKind`. Se creó la clase raíz `Program` (la cual contiene un `std::vector<StmtPtr>`) y se empaquetaron las expresiones globales en nodos `ExprStmt`.
 - `Parser/ast/cst_to_ast.cpp`: Se rediseñó el punto de entrada `cst_to_ast` para retornar un objeto `ProgramPtr`. Este recorre la lista `StmtList` recolectando las sentencias individuales y agregándolas al programa raíz. También se actualizó el driver `main.cpp` para mostrar este nuevo nivel estructural.
+
+## Iteración 8: Declaración de Funciones (Completada)
+
+Se ha añadido la capacidad de declarar funciones a nivel global.
+
+- `grammar.ll1`: Se integró la nueva derivación `Stmt -> FunctionDecl`. La sintaxis obliga a la palabra `FUNCTION`, nombre, parámetros (con firmas opcionales usando `:`), retorno opcional, y un cuerpo que puede ser sintaxis de flecha `=> Expr ;` o un `BlockExpr` `{ ... }`.
+- `Parser/ast/expr.hpp` y `.cpp`: Se agregó `StmtKind::FUNCTION_DECL` y la clase `FunctionDecl`, almacenando nombre, parámetros, tipo de retorno y cuerpo.
+- `Parser/ast/cst_to_ast.cpp`: Implementación de rutinas granulares (`build_function_decl`, `build_arg_id_list_opt`, etc.) para recorrer las listas separadas por comas del CST y poblar elegantemente la estructura del AST.

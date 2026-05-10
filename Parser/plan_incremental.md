@@ -23,6 +23,7 @@ Estado actual:
 - Iteración 5 (While) completada: gramática de ciclos condicionales iterativos y su mapeo al nodo WhileExpr en el AST.
 - Iteración 6 (For) completada: gramática de ciclos iterativos por colección, mapeado al nodo ForExpr en el AST.
 - Iteración 7 (Programa/Stmt) completada: nodo raíz elevado a lista de Stmt, integrando ExprStmt y preparando terreno para declaraciones.
+- Iteración 8 (Funciones) completada: gramática y AST para `function`, soportando argumentos tipados, retornos opcionales y cuerpos inline/bloque.
 
 Iteración 1 — llamadas y postfix (tu punto 1)
 Objetivo: f(), f(a,b), a.b, a.b(), a.b(c).d

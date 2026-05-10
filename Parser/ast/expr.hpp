@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 
 #include "../core/token.hpp"
 
@@ -34,7 +35,8 @@ struct Expr {
 using ExprPtr = std::unique_ptr<Expr>;
 
 enum class StmtKind {
-    EXPR
+    EXPR,
+    FUNCTION_DECL
 };
 
 struct Stmt {
@@ -50,6 +52,15 @@ struct ExprStmt final : Stmt {
     explicit ExprStmt(ExprPtr expr);
 
     ExprPtr expr;
+};
+
+struct FunctionDecl final : Stmt {
+    FunctionDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params, std::optional<Token> return_type, ExprPtr body);
+
+    Token name;
+    std::vector<std::pair<Token, std::optional<Token>>> params;
+    std::optional<Token> return_type;
+    ExprPtr body;
 };
 
 struct Program {
