@@ -66,6 +66,12 @@ WhileExpr::WhileExpr(ExprPtr condition, ExprPtr body)
       condition(std::move(condition)),
       body(std::move(body)) {}
 
+ForExpr::ForExpr(Token variable, ExprPtr iterable, ExprPtr body)
+    : Expr(ExprKind::FOR),
+      variable(std::move(variable)),
+      iterable(std::move(iterable)),
+      body(std::move(body)) {}
+
 std::string expr_to_string(const Expr& expr) {
     switch (expr.kind) {
         case ExprKind::NUMBER: {
@@ -143,6 +149,10 @@ std::string expr_to_string(const Expr& expr) {
         case ExprKind::WHILE: {
             const auto& while_expr = static_cast<const WhileExpr&>(expr);
             return "While(" + expr_to_string(*while_expr.condition) + ", " + expr_to_string(*while_expr.body) + ")";
+        }
+        case ExprKind::FOR: {
+            const auto& for_expr = static_cast<const ForExpr&>(expr);
+            return "For(" + for_expr.variable.lexeme + " in " + expr_to_string(*for_expr.iterable) + ", " + expr_to_string(*for_expr.body) + ")";
         }
     }
 
