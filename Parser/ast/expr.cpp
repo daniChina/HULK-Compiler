@@ -8,11 +8,36 @@ namespace parser {
 ExprStmt::ExprStmt(ExprPtr expr)
     : Stmt(StmtKind::EXPR), expr(std::move(expr)) {}
 
+FunctionDecl::FunctionDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params, std::optional<Token> return_type, ExprPtr body)
+    : Stmt(StmtKind::FUNCTION_DECL),
+      name(std::move(name)),
+      params(std::move(params)),
+      return_type(std::move(return_type)),
+      body(std::move(body)) {}
+
 std::string stmt_to_string(const Stmt& stmt) {
     switch (stmt.stmt_kind) {
         case StmtKind::EXPR: {
             const auto& expr_stmt = static_cast<const ExprStmt&>(stmt);
             return "ExprStmt(" + expr_to_string(*expr_stmt.expr) + ")";
+        }
+        case StmtKind::FUNCTION_DECL: {
+            const auto& func = static_cast<const FunctionDecl&>(stmt);
+            std::ostringstream out;
+            out << "FunctionDecl(" << func.name.lexeme << "(";
+            for (std::size_t i = 0; i < func.params.size(); ++i) {
+                if (i > 0) out << ", ";
+                out << func.params[i].first.lexeme;
+                if (func.params[i].second) {
+                    out << ": " << func.params[i].second->lexeme;
+                }
+            }
+            out << ")";
+            if (func.return_type) {
+                out << ": " << func.return_type->lexeme;
+            }
+            out << " => " << expr_to_string(*func.body) << ")";
+            return out.str();
         }
     }
     return "Stmt(?)";
