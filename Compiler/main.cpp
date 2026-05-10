@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
         if (options.print_ast && parse_result.cst_root) {
             auto ast = parser::cst_to_ast(*parse_result.cst_root);
             std::cout << "== AST ==\n";
-            std::cout << parser::expr_to_string(*ast) << "\n";
+            std::cout << parser::program_to_string(*ast) << "\n";
         }
 
         return 0;

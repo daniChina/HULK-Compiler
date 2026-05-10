@@ -33,6 +33,34 @@ struct Expr {
 
 using ExprPtr = std::unique_ptr<Expr>;
 
+enum class StmtKind {
+    EXPR
+};
+
+struct Stmt {
+    explicit Stmt(StmtKind kind) : stmt_kind(kind) {}
+    virtual ~Stmt() = default;
+
+    StmtKind stmt_kind;
+};
+
+using StmtPtr = std::unique_ptr<Stmt>;
+
+struct ExprStmt final : Stmt {
+    explicit ExprStmt(ExprPtr expr);
+
+    ExprPtr expr;
+};
+
+struct Program {
+    std::vector<StmtPtr> stmts;
+};
+
+using ProgramPtr = std::unique_ptr<Program>;
+
+std::string stmt_to_string(const Stmt& stmt);
+std::string program_to_string(const Program& prog);
+
 struct NumberExpr final : Expr {
     explicit NumberExpr(Token token);
 

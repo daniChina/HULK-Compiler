@@ -6,6 +6,6 @@
 namespace parser {
 
 // Convierte la raiz `Program` del CST actual en el AST de la expresion principal.
-ExprPtr cst_to_ast(const CstNode& root);
+ProgramPtr cst_to_ast(const CstNode& root);
 
 }  // namespace parser
