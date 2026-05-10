@@ -12,7 +12,16 @@
 Program         -> ExprStmt EOF_TOKEN
 ExprStmt        -> Expr SEMICOLON
 
-Expr            -> OrExpr
+Expr            -> LetExpr
+                | OrExpr
+
+LetExpr         -> LET BindingList IN Expr
+
+BindingList     -> Binding BindingTail
+BindingTail     -> COMMA Binding BindingTail
+                | ε
+
+Binding         -> IDENTIFIER ASSIGN Expr
 
 OrExpr          -> AndExpr OrExprTail
 OrExprTail      -> OR AndExpr OrExprTail | ε
