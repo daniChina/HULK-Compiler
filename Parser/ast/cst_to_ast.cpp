@@ -32,6 +32,9 @@ bool is_epsilon_node(const CstNode& node) {
 }
 
 ExprPtr build_expr(const CstNode& node);
+ExprPtr build_if_expr(const CstNode& node);
+ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else);
+ExprPtr build_else_opt(const CstNode& node);
 ExprPtr build_let_expr(const CstNode& node);
 void extract_bindings(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
 void extract_binding(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
@@ -69,10 +72,46 @@ ExprPtr build_expr_stmt(const CstNode& node) {
 ExprPtr build_expr(const CstNode& node) {
     expect_symbol(node, "Expr");
     const auto& first_child = child(node, 0);
+    if (first_child.symbol == "IfExpr") {
+        return build_if_expr(first_child);
+    }
     if (first_child.symbol == "LetExpr") {
         return build_let_expr(first_child);
     }
     return build_or_expr(first_child);
+}
+
+ExprPtr build_if_expr(const CstNode& node) {
+    expect_symbol(node, "IfExpr");
+    ExprPtr cond = build_expr(child(node, 2));
+    ExprPtr then_branch = build_expr(child(node, 4));
+    ExprPtr else_branch = build_else_opt(child(node, 6));
+    
+    return std::make_unique<IfExpr>(
+        std::move(cond), 
+        std::move(then_branch), 
+        build_elif_chain_opt(child(node, 5), std::move(else_branch))
+    );
+}
+
+ExprPtr build_else_opt(const CstNode& node) {
+    expect_symbol(node, "ElseOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return nullptr;
+    }
+    return build_expr(child(node, 1));
+}
+
+ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else) {
+    expect_symbol(node, "ElifChainOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return final_else;
+    }
+    ExprPtr cond = build_expr(child(node, 2));
+    ExprPtr then_branch = build_expr(child(node, 4));
+    ExprPtr nested_else = build_elif_chain_opt(child(node, 5), std::move(final_else));
+    
+    return std::make_unique<IfExpr>(std::move(cond), std::move(then_branch), std::move(nested_else));
 }
 
 ExprPtr build_let_expr(const CstNode& node) {
