@@ -32,6 +32,11 @@ bool is_epsilon_node(const CstNode& node) {
 }
 
 ExprPtr build_expr(const CstNode& node);
+ExprPtr build_let_expr(const CstNode& node);
+void extract_bindings(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
+void extract_binding(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
+void extract_binding_tail(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
+
 ExprPtr build_or_expr(const CstNode& node);
 ExprPtr build_or_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_and_expr(const CstNode& node);
@@ -61,7 +66,52 @@ ExprPtr build_expr_stmt(const CstNode& node) {
 
 ExprPtr build_expr(const CstNode& node) {
     expect_symbol(node, "Expr");
-    return build_or_expr(child(node, 0));
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "LetExpr") {
+        return build_let_expr(first_child);
+    }
+    return build_or_expr(first_child);
+}
+
+ExprPtr build_let_expr(const CstNode& node) {
+    expect_symbol(node, "LetExpr");
+    
+    std::vector<std::pair<Token, ExprPtr>> bindings;
+    extract_bindings(child(node, 1), bindings);
+    
+    ExprPtr body = build_expr(child(node, 3));
+    
+    for (int i = static_cast<int>(bindings.size()) - 1; i >= 0; --i) {
+        body = std::make_unique<LetExpr>(
+            bindings[i].first, 
+            std::move(bindings[i].second), 
+            std::move(body)
+        );
+    }
+    
+    return body;
+}
+
+void extract_bindings(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings) {
+    expect_symbol(node, "BindingList");
+    extract_binding(child(node, 0), bindings);
+    extract_binding_tail(child(node, 1), bindings);
+}
+
+void extract_binding(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings) {
+    expect_symbol(node, "Binding");
+    Token name = child(node, 0).token;
+    ExprPtr init = build_expr(child(node, 2));
+    bindings.emplace_back(std::move(name), std::move(init));
+}
+
+void extract_binding_tail(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings) {
+    expect_symbol(node, "BindingTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+    extract_binding(child(node, 1), bindings);
+    extract_binding_tail(child(node, 2), bindings);
 }
 
 ExprPtr build_or_expr(const CstNode& node) {
