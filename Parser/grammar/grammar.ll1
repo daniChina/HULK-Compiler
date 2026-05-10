@@ -78,3 +78,9 @@ Primary         -> NUMBER_LITERAL
                 | FALSE
                 | IDENTIFIER
                 | LPAREN Expr RPAREN
+                | BlockExpr
+
+BlockExpr       -> LBRACE BlockList RBRACE
+
+BlockList       -> Expr SEMICOLON BlockList
+                | ε
