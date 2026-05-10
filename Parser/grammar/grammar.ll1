@@ -15,7 +15,10 @@ ExprStmt        -> Expr SEMICOLON
 Expr            -> IfExpr
                 | LetExpr
                 | WhileExpr
+                | ForExpr
                 | OrExpr
+
+ForExpr         -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
 
 WhileExpr       -> WHILE LPAREN Expr RPAREN Expr
 
