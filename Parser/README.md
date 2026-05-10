@@ -476,3 +476,11 @@ Se ha implementado el soporte para expresiones condicionales de control de flujo
 - `grammar.ll1`: Se añadieron las producciones `IfExpr`, `ElifChainOpt`, y `ElseOpt`. La estructura permite bifurcaciones opcionales manejando internamente el LL(1) predictivamente y resolviendo el *dangling else* por medio de la precedencia en la gramática.
 - `Parser/ast/expr.hpp` y `.cpp`: Se integró el nodo AST `IfExpr` el cual posee una condición (`condition`), una rama verdadera (`then_branch`), y una rama falsa opcional (`else_branch`).
 - `Parser/ast/cst_to_ast.cpp`: Se programó el desugaring recursivo de `elif`. Un condicional del tipo `if A then B elif C then D else E` se representa en el AST como `If(A, B, If(C, D, E))`, lo que simplifica en gran medida su evaluación semántica.
+
+## Iteración 5: While (Completada)
+
+Se ha integrado el soporte para ciclos indeterminados.
+
+- `grammar.ll1`: Se definió `WhileExpr -> WHILE LPAREN Expr RPAREN Expr`. Al estar embebido en la jerarquía general de `Expr`, el cuerpo del while puede ser desde una simple primaria hasta un `BlockExpr`.
+- `Parser/ast/expr.hpp` y `.cpp`: Creación del nodo `WhileExpr` y del enumerador `ExprKind::WHILE`. Este nodo guarda su `condition` y su `body`.
+- `Parser/ast/cst_to_ast.cpp`: Extracción limpia de la condición y el cuerpo desde el CST.

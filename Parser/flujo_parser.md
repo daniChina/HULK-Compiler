@@ -1256,3 +1256,13 @@ El control de flujo condicional en HULK se evalúa como una expresión que retor
 - Se crearon los no terminales auxiliares `ElifChainOpt` (para encadenar recursivamente múltiples condiciones adicionales) y `ElseOpt` (opcional).
 - El AST ahora incluye un nodo `IfExpr` compuesto por `condition`, `then_branch`, y `else_branch` (que puede ser nulo si no se especifica el else).
 - La conversión `cst_to_ast.cpp` resuelve elegantemente el encadenamiento arbitrario de `elif` transformándolo topológicamente en condicionales `if` anidados dentro del campo `else_branch`, haciendo que el nodo semántico final no sepa de la existencia sintáctica de los `elif` sino simplemente de condiciones puras.
+
+---
+
+**15. Iteración 5 — Ciclos `while`**
+
+Se introdujeron los ciclos condicionales a través del nodo `WhileExpr`.
+
+- En `grammar.ll1`, se colocó `WhileExpr -> WHILE LPAREN Expr RPAREN Expr` como una ramificación en el nivel superior de `Expr`. Gracias a la composición, el último `Expr` puede derivar en un `BlockExpr` (usando `{ }`) o en una instrucción de una sola línea de manera ortogonal.
+- En el AST, se catalogó un nuevo `ExprKind::WHILE` y su nodo `WhileExpr` correspondiente, capturando `condition` y `body`.
+- `cst_to_ast.cpp` simplemente desempaqueta las posiciones `2` (la condición) y `4` (el cuerpo) de sus hijos CST directos sin transformaciones adicionales complejas.

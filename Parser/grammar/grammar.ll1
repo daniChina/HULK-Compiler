@@ -14,7 +14,10 @@ ExprStmt        -> Expr SEMICOLON
 
 Expr            -> IfExpr
                 | LetExpr
+                | WhileExpr
                 | OrExpr
+
+WhileExpr       -> WHILE LPAREN Expr RPAREN Expr
 
 IfExpr          -> IF LPAREN Expr RPAREN Expr ElifChainOpt ElseOpt
 

@@ -61,6 +61,11 @@ IfExpr::IfExpr(ExprPtr condition, ExprPtr then_branch, ExprPtr else_branch)
       then_branch(std::move(then_branch)),
       else_branch(std::move(else_branch)) {}
 
+WhileExpr::WhileExpr(ExprPtr condition, ExprPtr body)
+    : Expr(ExprKind::WHILE),
+      condition(std::move(condition)),
+      body(std::move(body)) {}
+
 std::string expr_to_string(const Expr& expr) {
     switch (expr.kind) {
         case ExprKind::NUMBER: {
@@ -134,6 +139,10 @@ std::string expr_to_string(const Expr& expr) {
             }
             out << ")";
             return out.str();
+        }
+        case ExprKind::WHILE: {
+            const auto& while_expr = static_cast<const WhileExpr&>(expr);
+            return "While(" + expr_to_string(*while_expr.condition) + ", " + expr_to_string(*while_expr.body) + ")";
         }
     }
 
