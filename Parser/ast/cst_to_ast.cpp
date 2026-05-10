@@ -55,6 +55,8 @@ ExprPtr build_unary_expr(const CstNode& node);
 ExprPtr build_postfix_expr(const CstNode& node);
 ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_primary(const CstNode& node);
+ExprPtr build_block_expr(const CstNode& node);
+void extract_block_list(const CstNode& node, std::vector<ExprPtr>& exprs);
 std::vector<ExprPtr> build_arg_list_opt(const CstNode& node);
 std::vector<ExprPtr> build_arg_list(const CstNode& node);
 void append_arg_list_tail(const CstNode& node, std::vector<ExprPtr>& args);
@@ -332,6 +334,9 @@ ExprPtr build_primary(const CstNode& node) {
         if (value.symbol == "IDENTIFIER") {
             return std::make_unique<IdentifierExpr>(value.token);
         }
+        if (value.symbol == "BlockExpr") {
+            return build_block_expr(value);
+        }
     }
 
     // Caso agrupado: LPAREN Expr RPAREN
@@ -342,6 +347,22 @@ ExprPtr build_primary(const CstNode& node) {
     }
 
     throw std::runtime_error("Forma de Primary no soportada en la conversion CST -> AST");
+}
+
+ExprPtr build_block_expr(const CstNode& node) {
+    expect_symbol(node, "BlockExpr");
+    std::vector<ExprPtr> exprs;
+    extract_block_list(child(node, 1), exprs);
+    return std::make_unique<BlockExpr>(std::move(exprs));
+}
+
+void extract_block_list(const CstNode& node, std::vector<ExprPtr>& exprs) {
+    expect_symbol(node, "BlockList");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+    exprs.push_back(build_expr(child(node, 0)));
+    extract_block_list(child(node, 2), exprs);
 }
 
 }  // namespace
