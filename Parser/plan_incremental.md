@@ -22,6 +22,7 @@ Estado actual:
 - Iteración 4 (If/Elif/Else) completada: gramática para control de flujo condicional con y sin else, normalización de elif anidados.
 - Iteración 5 (While) completada: gramática de ciclos condicionales iterativos y su mapeo al nodo WhileExpr en el AST.
 - Iteración 6 (For) completada: gramática de ciclos iterativos por colección, mapeado al nodo ForExpr en el AST.
+- Iteración 7 (Programa/Stmt) completada: nodo raíz elevado a lista de Stmt, integrando ExprStmt y preparando terreno para declaraciones.
 
 Iteración 1 — llamadas y postfix (tu punto 1)
 Objetivo: f(), f(a,b), a.b, a.b(), a.b(c).d
@@ -88,12 +89,26 @@ AST raíz Program real.
 
 
 Iteración 8 — funciones (tu punto 8)
-Objetivo: function ...
+Objetivo: Soportar la declaración de funciones globales (tanto en formato _arrow_ como en bloque).
+Ejemplo: `function f(x: Number): Number => x + 1;` o `function f(x) { ... }`
 
-Añadir producción de declaración de función (params, retorno, body/arrow).
-Verificar FIRST/FOLLOW de FUNCTION vs expresiones.
-CST de firma y cuerpo.
-AST: FunctionDecl.
+**Pasos detallados de implementación:**
+1. **Gramática (`grammar.ll1`)**: 
+   - Añadir `FunctionDecl` como una nueva opción en `Stmt`.
+   - Definir la estructura base: `FunctionDecl -> FUNCTION IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody`.
+   - Implementar las sub-producciones de argumentos (`ArgIdListOpt`, `ArgIdList`, `ArgIdListTail`), que manejen el identificador y su tipo opcional.
+   - Definir `TypeAnnotationOpt -> COLON IDENTIFIER | ε`.
+   - Diferenciar el cuerpo: `FunctionBody -> ARROW Expr SEMICOLON | BlockExpr`.
+2. **AST (`expr.hpp` y `expr.cpp`)**:
+   - Añadir `StmtKind::FUNCTION_DECL`.
+   - Diseñar el `struct FunctionDecl : Stmt` incluyendo: nombre (Token), parámetros (vector de pares: Token y tipo), tipo de retorno (Token opcional), y el cuerpo (`ExprPtr`).
+   - Escribir su función de _stringification_.
+3. **CST a AST (`cst_to_ast.cpp`)**:
+   - Añadir la rama condicional en `build_stmt` para derivar hacia `FunctionDecl`.
+   - Codificar `build_function_decl` asegurando extraer recursivamente los parámetros (recorriendo `ArgIdListOpt`) y diferenciando el tipo de cuerpo según la derivación.
+4. **Pruebas y Documentación**:
+   - Compilar el proyecto para verificar que no haya colisiones en la tabla LL(1) entre la palabra reservada `FUNCTION` y las expresiones.
+   - Actualizar `README.md` y `flujo_parser.md` reflejando los aprendizajes y cambios.
 
 
 Iteración 9 — type, herencia, atributos, métodos, self, base, new (tu punto 9)

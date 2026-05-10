@@ -492,3 +492,11 @@ Se ha integrado el soporte para ciclos iterativos.
 - `grammar.ll1`: Se definió `ForExpr -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr`. Al igual que `WhileExpr`, está embebido bajo `Expr`.
 - `Parser/ast/expr.hpp` y `.cpp`: Creación del nodo `ForExpr` que captura el `IDENTIFIER` como variable del ciclo, un `ExprPtr` como objeto iterable, y un `ExprPtr` como cuerpo.
 - `Parser/ast/cst_to_ast.cpp`: Implementada la rutina `build_for_expr` extrayendo secuencialmente los 3 tokens lógicos desde el CST.
+
+## Iteración 7: Programa Completo y Sentencias (Completada)
+
+Se ha refactorizado la cima de la gramática y del AST para soportar un programa estructurado como una lista de sentencias (actualmente `ExprStmt`, sentencias de expresiones terminadas en `;`). 
+
+- `grammar.ll1`: La producción `Program` ahora es `StmtList EOF_TOKEN`, donde `StmtList` agrupa recursivamente múltiples `Stmt`. Cada `Stmt` se define actualmente como `ExprStmt`.
+- `Parser/ast/expr.hpp` y `.cpp`: Se introdujo la jerarquía `Stmt` y su enumerador `StmtKind`. Se creó la clase raíz `Program` (la cual contiene un `std::vector<StmtPtr>`) y se empaquetaron las expresiones globales en nodos `ExprStmt`.
+- `Parser/ast/cst_to_ast.cpp`: Se rediseñó el punto de entrada `cst_to_ast` para retornar un objeto `ProgramPtr`. Este recorre la lista `StmtList` recolectando las sentencias individuales y agregándolas al programa raíz. También se actualizó el driver `main.cpp` para mostrar este nuevo nivel estructural.

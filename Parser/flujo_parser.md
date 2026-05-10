@@ -1276,3 +1276,13 @@ Se han implementado las iteraciones estándar sobre colecciones.
 - En la gramática, `ForExpr` es similar a `WhileExpr` pero con la sintaxis de HULK: `ForExpr -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr`. Esta notación obliga a leer el `IDENTIFIER` explícito para la variable del iterador, seguido de `IN`, y finalmente la expresión a ser iterada, cerrando todo con el cuerpo.
 - En el AST, el nodo `ForExpr` guarda el `Token` de la variable de iteración (para luego poder ser declarada localmente en la tabla de símbolos durante el chequeo semántico), el iterable y su cuerpo.
 - El CST al AST sigue la misma simpleza que su contraparte `while`, extrayendo directamente el identificador en índice `2`, el iterable en `4` y el cuerpo en `6`.
+
+---
+
+**17. Iteración 7 — Programa completo y sentencias**
+
+Para avanzar más allá de evaluar una simple expresión global, se preparó el terreno de jerarquía de declaraciones (Declarations y Statements).
+
+- En `grammar.ll1`, el axioma o símbolo de entrada `Program` dejó de ser un solo `ExprStmt`. Ahora deriva en `StmtList EOF_TOKEN`, permitiendo cero o múltiples `Stmt`. Cada `Stmt` se evalúa transitoriamente como `ExprStmt -> Expr SEMICOLON`, pero esta jerarquía es extensible inmediatamente para iteraciones futuras de funciones y clases.
+- En el AST, se separaron las aguas introduciendo el concepto fundamental abstracto `Stmt` y su familia vía `StmtKind` (para polimorfismo dinámico), así como la clase `Program` la cual actúa como la verdadera raíz conteniendo múltiples sentencias.
+- `cst_to_ast.cpp` cambió su firma final para retornar `ProgramPtr` encapsulando un vector, donde la extracción secuencial puebla todos los `Stmt`. Además, `main.cpp` fue refactorizado para invocar a `program_to_string` en la etapa de visualización del árbol.
