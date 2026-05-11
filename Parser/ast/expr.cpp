@@ -112,6 +112,9 @@ NumberExpr::NumberExpr(Token token)
 StringExpr::StringExpr(Token token)
     : Expr(ExprKind::STRING), token(std::move(token)) {}
 
+NullExpr::NullExpr(Token token)
+    : Expr(ExprKind::NULL_VALUE), token(std::move(token)) {}
+
 BoolExpr::BoolExpr(Token token, bool value)
     : Expr(ExprKind::BOOL), token(std::move(token)), value(value) {}
 
@@ -146,9 +149,10 @@ GetAttrExpr::GetAttrExpr(ExprPtr object, Token dot, Token name)
       dot(std::move(dot)),
       name(std::move(name)) {}
 
-LetExpr::LetExpr(Token name, ExprPtr initializer, ExprPtr body)
+LetExpr::LetExpr(Token name, std::optional<Token> declared_type, ExprPtr initializer, ExprPtr body)
     : Expr(ExprKind::LET),
       name(std::move(name)),
+      declared_type(std::move(declared_type)),
       initializer(std::move(initializer)),
       body(std::move(body)) {}
 
@@ -192,6 +196,10 @@ std::string expr_to_string(const Expr& expr) {
             const auto& string = static_cast<const StringExpr&>(expr);
             return "String(\"" + string.token.lexeme + "\")";
         }
+        case ExprKind::NULL_VALUE: {
+            // El AST conserva Null como literal canonico sin detalles extra.
+            return "Null";
+        }
         case ExprKind::BOOL: {
             const auto& boolean = static_cast<const BoolExpr&>(expr);
             return boolean.value ? "Bool(true)" : "Bool(false)";
@@ -233,7 +241,14 @@ std::string expr_to_string(const Expr& expr) {
         }
         case ExprKind::LET: {
             const auto& let_expr = static_cast<const LetExpr&>(expr);
-            return "Let(" + let_expr.name.lexeme + " = " + expr_to_string(*let_expr.initializer) + " in " + expr_to_string(*let_expr.body) + ")";
+            std::ostringstream out;
+            out << "Let(" << let_expr.name.lexeme;
+            if (let_expr.declared_type) {
+                out << ": " << let_expr.declared_type->lexeme;
+            }
+            out << " = " << expr_to_string(*let_expr.initializer)
+                << " in " << expr_to_string(*let_expr.body) << ")";
+            return out.str();
         }
         case ExprKind::BLOCK: {
             const auto& block = static_cast<const BlockExpr&>(expr);

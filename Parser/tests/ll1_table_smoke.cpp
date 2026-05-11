@@ -68,6 +68,14 @@ int main() {
         ok &= expect(
             cell_has_production(
                 ll1_table.table,
+                "Primary",
+                "NULL_LITERAL",
+                "Primary -> NULL_LITERAL"),
+            "M[Primary, NULL_LITERAL] uses the null literal production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
                 "OrExprTail",
                 "OR",
                 "OrExprTail -> OR AndExpr OrExprTail"),
@@ -120,6 +128,14 @@ int main() {
                 "STAR",
                 "PostfixTail -> ε"),
             "M[PostfixTail, STAR] uses epsilon after completing postfix chain");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "MulExprTail",
+                "PERCENT",
+                "MulExprTail -> PERCENT PowerExpr MulExprTail"),
+            "M[MulExprTail, PERCENT] uses modulo production");
 
         return ok ? 0 : 1;
     } catch (const std::exception& error) {

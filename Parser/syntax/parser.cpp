@@ -26,6 +26,10 @@ ExprPtr Parser::parse_primary() {
         return std::make_unique<StringExpr>(tokens_.advance());
     }
 
+    if (tokens_.is(TokenType::NULL_LITERAL)) {
+        return std::make_unique<NullExpr>(tokens_.advance());
+    }
+
     if (tokens_.is(TokenType::TRUE)) {
         return std::make_unique<BoolExpr>(tokens_.advance(), true);
     }
@@ -47,7 +51,7 @@ ExprPtr Parser::parse_primary() {
 
     throw ParseError(
         tokens_.current(),
-        "Se esperaba una expresion primaria: numero, string, booleano, identificador o '('");
+        "Se esperaba una expresion primaria: numero, string, null, booleano, identificador o '('");
 }
 
 ExprPtr Parser::parse_or() {
@@ -118,7 +122,9 @@ ExprPtr Parser::parse_add() {
 ExprPtr Parser::parse_mul() {
     auto expr = parse_power();
 
-    while (tokens_.is(TokenType::STAR) || tokens_.is(TokenType::SLASH)) {
+    while (tokens_.is(TokenType::STAR) ||
+           tokens_.is(TokenType::SLASH) ||
+           tokens_.is(TokenType::PERCENT)) {
         Token op = tokens_.advance();
         auto right = parse_power();
         expr = std::make_unique<BinaryExpr>(std::move(expr), std::move(op), std::move(right));

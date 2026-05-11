@@ -118,6 +118,19 @@ int main() {
         "Binary(Grouped(Binary(Number(1), +, Number(2))), *, Number(3))");
 
     ok &= expect_expression(
+        "modulo shares multiplicative precedence",
+        {
+            make_token(TokenType::NUMBER_LITERAL, "10", 1),
+            make_token(TokenType::PERCENT, "%", 4),
+            make_token(TokenType::NUMBER_LITERAL, "3", 6),
+            make_token(TokenType::STAR, "*", 8),
+            make_token(TokenType::NUMBER_LITERAL, "2", 10),
+            make_token(TokenType::SEMICOLON, ";", 11),
+            make_token(TokenType::EOF_TOKEN, "", 12),
+        },
+        "Binary(Binary(Number(10), %, Number(3)), *, Number(2))");
+
+    ok &= expect_expression(
         "power is right associative",
         {
             make_token(TokenType::NUMBER_LITERAL, "2", 1),

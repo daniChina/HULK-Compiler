@@ -59,13 +59,17 @@ ElifChainOpt    -> ELIF LPAREN Expr RPAREN Expr ElifChainOpt
 ElseOpt         -> ELSE Expr
                 | ε
 
-LetExpr         -> LET BindingList IN Expr
+LetExpr         -> LET BindingList IN LetBody
+LetBody         -> BlockExpr
+                | Expr
 
 BindingList     -> Binding BindingTail
 BindingTail     -> COMMA Binding BindingTail
                 | ε
 
-Binding         -> IDENTIFIER ASSIGN Expr
+Binding         -> IDENTIFIER TypeAnnotationOpt BindingAssign Expr
+BindingAssign   -> ASSIGN
+                | EQUAL
 
 OrExpr          -> AndExpr OrExprTail
 OrExprTail      -> OR AndExpr OrExprTail | ε
@@ -96,6 +100,7 @@ AddExprTail     -> PLUS MulExpr AddExprTail
 MulExpr         -> PowerExpr MulExprTail
 MulExprTail     -> STAR PowerExpr MulExprTail
                 | SLASH PowerExpr MulExprTail
+                | PERCENT PowerExpr MulExprTail
                 | ε
 
 PowerExpr       -> UnaryExpr PowerExprTail
@@ -120,11 +125,11 @@ ArgListTail     -> COMMA Expr ArgListTail
 
 Primary         -> NUMBER_LITERAL
                 | STRING_LITERAL
+                | NULL_LITERAL
                 | TRUE
                 | FALSE
                 | IDENTIFIER
                 | LPAREN Expr RPAREN
-                | BlockExpr
                 | NEW IDENTIFIER LPAREN ArgListOpt RPAREN
                 | BASE LPAREN ArgListOpt RPAREN
                 | SELF

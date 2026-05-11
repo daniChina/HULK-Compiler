@@ -14,6 +14,7 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::IDENTIFIER:     return TokenType::IDENTIFIER;
         case ::TokenType::NUMBER_LITERAL: return TokenType::NUMBER_LITERAL;
         case ::TokenType::STRING_LITERAL: return TokenType::STRING_LITERAL;
+        case ::TokenType::NULL_LITERAL:   return TokenType::NULL_LITERAL;
         case ::TokenType::TRUE:           return TokenType::TRUE;
         case ::TokenType::FALSE:          return TokenType::FALSE;
         case ::TokenType::IF:             return TokenType::IF;
@@ -49,6 +50,7 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::MINUS:          return TokenType::MINUS;
         case ::TokenType::STAR:           return TokenType::STAR;
         case ::TokenType::SLASH:          return TokenType::SLASH;
+        case ::TokenType::PERCENT:        return TokenType::PERCENT;
         case ::TokenType::CARET:          return TokenType::CARET;
         case ::TokenType::TILDE:          return TokenType::TILDE;
         case ::TokenType::BANG:           return TokenType::BANG;

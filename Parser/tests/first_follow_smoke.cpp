@@ -41,13 +41,13 @@ int main() {
         ok &= expect(
             contains_all(
                 first_follow.first_sets.at("Primary"),
-                {"NUMBER_LITERAL", "STRING_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
+                {"NUMBER_LITERAL", "STRING_LITERAL", "NULL_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
             "FIRST(Primary) contains all primary starters");
 
         ok &= expect(
             contains_all(
                 first_follow.first_sets.at("UnaryExpr"),
-                {"MINUS", "BANG", "TILDE", "NUMBER_LITERAL", "STRING_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
+                {"MINUS", "BANG", "TILDE", "NUMBER_LITERAL", "STRING_LITERAL", "NULL_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
             "FIRST(UnaryExpr) contains unary operators and primary starters");
 
         ok &= expect(
@@ -75,7 +75,7 @@ int main() {
         ok &= expect(
             contains_all(
                 first_follow.follow_sets.at("Primary"),
-                {"LPAREN", "DOT", "CARET", "STAR", "SLASH", "PLUS", "MINUS", "CONCAT", "CONCAT_WS", "LESS", "LESS_EQUAL",
+                {"LPAREN", "DOT", "CARET", "STAR", "SLASH", "PERCENT", "PLUS", "MINUS", "CONCAT", "CONCAT_WS", "LESS", "LESS_EQUAL",
                  "GREATER", "GREATER_EQUAL", "EQUAL_EQUAL", "BANG_EQUAL", "AND", "OR", "SEMICOLON", "RPAREN"}),
             "FOLLOW(Primary) contains the expected operator and closing symbols");
 
@@ -94,7 +94,7 @@ int main() {
             ok &= expect(
                 contains_all(
                     first_sequence,
-                    {"MINUS", "BANG", "TILDE", "NUMBER_LITERAL", "STRING_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
+                    {"MINUS", "BANG", "TILDE", "NUMBER_LITERAL", "STRING_LITERAL", "NULL_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
                 "FIRST(UnaryExpr PowerExprTail) matches expression starters");
         }
 
