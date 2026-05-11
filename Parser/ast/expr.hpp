@@ -12,12 +12,14 @@ namespace parser {
 enum class ExprKind {
     NUMBER,
     STRING,
+    NULL_VALUE,
     BOOL,
     IDENTIFIER,
     GROUPED,
     UNARY,
     BINARY,
     CALL,
+    GET_ATTR,
     LET,
     BLOCK,
     IF,
@@ -112,6 +114,12 @@ struct StringExpr final : Expr {
     Token token;
 };
 
+struct NullExpr final : Expr {
+    explicit NullExpr(Token token);
+
+    Token token;
+};
+
 struct BoolExpr final : Expr {
     BoolExpr(Token token, bool value);
 
@@ -164,9 +172,10 @@ struct GetAttrExpr final : Expr {
 };
 
 struct LetExpr final : Expr {
-    LetExpr(Token name, ExprPtr initializer, ExprPtr body);
+    LetExpr(Token name, std::optional<Token> declared_type, ExprPtr initializer, ExprPtr body);
 
     Token name;
+    std::optional<Token> declared_type;
     ExprPtr initializer;
     ExprPtr body;
 };

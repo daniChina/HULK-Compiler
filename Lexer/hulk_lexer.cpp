@@ -919,6 +919,11 @@ case 29:
 YY_RULE_SETUP
 #line 162 "hulk_lexer.l"
 { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                // `Null` se trata como literal dedicado aunque su patron base
+                // entre primero por identificador.
+                if (lexeme_ == "Null" || lexeme_ == "null") {
+                    return static_cast<int>(TokenType::NULL_LITERAL);
+                }
                 return static_cast<int>(TokenType::IDENTIFIER); }
 	YY_BREAK
 /* ── 8. Operadores de dos caracteres ────────────────────── */
@@ -1076,6 +1081,11 @@ YY_RULE_SETUP
                 MARK_TOKEN();
                 SET_LEXEME();
                 column_ += yyleng;
+                // `%` se rescata aqui para no depender de regenerar Flex
+                // mientras seguimos usando el `.cpp` versionado.
+                if (yytext[0] == '%') {
+                    return static_cast<int>(TokenType::PERCENT);
+                }
                 std::cerr << "[Lexer] linea " << line_
                           << ", columna " << token_col_
                           << ": caracter desconocido '"
@@ -2088,4 +2098,3 @@ int main() {
 }
 
 ================================================================ */
-

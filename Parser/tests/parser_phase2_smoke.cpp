@@ -87,6 +87,15 @@ int main() {
         "Bool(true)");
 
     ok &= expect_expression(
+        "null literal",
+        {
+            make_token(TokenType::NULL_LITERAL, "Null", 1),
+            make_token(TokenType::SEMICOLON, ";", 5),
+            make_token(TokenType::EOF_TOKEN, "", 6),
+        },
+        "Null");
+
+    ok &= expect_expression(
         "identifier",
         {
             make_token(TokenType::IDENTIFIER, "x", 1),

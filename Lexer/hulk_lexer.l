@@ -159,6 +159,11 @@ IDENT       {ALPHA}{ALNUM_}*
 
  /* ── 7. Identificadores y nombres globales ─────────────── */
 {IDENT}       { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                // `Null` se trata como literal dedicado aunque su patron base
+                // entre primero por identificador.
+                if (lexeme_ == "Null" || lexeme_ == "null") {
+                    return static_cast<int>(TokenType::NULL_LITERAL);
+                }
                 return static_cast<int>(TokenType::IDENTIFIER); }
 
  /* ── 8. Operadores de dos caracteres ────────────────────── */
@@ -201,6 +206,11 @@ IDENT       {ALPHA}{ALNUM_}*
                 MARK_TOKEN();
                 SET_LEXEME();
                 column_ += yyleng;
+                // `%` se rescata aqui para no depender de regenerar Flex
+                // mientras seguimos usando el `.cpp` versionado.
+                if (yytext[0] == '%') {
+                    return static_cast<int>(TokenType::PERCENT);
+                }
                 std::cerr << "[Lexer] linea " << line_
                           << ", columna " << token_col_
                           << ": caracter desconocido '"

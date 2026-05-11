@@ -42,8 +42,8 @@ int main() {
         ok &= expect(grammar.non_terminals.count("Primary") == 1, "Primary recognized as non-terminal");
         ok &= expect(grammar.terminals.count("NUMBER_LITERAL") == 1, "NUMBER_LITERAL recognized as terminal");
         ok &= expect(grammar.terminals.count("CARET") == 1, "CARET recognized as terminal");
-        ok &= expect(contains_production(grammar, "Program -> ExprStmt EOF_TOKEN"),
-                     "Program production loaded");
+        ok &= expect(contains_production(grammar, "Program -> StmtList EOF_TOKEN"),
+                     "Program production loaded with statement list root");
         ok &= expect(contains_production(grammar, "PowerExprTail -> CARET PowerExpr"),
                      "right-associative power production loaded");
         ok &= expect(contains_production(grammar, "OrExprTail -> ε"),
