@@ -38,9 +38,11 @@ ExprPtr build_for_expr(const CstNode& node);
 ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else);
 ExprPtr build_else_opt(const CstNode& node);
 ExprPtr build_let_expr(const CstNode& node);
-void extract_bindings(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
-void extract_binding(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
-void extract_binding_tail(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings);
+ExprPtr build_let_body(const CstNode& node);
+using LetBindingData = std::tuple<Token, std::optional<Token>, ExprPtr>;
+void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings);
+void extract_binding(const CstNode& node, std::vector<LetBindingData>& bindings);
+void extract_binding_tail(const CstNode& node, std::vector<LetBindingData>& bindings);
 
 ExprPtr build_or_expr(const CstNode& node);
 ExprPtr build_or_tail(ExprPtr left, const CstNode& node);
@@ -170,15 +172,16 @@ ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else) {
 ExprPtr build_let_expr(const CstNode& node) {
     expect_symbol(node, "LetExpr");
     
-    std::vector<std::pair<Token, ExprPtr>> bindings;
+    std::vector<LetBindingData> bindings;
     extract_bindings(child(node, 1), bindings);
     
-    ExprPtr body = build_expr(child(node, 3));
+    ExprPtr body = build_let_body(child(node, 3));
     
     for (int i = static_cast<int>(bindings.size()) - 1; i >= 0; --i) {
         body = std::make_unique<LetExpr>(
-            bindings[i].first, 
-            std::move(bindings[i].second), 
+            std::move(std::get<0>(bindings[i])),
+            std::move(std::get<1>(bindings[i])),
+            std::move(std::get<2>(bindings[i])),
             std::move(body)
         );
     }
@@ -186,20 +189,30 @@ ExprPtr build_let_expr(const CstNode& node) {
     return body;
 }
 
-void extract_bindings(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings) {
+ExprPtr build_let_body(const CstNode& node) {
+    expect_symbol(node, "LetBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "BlockExpr") {
+        return build_block_expr(first_child);
+    }
+    return build_expr(first_child);
+}
+
+void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings) {
     expect_symbol(node, "BindingList");
     extract_binding(child(node, 0), bindings);
     extract_binding_tail(child(node, 1), bindings);
 }
 
-void extract_binding(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings) {
+void extract_binding(const CstNode& node, std::vector<LetBindingData>& bindings) {
     expect_symbol(node, "Binding");
     Token name = child(node, 0).token;
-    ExprPtr init = build_expr(child(node, 2));
-    bindings.emplace_back(std::move(name), std::move(init));
+    std::optional<Token> declared_type = build_type_annotation_opt(child(node, 1));
+    ExprPtr init = build_expr(child(node, 3));
+    bindings.emplace_back(std::move(name), std::move(declared_type), std::move(init));
 }
 
-void extract_binding_tail(const CstNode& node, std::vector<std::pair<Token, ExprPtr>>& bindings) {
+void extract_binding_tail(const CstNode& node, std::vector<LetBindingData>& bindings) {
     expect_symbol(node, "BindingTail");
     if (node.children.empty() || is_epsilon_node(child(node, 0))) {
         return;
@@ -432,6 +445,9 @@ ExprPtr build_primary(const CstNode& node) {
         if (value.symbol == "STRING_LITERAL") {
             return std::make_unique<StringExpr>(value.token);
         }
+        if (value.symbol == "NULL_LITERAL") {
+            return std::make_unique<NullExpr>(value.token);
+        }
         if (value.symbol == "TRUE") {
             return std::make_unique<BoolExpr>(value.token, true);
         }
@@ -440,9 +456,6 @@ ExprPtr build_primary(const CstNode& node) {
         }
         if (value.symbol == "IDENTIFIER") {
             return std::make_unique<IdentifierExpr>(value.token);
-        }
-        if (value.symbol == "BlockExpr") {
-            return build_block_expr(value);
         }
     }
 

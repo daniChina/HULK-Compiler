@@ -12,6 +12,7 @@ enum class TokenType {
     IDENTIFIER,
     NUMBER_LITERAL,
     STRING_LITERAL,
+    NULL_LITERAL,
     TRUE,
     FALSE,
 
@@ -50,6 +51,7 @@ enum class TokenType {
     MINUS,
     STAR,
     SLASH,
+    PERCENT,
     CARET,
     TILDE,
     BANG,
@@ -84,6 +86,7 @@ inline const char* token_name(TokenType type) {
         case TokenType::IDENTIFIER: return "IDENTIFIER";
         case TokenType::NUMBER_LITERAL: return "NUMBER_LITERAL";
         case TokenType::STRING_LITERAL: return "STRING_LITERAL";
+        case TokenType::NULL_LITERAL: return "NULL_LITERAL";
         case TokenType::TRUE: return "TRUE";
         case TokenType::FALSE: return "FALSE";
         case TokenType::IF: return "IF";
@@ -119,6 +122,7 @@ inline const char* token_name(TokenType type) {
         case TokenType::MINUS: return "MINUS";
         case TokenType::STAR: return "STAR";
         case TokenType::SLASH: return "SLASH";
+        case TokenType::PERCENT: return "PERCENT";
         case TokenType::CARET: return "CARET";
         case TokenType::TILDE: return "TILDE";
         case TokenType::BANG: return "BANG";
