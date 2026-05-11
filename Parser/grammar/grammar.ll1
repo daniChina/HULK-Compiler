@@ -16,6 +16,7 @@ StmtList        -> Stmt StmtList
 
 Stmt            -> ExprStmt
                 | FunctionDecl
+                | TypeDecl
 
 FunctionDecl    -> FUNCTION IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
 
@@ -28,6 +29,15 @@ TypeAnnotationOpt -> COLON IDENTIFIER | ε
 
 FunctionBody    -> ARROW Expr SEMICOLON
                 | BlockExpr
+
+TypeDecl        -> TYPE IDENTIFIER TypeParamsOpt TypeInheritanceOpt LBRACE TypeBody RBRACE
+TypeParamsOpt   -> LPAREN ArgIdListOpt RPAREN | ε
+TypeInheritanceOpt -> INHERITS IDENTIFIER TypeBaseArgsOpt | ε
+TypeBaseArgsOpt -> LPAREN ArgListOpt RPAREN | ε
+TypeBody        -> TypeMember TypeBody | ε
+TypeMember      -> IDENTIFIER TypeMemberTail
+TypeMemberTail  -> ASSIGN Expr SEMICOLON
+                | LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
 
 ExprStmt        -> Expr SEMICOLON
 
@@ -70,6 +80,7 @@ CmpExprTail     -> LESS ConcatExpr CmpExprTail
                 | GREATER_EQUAL ConcatExpr CmpExprTail
                 | EQUAL_EQUAL ConcatExpr CmpExprTail
                 | BANG_EQUAL ConcatExpr CmpExprTail
+                | IS IDENTIFIER CmpExprTail
                 | ε
 
 ConcatExpr      -> AddExpr ConcatExprTail
@@ -95,7 +106,8 @@ UnaryExpr       -> MINUS UnaryExpr
                 | TILDE UnaryExpr
                 | PostfixExpr
 
-PostfixExpr     -> Primary PostfixTail
+PostfixExpr     -> Primary PostfixTail AsExprOpt
+AsExprOpt       -> AS IDENTIFIER AsExprOpt | ε
 PostfixTail     -> LPAREN ArgListOpt RPAREN PostfixTail
                 | DOT IDENTIFIER PostfixTail
                 | ε
@@ -113,6 +125,9 @@ Primary         -> NUMBER_LITERAL
                 | IDENTIFIER
                 | LPAREN Expr RPAREN
                 | BlockExpr
+                | NEW IDENTIFIER LPAREN ArgListOpt RPAREN
+                | BASE LPAREN ArgListOpt RPAREN
+                | SELF
 
 BlockExpr       -> LBRACE BlockList RBRACE
 
