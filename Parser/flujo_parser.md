@@ -1296,3 +1296,13 @@ Al tener la jerarquía de sentencias establecida, se implementaron las declaraci
 - En la gramática, `Stmt` deriva en `FunctionDecl`. Las funciones incorporan múltiples no terminales auxiliares como `ArgIdListOpt` y `TypeAnnotationOpt` para lidiar con el tipado opcional de los parámetros y del retorno. El cuerpo diferencia claramente la notación *arrow* (`=> expr ;`) de un bloque completo (`{ ... }`).
 - El AST incorporó la clase semántica `FunctionDecl` que, en lugar de vectores crudos de expresiones, usa fuertemente `std::pair` combinando `Token` (para identificadores) y `std::optional<Token>` para retener las inferencias de tipos, encapsulando puramente la semántica HULK.
 - La extracción `build_function_decl` utiliza ayudantes recursivos para "aplanar" las listas enlazadas en forma de árbol que surgen de la recursión por la derecha requerida por LL(1), devolviendo vectores planos listos para iterar durante la fase semántica.
+
+---
+
+**19. Iteración 9 — Clases y Objetos (type, herencia, atributos, métodos, self, base, new)**
+
+El compilador ha escalado al soporte completo del paradigma de orientación a objetos especificado por HULK.
+
+- En la gramática, `TypeDecl` se ancló como una derivación de `Stmt`. Su cuerpo interior `TypeBody` exigía una solución cuidadosa para mantenerse LL(1). Como los atributos (`x = 1;`) y los métodos (`x() => 1;`) inician ambos con un identificador, se aplicó la técnica clásica de "factorización por la izquierda": todos comienzan derivando un `IDENTIFIER` que va seguido de un `TypeMemberTail`. Si este *tail* encuentra `=` es un atributo; si encuentra `(` es un método.
+- Dentro de `Primary`, se añadieron las producciones semánticas de instancias: instanciación de objetos usando `new Type(...)`, llamadas explícitas a los constructores ancestros vía `base(...)`, y la autorreferencia de objetos invocando `self`.
+- A nivel del AST, `TypeDecl` combina todos estos metadatos en un nodo pesado, distinguiendo la clase ancestro opcional (vía `INHERITS`) de la clase base. Esta rica estructura permite al Analizador Semántico construir sin esfuerzo el Árbol de Jerarquías y comprobar el *dispatch* dinámico de métodos y resolución de polimorfismo en futuros sprints.

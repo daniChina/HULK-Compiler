@@ -507,4 +507,10 @@ Se ha añadido la capacidad de declarar funciones a nivel global.
 
 - `grammar.ll1`: Se integró la nueva derivación `Stmt -> FunctionDecl`. La sintaxis obliga a la palabra `FUNCTION`, nombre, parámetros (con firmas opcionales usando `:`), retorno opcional, y un cuerpo que puede ser sintaxis de flecha `=> Expr ;` o un `BlockExpr` `{ ... }`.
 - `Parser/ast/expr.hpp` y `.cpp`: Se agregó `StmtKind::FUNCTION_DECL` y la clase `FunctionDecl`, almacenando nombre, parámetros, tipo de retorno y cuerpo.
-- `Parser/ast/cst_to_ast.cpp`: Implementación de rutinas granulares (`build_function_decl`, `build_arg_id_list_opt`, etc.) para recorrer las listas separadas por comas del CST y poblar elegantemente la estructura del AST.
+## Iteración 9: Orientación a Objetos (Completada)
+
+Se ha culminado el Parser integrando la declaración de tipos, atributos, métodos, constructores de clase, y las expresiones de instanciación e invocación base.
+
+- `grammar.ll1`: Se definió `TypeDecl` con parámetros opcionales y ancestro opcional (mediante `INHERITS`). El cuerpo de la clase agrupa una lista de `TypeMember`, que deriva determinísticamente en atributo o método sin romper el parseo predictivo LL(1).
+- `Parser/ast/expr.hpp` y `.cpp`: Se agregaron los nodos `TypeDecl`, `AttributeDef` y `MethodDef` para estructurar la definición de clases, así como `NewExpr` para la instanciación y `BaseCallExpr` para inicializar clases padres.
+- `Parser/ast/cst_to_ast.cpp`: Implementación de rutinas complejas para mapear el cuerpo de la clase y separar limpiamente los constructos de objetos antes de la evaluación semántica.

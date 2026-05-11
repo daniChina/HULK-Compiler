@@ -112,11 +112,29 @@ Ejemplo: `function f(x: Number): Number => x + 1;` o `function f(x) { ... }`
    - Actualizar `README.md` y `flujo_parser.md` reflejando los aprendizajes y cambios.
 
 
-Iteración 9 — type, herencia, atributos, métodos, self, base, new (tu punto 9)
-Objetivo: cierre del frente OO
+Iteración 9 — Clases y Objetos (type, herencia, atributos, métodos, self, base, new)
+Objetivo: Soportar la declaración completa de tipos orientados a objetos y su instanciación.
+Ejemplo: `type A(x) inherits B(x) { x = x; f() => x; }` y `new A(1)`
 
-Añadir TypeDecl, InheritsOpt, miembros.
-Integrar self, base(...), new T(...) en expresiones/postfix.
-Verificar LL(1) en ramas de tipo vs función vs expr.
-CST detallado de tipo y miembros.
-AST: TypeDecl, MethodDecl, NewExpr, BaseCallExpr, etc.
+**Pasos detallados de implementación:**
+1. **Gramática (`grammar.ll1`)**:
+   - Extender `Stmt` con `TypeDecl`.
+   - Implementar `TypeDecl -> TYPE IDENTIFIER TypeParamsOpt TypeInheritanceOpt LBRACE TypeBody RBRACE`.
+   - Definir `TypeParamsOpt -> LPAREN ArgIdListOpt RPAREN | ε`.
+   - Definir `TypeInheritanceOpt -> INHERITS IDENTIFIER TypeBaseArgsOpt | ε`.
+   - Definir `TypeBaseArgsOpt -> LPAREN ArgListOpt RPAREN | ε`.
+   - Para el cuerpo: `TypeBody -> TypeMember TypeBody | ε`.
+   - Para evitar conflictos LL(1) entre métodos y atributos que empiezan por identificador, factorizamos: `TypeMember -> IDENTIFIER TypeMemberTail`.
+   - `TypeMemberTail -> ASSIGN Expr SEMICOLON` (Atributo) | `LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody` (Método).
+   - Añadir la expresión `NewExpr -> NEW IDENTIFIER LPAREN ArgListOpt RPAREN` dentro de la jerarquía global de `Expr`.
+2. **AST (`expr.hpp` y `expr.cpp`)**:
+   - En expresiones: Añadir `ExprKind::NEW_OBJ` y su struct `NewExpr`.
+   - En declaraciones: Añadir `StmtKind::TYPE_DECL`.
+   - Crear sub-nodos para los miembros: `AttributeDef` (nombre, expresión) y `MethodDef` (nombre, parámetros, retorno, cuerpo).
+   - Crear el nodo final `TypeDecl` que agrupe: nombre, argumentos de clase, ancestro opcional, argumentos pasados al ancestro, y una lista combinada de atributos y métodos.
+3. **CST a AST (`cst_to_ast.cpp`)**:
+   - Añadir soporte en `build_stmt` para derivar hacia `TypeDecl`.
+   - Codificar extracciones robustas para recorrer el `TypeBody` e instanciar dinámicamente `AttributeDef` o `MethodDef` según la rama tomada por `TypeMemberTail`.
+4. **Validaciones Finales**:
+   - Asegurarse de que el compilador sigue siendo estrictamente LL(1).
+   - Documentar la culminación del Parser en `README.md` y `flujo_parser.md`.
