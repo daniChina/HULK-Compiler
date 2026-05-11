@@ -15,6 +15,17 @@ FunctionDecl::FunctionDecl(Token name, std::vector<std::pair<Token, std::optiona
       return_type(std::move(return_type)),
       body(std::move(body)) {}
 
+TypeDecl::TypeDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params,
+             std::optional<Token> parent_name, std::vector<ExprPtr> parent_args,
+             std::vector<AttributeDef> attributes, std::vector<MethodDef> methods)
+    : Stmt(StmtKind::TYPE_DECL),
+      name(std::move(name)),
+      params(std::move(params)),
+      parent_name(std::move(parent_name)),
+      parent_args(std::move(parent_args)),
+      attributes(std::move(attributes)),
+      methods(std::move(methods)) {}
+
 std::string stmt_to_string(const Stmt& stmt) {
     switch (stmt.stmt_kind) {
         case StmtKind::EXPR: {
@@ -37,6 +48,48 @@ std::string stmt_to_string(const Stmt& stmt) {
                 out << ": " << func.return_type->lexeme;
             }
             out << " => " << expr_to_string(*func.body) << ")";
+            return out.str();
+        }
+        case StmtKind::TYPE_DECL: {
+            const auto& type_decl = static_cast<const TypeDecl&>(stmt);
+            std::ostringstream out;
+            out << "TypeDecl(" << type_decl.name.lexeme << "(";
+            for (std::size_t i = 0; i < type_decl.params.size(); ++i) {
+                if (i > 0) out << ", ";
+                out << type_decl.params[i].first.lexeme;
+                if (type_decl.params[i].second) {
+                    out << ": " << type_decl.params[i].second->lexeme;
+                }
+            }
+            out << ")";
+            if (type_decl.parent_name) {
+                out << " inherits " << type_decl.parent_name->lexeme << "(";
+                for (std::size_t i = 0; i < type_decl.parent_args.size(); ++i) {
+                    if (i > 0) out << ", ";
+                    out << expr_to_string(*type_decl.parent_args[i]);
+                }
+                out << ")";
+            }
+            out << " {\n";
+            for (const auto& attr : type_decl.attributes) {
+                out << "    " << attr.name.lexeme << " = " << expr_to_string(*attr.value) << ";\n";
+            }
+            for (const auto& method : type_decl.methods) {
+                out << "    " << method.name.lexeme << "(";
+                for (std::size_t i = 0; i < method.params.size(); ++i) {
+                    if (i > 0) out << ", ";
+                    out << method.params[i].first.lexeme;
+                    if (method.params[i].second) {
+                        out << ": " << method.params[i].second->lexeme;
+                    }
+                }
+                out << ")";
+                if (method.return_type) {
+                    out << ": " << method.return_type->lexeme;
+                }
+                out << " => " << expr_to_string(*method.body) << ";\n";
+            }
+            out << "})";
             return out.str();
         }
     }
@@ -120,6 +173,15 @@ ForExpr::ForExpr(Token variable, ExprPtr iterable, ExprPtr body)
       iterable(std::move(iterable)),
       body(std::move(body)) {}
 
+NewExpr::NewExpr(Token type_name, std::vector<ExprPtr> args)
+    : Expr(ExprKind::NEW_OBJ),
+      type_name(std::move(type_name)),
+      args(std::move(args)) {}
+
+BaseCallExpr::BaseCallExpr(std::vector<ExprPtr> args)
+    : Expr(ExprKind::BASE_CALL),
+      args(std::move(args)) {}
+
 std::string expr_to_string(const Expr& expr) {
     switch (expr.kind) {
         case ExprKind::NUMBER: {
@@ -201,6 +263,28 @@ std::string expr_to_string(const Expr& expr) {
         case ExprKind::FOR: {
             const auto& for_expr = static_cast<const ForExpr&>(expr);
             return "For(" + for_expr.variable.lexeme + " in " + expr_to_string(*for_expr.iterable) + ", " + expr_to_string(*for_expr.body) + ")";
+        }
+        case ExprKind::NEW_OBJ: {
+            const auto& new_expr = static_cast<const NewExpr&>(expr);
+            std::ostringstream out;
+            out << "New(" << new_expr.type_name.lexeme << "(";
+            for (std::size_t i = 0; i < new_expr.args.size(); ++i) {
+                if (i > 0) out << ", ";
+                out << expr_to_string(*new_expr.args[i]);
+            }
+            out << "))";
+            return out.str();
+        }
+        case ExprKind::BASE_CALL: {
+            const auto& base_expr = static_cast<const BaseCallExpr&>(expr);
+            std::ostringstream out;
+            out << "BaseCall(";
+            for (std::size_t i = 0; i < base_expr.args.size(); ++i) {
+                if (i > 0) out << ", ";
+                out << expr_to_string(*base_expr.args[i]);
+            }
+            out << ")";
+            return out.str();
         }
     }
 

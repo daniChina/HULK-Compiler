@@ -22,7 +22,9 @@ enum class ExprKind {
     BLOCK,
     IF,
     WHILE,
-    FOR
+    FOR,
+    NEW_OBJ,
+    BASE_CALL
 };
 
 struct Expr {
@@ -36,7 +38,8 @@ using ExprPtr = std::unique_ptr<Expr>;
 
 enum class StmtKind {
     EXPR,
-    FUNCTION_DECL
+    FUNCTION_DECL,
+    TYPE_DECL
 };
 
 struct Stmt {
@@ -61,6 +64,31 @@ struct FunctionDecl final : Stmt {
     std::vector<std::pair<Token, std::optional<Token>>> params;
     std::optional<Token> return_type;
     ExprPtr body;
+};
+
+struct AttributeDef {
+    Token name;
+    ExprPtr value;
+};
+
+struct MethodDef {
+    Token name;
+    std::vector<std::pair<Token, std::optional<Token>>> params;
+    std::optional<Token> return_type;
+    ExprPtr body;
+};
+
+struct TypeDecl final : Stmt {
+    TypeDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params,
+             std::optional<Token> parent_name, std::vector<ExprPtr> parent_args,
+             std::vector<AttributeDef> attributes, std::vector<MethodDef> methods);
+
+    Token name;
+    std::vector<std::pair<Token, std::optional<Token>>> params;
+    std::optional<Token> parent_name;
+    std::vector<ExprPtr> parent_args;
+    std::vector<AttributeDef> attributes;
+    std::vector<MethodDef> methods;
 };
 
 struct Program {
@@ -170,6 +198,19 @@ struct ForExpr final : Expr {
     Token variable;
     ExprPtr iterable;
     ExprPtr body;
+};
+
+struct NewExpr final : Expr {
+    NewExpr(Token type_name, std::vector<ExprPtr> args);
+
+    Token type_name;
+    std::vector<ExprPtr> args;
+};
+
+struct BaseCallExpr final : Expr {
+    BaseCallExpr(std::vector<ExprPtr> args);
+
+    std::vector<ExprPtr> args;
 };
 
 std::string expr_to_string(const Expr& expr);
