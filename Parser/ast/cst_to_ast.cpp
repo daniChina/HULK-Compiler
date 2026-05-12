@@ -44,6 +44,8 @@ void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings
 void extract_binding(const CstNode& node, std::vector<LetBindingData>& bindings);
 void extract_binding_tail(const CstNode& node, std::vector<LetBindingData>& bindings);
 
+ExprPtr build_assign_expr(const CstNode& node);
+ExprPtr build_assign_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_or_expr(const CstNode& node);
 ExprPtr build_or_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_and_expr(const CstNode& node);
@@ -118,7 +120,10 @@ ExprPtr build_expr(const CstNode& node) {
     if (first_child.symbol == "LetExpr") {
         return build_let_expr(first_child);
     }
-    return build_or_expr(first_child);
+    if (first_child.symbol == "AssignExpr") {
+        return build_assign_expr(first_child);
+    }
+    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, LetExpr o AssignExpr");
 }
 
 ExprPtr build_for_expr(const CstNode& node) {
@@ -219,6 +224,23 @@ void extract_binding_tail(const CstNode& node, std::vector<LetBindingData>& bind
     }
     extract_binding(child(node, 1), bindings);
     extract_binding_tail(child(node, 2), bindings);
+}
+
+ExprPtr build_assign_expr(const CstNode& node) {
+    expect_symbol(node, "AssignExpr");
+    auto left = build_or_expr(child(node, 0));
+    return build_assign_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_assign_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "AssignTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_assign_expr(child(node, 1));
+    return std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
 }
 
 ExprPtr build_or_expr(const CstNode& node) {

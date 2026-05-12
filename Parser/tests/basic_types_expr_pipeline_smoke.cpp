@@ -282,8 +282,27 @@ int main() {
             ll1_table,
             "print(parse(42));",
             "Program(\n"
-            "  ExprStmt(Call(Identifier(print), [Call(Identifier(parse), [Number(42)])]))\n"
-            ")");
+                "  ExprStmt(Call(Identifier(print), [Call(Identifier(parse), [Number(42)])]))\n"
+                ")");
+        }
+
+        // Caso 9b: valida que tambien se acepten identificadores cuyo primer
+        // caracter es `_`, como pide la especificacion.
+        {
+            const auto tokens = tokenize_source("_ugly_case;");
+            ok &= expect_token_types(
+                "lexer recognizes identifier starting with underscore",
+                tokens,
+                {parser::TokenType::IDENTIFIER, parser::TokenType::SEMICOLON, parser::TokenType::EOF_TOKEN});
+
+            ok &= expect_program_ast(
+                "pipeline parses identifier starting with underscore",
+                grammar,
+                ll1_table,
+                "_ugly_case;",
+                "Program(\n"
+                "  ExprStmt(Identifier(_ugly_case))\n"
+                ")");
         }
 
         // Caso 10: mezcla grande para comprobar que todos los niveles de

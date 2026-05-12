@@ -143,5 +143,37 @@ int main() {
         },
         "Binary(Number(2), ^, Binary(Number(3), ^, Number(4)))");
 
+    ok &= expect_expression(
+        "assignment is right associative and weaker than addition",
+        {
+            make_token(TokenType::IDENTIFIER, "y", 1),
+            make_token(TokenType::ASSIGN, ":=", 3),
+            make_token(TokenType::IDENTIFIER, "x", 6),
+            make_token(TokenType::ASSIGN, ":=", 8),
+            make_token(TokenType::NUMBER_LITERAL, "5", 11),
+            make_token(TokenType::PLUS, "+", 13),
+            make_token(TokenType::NUMBER_LITERAL, "5", 15),
+            make_token(TokenType::SEMICOLON, ";", 16),
+            make_token(TokenType::EOF_TOKEN, "", 17),
+        },
+        "Binary(Identifier(y), :=, Binary(Identifier(x), :=, Binary(Number(5), +, Number(5))))");
+
+    ok &= expect_expression(
+        "parenthesized assignment before addition",
+        {
+            make_token(TokenType::IDENTIFIER, "y", 1),
+            make_token(TokenType::ASSIGN, ":=", 3),
+            make_token(TokenType::LPAREN, "(", 5),
+            make_token(TokenType::IDENTIFIER, "x", 6),
+            make_token(TokenType::ASSIGN, ":=", 8),
+            make_token(TokenType::NUMBER_LITERAL, "5", 11),
+            make_token(TokenType::RPAREN, ")", 12),
+            make_token(TokenType::PLUS, "+", 14),
+            make_token(TokenType::NUMBER_LITERAL, "1", 16),
+            make_token(TokenType::SEMICOLON, ";", 17),
+            make_token(TokenType::EOF_TOKEN, "", 18),
+        },
+        "Binary(Identifier(y), :=, Binary(Grouped(Binary(Identifier(x), :=, Number(5))), +, Number(1)))");
+
     return ok ? 0 : 1;
 }
