@@ -8,7 +8,17 @@ Parser::Parser(TokenList tokens)
     : tokens_(std::move(tokens)) {}
 
 ExprPtr Parser::parse_expression() {
-    return parse_or();
+    return parse_assign();
+}
+
+ExprPtr Parser::parse_assign() {
+    auto expr = parse_or();
+    if (tokens_.is(TokenType::ASSIGN)) {
+        Token op = tokens_.advance();
+        auto right = parse_assign();
+        return std::make_unique<BinaryExpr>(std::move(expr), std::move(op), std::move(right));
+    }
+    return expr;
 }
 
 ExprPtr Parser::parse_expression_statement() {

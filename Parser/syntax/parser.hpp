@@ -13,6 +13,7 @@ public:
     ExprPtr parse_expression_statement();
 
 private:
+    ExprPtr parse_assign();
     ExprPtr parse_or();
     ExprPtr parse_and();
     ExprPtr parse_comparison();

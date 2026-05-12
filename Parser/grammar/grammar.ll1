@@ -45,7 +45,11 @@ Expr            -> IfExpr
                 | LetExpr
                 | WhileExpr
                 | ForExpr
-                | OrExpr
+                | AssignExpr
+
+AssignExpr      -> OrExpr AssignTail
+AssignTail      -> ASSIGN AssignExpr
+                | ε
 
 ForExpr         -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
 
