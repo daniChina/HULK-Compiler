@@ -23,6 +23,16 @@ void insert_table_entry(
         return;
     }
 
+    // Si ya hay una produccion concreta y llega una segunda entrada desde epsilon+FOLLOW
+    // (misma celda que un terminal de FIRST de otra alternativa), conservar la no-epsilon.
+    if (production.is_epsilon()) {
+        return;
+    }
+    if (found->second.is_epsilon()) {
+        found->second = production;
+        return;
+    }
+
     result.conflicts.push_back(Ll1Conflict{
         non_terminal,
         terminal,

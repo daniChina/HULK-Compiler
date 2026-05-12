@@ -206,6 +206,28 @@ IDENT       {ALPHA}{ALNUM_}*
                 MARK_TOKEN();
                 SET_LEXEME();
                 column_ += yyleng;
+                // Soporta identificadores que empiezan por `_` aunque el
+                // automata principal actual no los consuma por la regla IDENT.
+                if (yytext[0] == '_') {
+                    while (true) {
+                        int next = yyinput();
+                        if (next == 0) {
+                            break;
+                        }
+                        if ((next >= 'a' && next <= 'z') ||
+                            (next >= 'A' && next <= 'Z') ||
+                            (next >= '0' && next <= '9') ||
+                            next == '_') {
+                            lexeme_ += static_cast<char>(next);
+                            ++column_;
+                            continue;
+                        }
+                        yyunput(next, yytext_ptr);
+                        break;
+                    }
+                    sem.str_val = lexeme_;
+                    return static_cast<int>(TokenType::IDENTIFIER);
+                }
                 // `%` se rescata aqui para no depender de regenerar Flex
                 // mientras seguimos usando el `.cpp` versionado.
                 if (yytext[0] == '%') {

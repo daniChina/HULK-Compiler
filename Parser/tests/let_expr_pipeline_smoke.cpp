@@ -114,6 +114,33 @@ int main() {
             "  ExprStmt(Let(x: Number = Number(1) in Let(y: Number = Number(2) in Let(msg: String = String(\"\"ok\"\") in Block(Call(Identifier(print), [Identifier(msg)]), Binary(Identifier(x), +, Identifier(y)))))))\n"
             ")");
 
+        // Caso 7: asignacion destructiva `:=` a variable ligada por let dentro de un bloque
+        // (valor de retorno y reasignacion; print solo comprueba forma del arbol).
+        ok &= expect_program_ast(
+            "let block with string reassignment via :=",
+            grammar,
+            ll1_table,
+            "let color = \"green\" in { print(color); color := \"blue\"; print(color); };",
+            "Program(\n"
+            "  ExprStmt(Let(color = String(\"\"green\"\") in Block(Call(Identifier(print), [Identifier(color)]), "
+            "Binary(Identifier(color), :=, String(\"\"blue\"\")), Call(Identifier(print), [Identifier(color)]))))\n"
+            ")");
+
+        // Caso 8: `:=` asocia a la derecha y tiene menor prioridad que la aritmetica
+        // (y := x := 5 + 5  ~  y := (x := (5 + 5)); y := (x := 5) + 1 fuerza otro orden).
+        ok &= expect_program_ast(
+            "let with chained assignment precedence inside block",
+            grammar,
+            ll1_table,
+            "let x = 0, y = 0 in { y := x := 5 + 5; print(x); print(y); y := (x := 5) + 1; print(x); print(y); };",
+            "Program(\n"
+            "  ExprStmt(Let(x = Number(0) in Let(y = Number(0) in Block(Binary(Identifier(y), :=, "
+            "Binary(Identifier(x), :=, Binary(Number(5), +, Number(5)))), Call(Identifier(print), [Identifier(x)]), "
+            "Call(Identifier(print), [Identifier(y)]), Binary(Identifier(y), :=, "
+            "Binary(Grouped(Binary(Identifier(x), :=, Number(5))), +, Number(1))), "
+            "Call(Identifier(print), [Identifier(x)]), Call(Identifier(print), [Identifier(y)])))))\n"
+            ")");
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] let pipeline smoke threw exception: " << error.what() << "\n";
