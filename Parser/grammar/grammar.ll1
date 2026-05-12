@@ -1,9 +1,10 @@
 // Primera gramatica LL(1) formal del proyecto.
 // Alcance actual:
-// - expresiones
-// - precedencia de operadores
+// - programa: lista de sentencias (expresion global, funciones globales, declaraciones type)
+// - condicionales if / elif / else (cuerpos IfBody: expresion o bloque)
+// - while (cuerpo WhileBody; else opcional WhileElseOpt)
+// - expresiones y precedencia de operadores
 // - asociatividad derecha para CARET
-// - una sentencia de expresion terminada en SEMICOLON
 //
 // Convenciones:
 // - Los terminales usan exactamente los nombres expuestos por Parser/core/token.hpp
@@ -53,14 +54,23 @@ AssignTail      -> ASSIGN AssignExpr
 
 ForExpr         -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
 
-WhileExpr       -> WHILE LPAREN Expr RPAREN Expr
+WhileBody       -> BlockExpr
+                | Expr
 
-IfExpr          -> IF LPAREN Expr RPAREN Expr ElifChainOpt ElseOpt
-
-ElifChainOpt    -> ELIF LPAREN Expr RPAREN Expr ElifChainOpt
+WhileElseOpt    -> ELSE WhileBody
                 | ε
 
-ElseOpt         -> ELSE Expr
+WhileExpr       -> WHILE LPAREN Expr RPAREN WhileBody WhileElseOpt
+
+IfBody          -> BlockExpr
+                | Expr
+
+IfExpr          -> IF LPAREN Expr RPAREN IfBody ElifChainOpt ElseOpt
+
+ElifChainOpt    -> ELIF LPAREN Expr RPAREN IfBody ElifChainOpt
+                | ε
+
+ElseOpt         -> ELSE IfBody
                 | ε
 
 LetExpr         -> LET BindingList IN LetBody

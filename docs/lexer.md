@@ -23,7 +23,7 @@ Lo que sí cubre (según [hulk_lexer.l](/home/nebur02/Documents/3er Ano/2do SEME
 - control/estructura: `if`, `elif`, `else`, `while`, `for`, `let`, `in`
 - funciones/tipos/protocolos/macros: `function`, `type`, `protocol`, `def`, `new`, `inherits`, `self`, `base`, `is`, `as`
 - builtins: `print`, `sqrt`, `sin`, `cos`, `exp`, `log`, `rand`, `PI`, `E`, `range`
-- operadores/símbolos: `:=`, `=>`, `==`, `!=`, `<=`, `>=`, `=`, `@`, `+ - * / ^ ~ ! < >`, paréntesis/llaves/corchetes, `, ; . :`
+- operadores/símbolos: `:=`, `=>`, `->`, `==`, `!=`, `<=`, `>=`, `=`, `@`, `+ - * / ^ ~ ! < >`, paréntesis/llaves/corchetes, `, ; . :`
 - manejo de comentarios, espacios, EOF y carácter desconocido
 
 Para “HULK completo” según [Hulk.md](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Hulk.md), faltan al menos estas piezas:
@@ -34,7 +34,7 @@ Para “HULK completo” según [Hulk.md](/home/nebur02/Documents/3er Ano/2do SE
   - `&` y `|` si decides seguir la notación booleana de esa sección del `.md` (tu lexer hoy usa keywords `and`/`or`)
   - `**` si quieres soportar la notación de potencia usada en partes del `.md` (hoy solo hay `^`)
   - `extends` (aparece en ejemplos de protocolos más amplios, hoy sería `IDENTIFIER`)
-- si apuntas al tour completo que ya tienes en `example.hulk`, también faltan keywords/tokens para cosas como `match`, `case`, `default`, y `->`.
+- si apuntas al tour completo que ya tienes en `example.hulk`, también faltan keywords/tokens para cosas como `match`, `case`, `default`, u otras extensiones no contempladas en el lexer actual.
 - y más importante: aunque el lexer esté completo, todavía faltaría el resto del compilador:
   - parser (gramática sintáctica)
   - AST

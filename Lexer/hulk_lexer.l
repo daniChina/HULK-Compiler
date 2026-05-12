@@ -169,6 +169,7 @@ IDENT       {ALPHA}{ALNUM_}*
  /* ── 8. Operadores de dos caracteres ────────────────────── */
 ":="          { UPD(ASSIGN);        }
 "=>"          { UPD(ARROW);         }
+"->"          { UPD(ARROW);         }
 "=="          { UPD(EQUAL_EQUAL);   }
 "!="          { UPD(BANG_EQUAL);    }
 "<="          { UPD(LESS_EQUAL);    }
