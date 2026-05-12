@@ -30,7 +30,7 @@ En tu archivo [hulk_lexer.l](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPIL
 - **Builtins**: `print`, `sqrt`, `sin`, `cos`, `exp`, `log`, `rand`, `PI`, `E`, `range`
 - **Identificadores**: `{IDENT}`
 - **Operadores/símbolos**:
-  - 2 chars: `:=`, `=>`, `==`, `!=`, `<=`, `>=`
+  - 2 chars: `:=`, `=>`, `->`, `==`, `!=`, `<=`, `>=`
   - 1 char: `=`, `@`, `(` `)` `{` `}` `[` `]` `,` `;` `.` `:` `+` `-` `*` `/` `^` `~` `!` `<` `>`
 - **EOF**: `<<EOF>>`
 - **Desconocido**: `.`

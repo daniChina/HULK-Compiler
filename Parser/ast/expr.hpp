@@ -195,10 +195,11 @@ struct IfExpr final : Expr {
 };
 
 struct WhileExpr final : Expr {
-    WhileExpr(ExprPtr condition, ExprPtr body);
+    WhileExpr(ExprPtr condition, ExprPtr body, ExprPtr else_branch);
 
     ExprPtr condition;
     ExprPtr body;
+    ExprPtr else_branch;
 };
 
 struct ForExpr final : Expr {

@@ -5,6 +5,7 @@
 #include "../generator/first_follow.hpp"
 #include "../generator/grammar_reader.hpp"
 #include "../generator/ll1_table.hpp"
+#include "../generator/production.hpp"
 
 namespace {
 
@@ -48,6 +49,88 @@ int main() {
         bool ok = true;
 
         ok &= expect(ll1_table.conflicts.empty(), "grammar builds LL(1) table without conflicts");
+
+        // Condicionales: celdas criticas de IfBody / ElifChainOpt / ElseOpt (ademas de conflicts.empty(),
+        // build_ll1_table puede resolver choques epsilon vs no-epsilon sin listarlos; aqui se fija el comportamiento deseado).
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "IfBody",
+                "LBRACE",
+                "IfBody -> BlockExpr"),
+            "M[IfBody, LBRACE] uses block body production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "IfBody",
+                "IF",
+                "IfBody -> Expr"),
+            "M[IfBody, IF] uses expression body production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ElseOpt",
+                "ELSE",
+                "ElseOpt -> ELSE IfBody"),
+            "M[ElseOpt, ELSE] uses else-branch production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ElseOpt",
+                "SEMICOLON",
+                std::string("ElseOpt -> ") + parser::generator::kEpsilonSymbol),
+            "M[ElseOpt, SEMICOLON] uses epsilon when else is omitted");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ElifChainOpt",
+                "ELIF",
+                "ElifChainOpt -> ELIF LPAREN Expr RPAREN IfBody ElifChainOpt"),
+            "M[ElifChainOpt, ELIF] continues elif chain");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ElifChainOpt",
+                "ELSE",
+                std::string("ElifChainOpt -> ") + parser::generator::kEpsilonSymbol),
+            "M[ElifChainOpt, ELSE] closes elif chain before optional else");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "WhileBody",
+                "LBRACE",
+                "WhileBody -> BlockExpr"),
+            "M[WhileBody, LBRACE] uses block as while body");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "WhileBody",
+                "NUMBER_LITERAL",
+                "WhileBody -> Expr"),
+            "M[WhileBody, NUMBER_LITERAL] uses expression as while body");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "WhileElseOpt",
+                "ELSE",
+                "WhileElseOpt -> ELSE WhileBody"),
+            "M[WhileElseOpt, ELSE] attaches while-else branch");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "WhileElseOpt",
+                "SEMICOLON",
+                std::string("WhileElseOpt -> ") + parser::generator::kEpsilonSymbol),
+            "M[WhileElseOpt, SEMICOLON] omits optional while-else");
 
         ok &= expect(
             cell_has_production(

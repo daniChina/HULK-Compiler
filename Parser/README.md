@@ -60,7 +60,15 @@ Ahi se define:
 
 ## Organizacion actual
 
-La carpeta `Parser/` ahora queda separada por responsabilidad:
+La carpeta `Parser/` ahora queda separada por respRequest ID: 56436543-132a-48ea-bbf9-3584239bf5c5
+$2t: You've hit your usage limit Get Cursor Pro for more Agent usage, unlimited Tab, and more.
+    at LJy (vscode-file://vscode-app/usr/share/cursor/resources/app/out/vs/workbench/workbench.desktop.main.js:29226:25158)
+    at DJy (vscode-file://vscode-app/usr/share/cursor/resources/app/out/vs/workbench/workbench.desktop.main.js:29226:24303)
+    at qJy (vscode-file://vscode-app/usr/share/cursor/resources/app/out/vs/workbench/workbench.desktop.main.js:29227:6490)
+    at c5d.run (vscode-file://vscode-app/usr/share/cursor/resources/app/out/vs/workbench/workbench.desktop.main.js:29227:11311)
+    at async vfs.runAgentLoop (vscode-file://vscode-app/usr/share/cursor/resources/app/out/vs/workbench/workbench.desktop.main.js:41560:14333)
+    at async jCh._runBackgroundTaskCompletionAction (vscode-file://vscode-app/usr/share/cursor/resources/app/out/vs/workbench/workbench.desktop.main.js:41628:14875)
+    at async jCh._maybeDispatchBackgroundCompletions (vscode-file://vscode-app/usr/share/cursor/resources/app/out/vs/workbench/workbench.desktop.main.js:41628:17177)onsabilidad:
 
 - `Parser/core/`: contrato de tokens, adaptador lexer -> parser, error sintactico y `TokenStream`
 - `Parser/ast/`: nodos de AST manual y nodos de CST del parser LL(1)
@@ -473,17 +481,20 @@ Se ha implementado el soporte para bloques de expresiones `{ ... }`. Los cambios
 
 Se ha implementado el soporte para expresiones condicionales de control de flujo. Los cambios incluyen:
 
-- `grammar.ll1`: Se añadieron las producciones `IfExpr`, `ElifChainOpt`, y `ElseOpt`. La estructura permite bifurcaciones opcionales manejando internamente el LL(1) predictivamente y resolviendo el *dangling else* por medio de la precedencia en la gramática.
+- `grammar.ll1`: Se añadieron las producciones `IfExpr`, `ElifChainOpt`, y `ElseOpt`, y el no terminal `IfBody` (`BlockExpr | Expr`) para que cada rama (`then`, cada `elif` y `else`) admita tanto una expresión como un bloque `{ ... }`, en línea con `LetBody` y con la especificación de HULK. La estructura de `elif`/`else` opcional sigue siendo LL(1); el *dangling else* se resuelve por la forma habitual de la gramática.
 - `Parser/ast/expr.hpp` y `.cpp`: Se integró el nodo AST `IfExpr` el cual posee una condición (`condition`), una rama verdadera (`then_branch`), y una rama falsa opcional (`else_branch`).
-- `Parser/ast/cst_to_ast.cpp`: Se programó el desugaring recursivo de `elif`. Un condicional del tipo `if A then B elif C then D else E` se representa en el AST como `If(A, B, If(C, D, E))`, lo que simplifica en gran medida su evaluación semántica.
+- `Parser/ast/cst_to_ast.cpp`: Se programó el desugaring recursivo de `elif`. Un condicional del tipo `if A then B elif C then D else E` se representa en el AST como `If(A, B, If(C, D, E))`, lo que simplifica en gran medida su evaluación semántica. La conversión de `IfBody` reutiliza la misma idea que `LetBody` (bloque o expresión).
+- `Parser/tests/if_expr_pipeline_smoke.cpp` y `Parser/tests/if_expr_invalid_smoke.cpp`: pruebas de regresión del pipeline y de rechazo sintáctico para formas inválidas habituales.
 
 ## Iteración 5: While (Completada)
 
 Se ha integrado el soporte para ciclos indeterminados.
 
-- `grammar.ll1`: Se definió `WhileExpr -> WHILE LPAREN Expr RPAREN Expr`. Al estar embebido en la jerarquía general de `Expr`, el cuerpo del while puede ser desde una simple primaria hasta un `BlockExpr`.
-- `Parser/ast/expr.hpp` y `.cpp`: Creación del nodo `WhileExpr` y del enumerador `ExprKind::WHILE`. Este nodo guarda su `condition` y su `body`.
-- `Parser/ast/cst_to_ast.cpp`: Extracción limpia de la condición y el cuerpo desde el CST.
+- `grammar.ll1`: `WhileExpr -> WHILE LPAREN Expr RPAREN WhileBody WhileElseOpt`, con `WhileBody -> BlockExpr | Expr` (misma discriminación LL(1) que `IfBody`/`LetBody`: `{` inicia bloque) y `WhileElseOpt -> ELSE WhileBody | ε` para el valor cuando el cuerpo no se ejecuta nunca (semántica de `Null` vs rama `else` a nivel de ejecución).
+- `Parser/ast/expr.hpp` y `.cpp`: `WhileExpr` almacena `condition`, `body` y `else_branch` opcional; `expr_to_string` emite `While(cond, body)` o `While(cond, body, else)` si hay `else`.
+- `Parser/ast/cst_to_ast.cpp`: `build_while_body` y `build_while_else_opt` para el CST.
+- `Parser/tests/while_expr_pipeline_smoke.cpp` y `Parser/tests/while_expr_invalid_smoke.cpp`: pipeline completo y rechazos sintácticos.
+- `Parser/tests/ll1_table_smoke.cpp`: celdas `WhileBody` / `WhileElseOpt` en la tabla predictiva.
 
 ## Iteración 6: For (Completada)
 
@@ -495,9 +506,9 @@ Se ha integrado el soporte para ciclos iterativos.
 
 ## Iteración 7: Programa Completo y Sentencias (Completada)
 
-Se ha refactorizado la cima de la gramática y del AST para soportar un programa estructurado como una lista de sentencias (actualmente `ExprStmt`, sentencias de expresiones terminadas en `;`). 
+Se ha refactorizado la cima de la gramática y del AST para soportar un programa estructurado como una lista de sentencias.
 
-- `grammar.ll1`: La producción `Program` ahora es `StmtList EOF_TOKEN`, donde `StmtList` agrupa recursivamente múltiples `Stmt`. Cada `Stmt` se define actualmente como `ExprStmt`.
+- `grammar.ll1`: La producción `Program` ahora es `StmtList EOF_TOKEN`, donde `StmtList` agrupa recursivamente múltiples `Stmt`. Cada `Stmt` puede ser `ExprStmt`, `FunctionDecl` o `TypeDecl`.
 - `Parser/ast/expr.hpp` y `.cpp`: Se introdujo la jerarquía `Stmt` y su enumerador `StmtKind`. Se creó la clase raíz `Program` (la cual contiene un `std::vector<StmtPtr>`) y se empaquetaron las expresiones globales en nodos `ExprStmt`.
 - `Parser/ast/cst_to_ast.cpp`: Se rediseñó el punto de entrada `cst_to_ast` para retornar un objeto `ProgramPtr`. Este recorre la lista `StmtList` recolectando las sentencias individuales y agregándolas al programa raíz. También se actualizó el driver `main.cpp` para mostrar este nuevo nivel estructural.
 
@@ -505,8 +516,11 @@ Se ha refactorizado la cima de la gramática y del AST para soportar un programa
 
 Se ha añadido la capacidad de declarar funciones a nivel global.
 
-- `grammar.ll1`: Se integró la nueva derivación `Stmt -> FunctionDecl`. La sintaxis obliga a la palabra `FUNCTION`, nombre, parámetros (con firmas opcionales usando `:`), retorno opcional, y un cuerpo que puede ser sintaxis de flecha `=> Expr ;` o un `BlockExpr` `{ ... }`.
-- `Parser/ast/expr.hpp` y `.cpp`: Se agregó `StmtKind::FUNCTION_DECL` y la clase `FunctionDecl`, almacenando nombre, parámetros, tipo de retorno y cuerpo.
+- `grammar.ll1`: Se integró la nueva derivación `Stmt -> FunctionDecl`. La sintaxis obliga a la palabra `FUNCTION`, nombre, parámetros (con firmas opcionales usando `:`), retorno opcional, y un cuerpo que puede ser la forma compacta `ARROW Expr ;` (flecha `=>` o `->` seguida de una sola expresión y punto y coma) o la forma extendida `BlockExpr` `{ ... }` (lista de expresiones separadas por `;` dentro de llaves; no se exige `;` tras la `}`).
+- `Lexer/hulk_lexer.l`: El token `ARROW` reconoce tanto `=>` (forma descrita en `Hulk.md`) como `->` (notación equivalente usada en algunos guiones de curso).
+- `Parser/ast/expr.hpp` y `.cpp`: Se agregó `StmtKind::FUNCTION_DECL` y la clase `FunctionDecl`, almacenando nombre, parámetros, tipo de retorno y cuerpo. En `stmt_to_string`, el cuerpo se muestra siempre precedido por el texto ` => ` como convención de volcado, independientemente de si el fuente usó `=>` o `->`.
+- `Parser/tests/function_decl_pipeline_smoke.cpp`: pruebas de regresión lexer → parser → AST para funciones compactas (`=>` / `->`), extendidas (`{ ... }`) y listas de declaraciones antes de la expresión global.
+
 ## Iteración 9: Orientación a Objetos (Completada)
 
 Se ha culminado el Parser integrando la declaración de tipos, atributos, métodos, constructores de clase, y las expresiones de instanciación e invocación base.
