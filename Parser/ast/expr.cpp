@@ -166,10 +166,11 @@ IfExpr::IfExpr(ExprPtr condition, ExprPtr then_branch, ExprPtr else_branch)
       then_branch(std::move(then_branch)),
       else_branch(std::move(else_branch)) {}
 
-WhileExpr::WhileExpr(ExprPtr condition, ExprPtr body)
+WhileExpr::WhileExpr(ExprPtr condition, ExprPtr body, ExprPtr else_branch)
     : Expr(ExprKind::WHILE),
       condition(std::move(condition)),
-      body(std::move(body)) {}
+      body(std::move(body)),
+      else_branch(std::move(else_branch)) {}
 
 ForExpr::ForExpr(Token variable, ExprPtr iterable, ExprPtr body)
     : Expr(ExprKind::FOR),
@@ -273,7 +274,13 @@ std::string expr_to_string(const Expr& expr) {
         }
         case ExprKind::WHILE: {
             const auto& while_expr = static_cast<const WhileExpr&>(expr);
-            return "While(" + expr_to_string(*while_expr.condition) + ", " + expr_to_string(*while_expr.body) + ")";
+            std::ostringstream out;
+            out << "While(" << expr_to_string(*while_expr.condition) << ", " << expr_to_string(*while_expr.body);
+            if (while_expr.else_branch) {
+                out << ", " << expr_to_string(*while_expr.else_branch);
+            }
+            out << ")";
+            return out.str();
         }
         case ExprKind::FOR: {
             const auto& for_expr = static_cast<const ForExpr&>(expr);

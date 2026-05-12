@@ -39,6 +39,9 @@ ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else);
 ExprPtr build_else_opt(const CstNode& node);
 ExprPtr build_let_expr(const CstNode& node);
 ExprPtr build_let_body(const CstNode& node);
+ExprPtr build_if_body(const CstNode& node);
+ExprPtr build_while_body(const CstNode& node);
+ExprPtr build_while_else_opt(const CstNode& node);
 using LetBindingData = std::tuple<Token, std::optional<Token>, ExprPtr>;
 void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings);
 void extract_binding(const CstNode& node, std::vector<LetBindingData>& bindings);
@@ -137,21 +140,21 @@ ExprPtr build_for_expr(const CstNode& node) {
 ExprPtr build_while_expr(const CstNode& node) {
     expect_symbol(node, "WhileExpr");
     ExprPtr cond = build_expr(child(node, 2));
-    ExprPtr body = build_expr(child(node, 4));
-    return std::make_unique<WhileExpr>(std::move(cond), std::move(body));
+    ExprPtr body = build_while_body(child(node, 4));
+    ExprPtr else_branch = build_while_else_opt(child(node, 5));
+    return std::make_unique<WhileExpr>(std::move(cond), std::move(body), std::move(else_branch));
 }
 
 ExprPtr build_if_expr(const CstNode& node) {
     expect_symbol(node, "IfExpr");
     ExprPtr cond = build_expr(child(node, 2));
-    ExprPtr then_branch = build_expr(child(node, 4));
+    ExprPtr then_branch = build_if_body(child(node, 4));
     ExprPtr else_branch = build_else_opt(child(node, 6));
-    
+
     return std::make_unique<IfExpr>(
-        std::move(cond), 
-        std::move(then_branch), 
-        build_elif_chain_opt(child(node, 5), std::move(else_branch))
-    );
+        std::move(cond),
+        std::move(then_branch),
+        build_elif_chain_opt(child(node, 5), std::move(else_branch)));
 }
 
 ExprPtr build_else_opt(const CstNode& node) {
@@ -159,7 +162,7 @@ ExprPtr build_else_opt(const CstNode& node) {
     if (node.children.empty() || is_epsilon_node(child(node, 0))) {
         return nullptr;
     }
-    return build_expr(child(node, 1));
+    return build_if_body(child(node, 1));
 }
 
 ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else) {
@@ -168,9 +171,9 @@ ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else) {
         return final_else;
     }
     ExprPtr cond = build_expr(child(node, 2));
-    ExprPtr then_branch = build_expr(child(node, 4));
+    ExprPtr then_branch = build_if_body(child(node, 4));
     ExprPtr nested_else = build_elif_chain_opt(child(node, 5), std::move(final_else));
-    
+
     return std::make_unique<IfExpr>(std::move(cond), std::move(then_branch), std::move(nested_else));
 }
 
@@ -201,6 +204,32 @@ ExprPtr build_let_body(const CstNode& node) {
         return build_block_expr(first_child);
     }
     return build_expr(first_child);
+}
+
+ExprPtr build_if_body(const CstNode& node) {
+    expect_symbol(node, "IfBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "BlockExpr") {
+        return build_block_expr(first_child);
+    }
+    return build_expr(first_child);
+}
+
+ExprPtr build_while_body(const CstNode& node) {
+    expect_symbol(node, "WhileBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "BlockExpr") {
+        return build_block_expr(first_child);
+    }
+    return build_expr(first_child);
+}
+
+ExprPtr build_while_else_opt(const CstNode& node) {
+    expect_symbol(node, "WhileElseOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return nullptr;
+    }
+    return build_while_body(child(node, 1));
 }
 
 void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings) {

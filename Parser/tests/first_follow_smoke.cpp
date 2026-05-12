@@ -98,6 +98,12 @@ int main() {
                 "FIRST(UnaryExpr PowerExprTail) matches expression starters");
         }
 
+        // IfBody / LetBody: BlockExpr solo con '{' ; Expr no puede empezar por LBRACE en esta gramatica,
+        // asi FIRST(BlockExpr) y FIRST(Expr) son disjuntos y la eleccion LL(1) en M[IfBody, a] es unica.
+        ok &= expect(
+            first_follow.first_sets.at("Expr").count("LBRACE") == 0,
+            "FIRST(Expr) excludes LBRACE so IfBody, LetBody, and WhileBody discriminate block vs expression");
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] first/follow smoke threw exception: " << error.what() << "\n";
