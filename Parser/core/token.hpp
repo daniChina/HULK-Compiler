@@ -21,6 +21,7 @@ enum class TokenType {
     ELSE,
     WHILE,
     FOR,
+    WITH,
     FUNCTION,
     TYPE,
     PROTOCOL,
@@ -94,6 +95,7 @@ inline const char* token_name(TokenType type) {
         case TokenType::ELSE: return "ELSE";
         case TokenType::WHILE: return "WHILE";
         case TokenType::FOR: return "FOR";
+        case TokenType::WITH: return "WITH";
         case TokenType::FUNCTION: return "FUNCTION";
         case TokenType::TYPE: return "TYPE";
         case TokenType::PROTOCOL: return "PROTOCOL";

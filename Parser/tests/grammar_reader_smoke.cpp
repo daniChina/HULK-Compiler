@@ -46,6 +46,8 @@ int main() {
                      "Program production loaded with statement list root");
         ok &= expect(contains_production(grammar, "PowerExprTail -> CARET PowerExpr"),
                      "right-associative power production loaded");
+        ok &= expect(contains_production(grammar, "WithExpr -> WITH LPAREN WithSourceExpr AS IDENTIFIER RPAREN WithBody WithElseOpt"),
+                     "with null-safety production loaded");
         ok &= expect(contains_production(grammar, "OrExprTail -> ε"),
                      "epsilon alternative loaded");
         ok &= expect(contains_production(grammar, "Primary -> LPAREN Expr RPAREN"),

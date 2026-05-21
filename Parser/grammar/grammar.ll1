@@ -46,6 +46,7 @@ Expr            -> IfExpr
                 | LetExpr
                 | WhileExpr
                 | ForExpr
+                | WithExpr
                 | AssignExpr
 
 AssignExpr      -> OrExpr AssignTail
@@ -53,6 +54,58 @@ AssignTail      -> ASSIGN AssignExpr
                 | ε
 
 ForExpr         -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
+
+WithExpr        -> WITH LPAREN WithSourceExpr AS IDENTIFIER RPAREN WithBody WithElseOpt
+WithBody        -> BlockExpr
+                | Expr
+WithElseOpt     -> ELSE WithBody
+                | ε
+
+WithSourceExpr      -> WithSourceOrExpr WithSourceAssignTail
+WithSourceAssignTail -> ASSIGN WithSourceExpr
+                     | ε
+
+WithSourceOrExpr      -> WithSourceAndExpr WithSourceOrExprTail
+WithSourceOrExprTail  -> OR WithSourceAndExpr WithSourceOrExprTail | ε
+
+WithSourceAndExpr     -> WithSourceCmpExpr WithSourceAndExprTail
+WithSourceAndExprTail -> AND WithSourceCmpExpr WithSourceAndExprTail | ε
+
+WithSourceCmpExpr     -> WithSourceConcatExpr WithSourceCmpExprTail
+WithSourceCmpExprTail -> LESS WithSourceConcatExpr WithSourceCmpExprTail
+                      | LESS_EQUAL WithSourceConcatExpr WithSourceCmpExprTail
+                      | GREATER WithSourceConcatExpr WithSourceCmpExprTail
+                      | GREATER_EQUAL WithSourceConcatExpr WithSourceCmpExprTail
+                      | EQUAL_EQUAL WithSourceConcatExpr WithSourceCmpExprTail
+                      | BANG_EQUAL WithSourceConcatExpr WithSourceCmpExprTail
+                      | IS IDENTIFIER WithSourceCmpExprTail
+                      | ε
+
+WithSourceConcatExpr     -> WithSourceAddExpr WithSourceConcatExprTail
+WithSourceConcatExprTail -> CONCAT WithSourceAddExpr WithSourceConcatExprTail
+                         | CONCAT_WS WithSourceAddExpr WithSourceConcatExprTail
+                         | ε
+
+WithSourceAddExpr     -> WithSourceMulExpr WithSourceAddExprTail
+WithSourceAddExprTail -> PLUS WithSourceMulExpr WithSourceAddExprTail
+                      | MINUS WithSourceMulExpr WithSourceAddExprTail
+                      | ε
+
+WithSourceMulExpr     -> WithSourcePowerExpr WithSourceMulExprTail
+WithSourceMulExprTail -> STAR WithSourcePowerExpr WithSourceMulExprTail
+                      | SLASH WithSourcePowerExpr WithSourceMulExprTail
+                      | PERCENT WithSourcePowerExpr WithSourceMulExprTail
+                      | ε
+
+WithSourcePowerExpr     -> WithSourceUnaryExpr WithSourcePowerExprTail
+WithSourcePowerExprTail -> CARET WithSourcePowerExpr | ε
+
+WithSourceUnaryExpr -> MINUS WithSourceUnaryExpr
+                    | BANG WithSourceUnaryExpr
+                    | TILDE WithSourceUnaryExpr
+                    | WithSourcePostfixExpr
+
+WithSourcePostfixExpr -> Primary PostfixTail
 
 WhileBody       -> BlockExpr
                 | Expr

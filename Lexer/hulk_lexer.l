@@ -142,6 +142,7 @@ IDENT       {ALPHA}{ALNUM_}*
 "else"        { UPD(ELSE);       }
 "while"       { UPD(WHILE);      }
 "for"         { UPD(FOR);        }
+"with"        { UPD(WITH);       }
 "function"    { UPD(FUNCTION);   }
 "type"        { UPD(TYPE);       }
 "protocol"    { UPD(PROTOCOL);   }
@@ -159,6 +160,11 @@ IDENT       {ALPHA}{ALNUM_}*
 
  /* ── 7. Identificadores y nombres globales ─────────────── */
 {IDENT}       { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                // Mientras el .cpp versionado no se regenere con flex, este
+                // fallback mantiene `with` como keyword aunque llegue por IDENT.
+                if (lexeme_ == "with") {
+                    return static_cast<int>(TokenType::WITH);
+                }
                 // `Null` se trata como literal dedicado aunque su patron base
                 // entre primero por identificador.
                 if (lexeme_ == "Null" || lexeme_ == "null") {

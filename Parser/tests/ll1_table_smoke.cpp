@@ -135,6 +135,38 @@ int main() {
         ok &= expect(
             cell_has_production(
                 ll1_table.table,
+                "Expr",
+                "WITH",
+                "Expr -> WithExpr"),
+            "M[Expr, WITH] dispatches to with expression");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "WithBody",
+                "LBRACE",
+                "WithBody -> BlockExpr"),
+            "M[WithBody, LBRACE] uses block body production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "WithElseOpt",
+                "ELSE",
+                "WithElseOpt -> ELSE WithBody"),
+            "M[WithElseOpt, ELSE] attaches with-else branch");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "WithElseOpt",
+                "SEMICOLON",
+                std::string("WithElseOpt -> ") + parser::generator::kEpsilonSymbol),
+            "M[WithElseOpt, SEMICOLON] omits optional with-else");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
                 "Primary",
                 "NUMBER_LITERAL",
                 "Primary -> NUMBER_LITERAL"),

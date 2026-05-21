@@ -919,6 +919,11 @@ case 29:
 YY_RULE_SETUP
 #line 162 "hulk_lexer.l"
 { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                // Mientras el .cpp versionado no se regenere con flex, este
+                // fallback mantiene `with` como keyword aunque llegue por IDENT.
+                if (lexeme_ == "with") {
+                    return static_cast<int>(TokenType::WITH);
+                }
                 // `Null` se trata como literal dedicado aunque su patron base
                 // entre primero por identificador.
                 if (lexeme_ == "Null" || lexeme_ == "null") {
@@ -2125,4 +2130,3 @@ int main() {
 }
 
 ================================================================ */
-
