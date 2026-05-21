@@ -35,6 +35,7 @@ ExprPtr build_expr(const CstNode& node);
 ExprPtr build_if_expr(const CstNode& node);
 ExprPtr build_while_expr(const CstNode& node);
 ExprPtr build_for_expr(const CstNode& node);
+ExprPtr build_with_expr(const CstNode& node);
 ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else);
 ExprPtr build_else_opt(const CstNode& node);
 ExprPtr build_let_expr(const CstNode& node);
@@ -42,6 +43,8 @@ ExprPtr build_let_body(const CstNode& node);
 ExprPtr build_if_body(const CstNode& node);
 ExprPtr build_while_body(const CstNode& node);
 ExprPtr build_while_else_opt(const CstNode& node);
+ExprPtr build_with_body(const CstNode& node);
+ExprPtr build_with_else_opt(const CstNode& node);
 using LetBindingData = std::tuple<Token, std::optional<Token>, ExprPtr>;
 void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings);
 void extract_binding(const CstNode& node, std::vector<LetBindingData>& bindings);
@@ -66,6 +69,27 @@ ExprPtr build_power_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_unary_expr(const CstNode& node);
 ExprPtr build_postfix_expr(const CstNode& node);
 ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node);
+
+// Esta familia paralela evita que el `as` propio de `with (...) as id`
+// sea absorbido por el cast postfix general de otras expresiones.
+ExprPtr build_with_source_expr(const CstNode& node);
+ExprPtr build_with_source_assign_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_or_expr(const CstNode& node);
+ExprPtr build_with_source_or_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_and_expr(const CstNode& node);
+ExprPtr build_with_source_and_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_cmp_expr(const CstNode& node);
+ExprPtr build_with_source_cmp_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_concat_expr(const CstNode& node);
+ExprPtr build_with_source_concat_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_add_expr(const CstNode& node);
+ExprPtr build_with_source_add_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_mul_expr(const CstNode& node);
+ExprPtr build_with_source_mul_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_power_expr(const CstNode& node);
+ExprPtr build_with_source_power_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_with_source_unary_expr(const CstNode& node);
+ExprPtr build_with_source_postfix_expr(const CstNode& node);
 ExprPtr build_primary(const CstNode& node);
 ExprPtr build_block_expr(const CstNode& node);
 void extract_block_list(const CstNode& node, std::vector<ExprPtr>& exprs);
@@ -120,13 +144,16 @@ ExprPtr build_expr(const CstNode& node) {
     if (first_child.symbol == "ForExpr") {
         return build_for_expr(first_child);
     }
+    if (first_child.symbol == "WithExpr") {
+        return build_with_expr(first_child);
+    }
     if (first_child.symbol == "LetExpr") {
         return build_let_expr(first_child);
     }
     if (first_child.symbol == "AssignExpr") {
         return build_assign_expr(first_child);
     }
-    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, LetExpr o AssignExpr");
+    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, WithExpr, LetExpr o AssignExpr");
 }
 
 ExprPtr build_for_expr(const CstNode& node) {
@@ -143,6 +170,15 @@ ExprPtr build_while_expr(const CstNode& node) {
     ExprPtr body = build_while_body(child(node, 4));
     ExprPtr else_branch = build_while_else_opt(child(node, 5));
     return std::make_unique<WhileExpr>(std::move(cond), std::move(body), std::move(else_branch));
+}
+
+ExprPtr build_with_expr(const CstNode& node) {
+    expect_symbol(node, "WithExpr");
+    ExprPtr value = build_with_source_expr(child(node, 2));
+    Token alias = child(node, 4).token;
+    ExprPtr body = build_with_body(child(node, 6));
+    ExprPtr else_branch = build_with_else_opt(child(node, 7));
+    return std::make_unique<WithExpr>(std::move(value), std::move(alias), std::move(body), std::move(else_branch));
 }
 
 ExprPtr build_if_expr(const CstNode& node) {
@@ -230,6 +266,23 @@ ExprPtr build_while_else_opt(const CstNode& node) {
         return nullptr;
     }
     return build_while_body(child(node, 1));
+}
+
+ExprPtr build_with_body(const CstNode& node) {
+    expect_symbol(node, "WithBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "BlockExpr") {
+        return build_block_expr(first_child);
+    }
+    return build_expr(first_child);
+}
+
+ExprPtr build_with_else_opt(const CstNode& node) {
+    expect_symbol(node, "WithElseOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return nullptr;
+    }
+    return build_with_body(child(node, 1));
 }
 
 void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings) {
@@ -435,6 +488,170 @@ ExprPtr build_postfix_expr(const CstNode& node) {
     return left;
 }
 
+ExprPtr build_with_source_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceExpr");
+    auto left = build_with_source_or_expr(child(node, 0));
+    return build_with_source_assign_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_assign_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourceAssignTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_expr(child(node, 1));
+    return std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+}
+
+ExprPtr build_with_source_or_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceOrExpr");
+    auto left = build_with_source_and_expr(child(node, 0));
+    return build_with_source_or_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_or_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourceOrExprTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_and_expr(child(node, 1));
+    auto combined = std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+    return build_with_source_or_tail(std::move(combined), child(node, 2));
+}
+
+ExprPtr build_with_source_and_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceAndExpr");
+    auto left = build_with_source_cmp_expr(child(node, 0));
+    return build_with_source_and_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_and_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourceAndExprTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_cmp_expr(child(node, 1));
+    auto combined = std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+    return build_with_source_and_tail(std::move(combined), child(node, 2));
+}
+
+ExprPtr build_with_source_cmp_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceCmpExpr");
+    auto left = build_with_source_concat_expr(child(node, 0));
+    return build_with_source_cmp_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_cmp_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourceCmpExprTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    const auto& op_node = child(node, 0);
+    if (op_node.symbol == "IS") {
+        return build_with_source_cmp_tail(std::move(left), child(node, 2));
+    }
+
+    Token op = op_node.token;
+    ExprPtr right = build_with_source_concat_expr(child(node, 1));
+    auto new_left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
+    return build_with_source_cmp_tail(std::move(new_left), child(node, 2));
+}
+
+ExprPtr build_with_source_concat_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceConcatExpr");
+    auto left = build_with_source_add_expr(child(node, 0));
+    return build_with_source_concat_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_concat_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourceConcatExprTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_add_expr(child(node, 1));
+    auto combined = std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+    return build_with_source_concat_tail(std::move(combined), child(node, 2));
+}
+
+ExprPtr build_with_source_add_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceAddExpr");
+    auto left = build_with_source_mul_expr(child(node, 0));
+    return build_with_source_add_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_add_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourceAddExprTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_mul_expr(child(node, 1));
+    auto combined = std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+    return build_with_source_add_tail(std::move(combined), child(node, 2));
+}
+
+ExprPtr build_with_source_mul_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceMulExpr");
+    auto left = build_with_source_power_expr(child(node, 0));
+    return build_with_source_mul_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_mul_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourceMulExprTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_power_expr(child(node, 1));
+    auto combined = std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+    return build_with_source_mul_tail(std::move(combined), child(node, 2));
+}
+
+ExprPtr build_with_source_power_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourcePowerExpr");
+    auto left = build_with_source_unary_expr(child(node, 0));
+    return build_with_source_power_tail(std::move(left), child(node, 1));
+}
+
+ExprPtr build_with_source_power_tail(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "WithSourcePowerExprTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_power_expr(child(node, 1));
+    return std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+}
+
+ExprPtr build_with_source_unary_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourceUnaryExpr");
+    if (node.children.size() == 1) {
+        return build_with_source_postfix_expr(child(node, 0));
+    }
+
+    Token op = child(node, 0).token;
+    auto right = build_with_source_unary_expr(child(node, 1));
+    return std::make_unique<UnaryExpr>(std::move(op), std::move(right));
+}
+
+ExprPtr build_with_source_postfix_expr(const CstNode& node) {
+    expect_symbol(node, "WithSourcePostfixExpr");
+    auto left = build_primary(child(node, 0));
+    return build_postfix_tail(std::move(left), child(node, 1));
+}
+
 ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node) {
     expect_symbol(node, "PostfixTail");
     if (node.children.empty() || is_epsilon_node(child(node, 0))) {
@@ -508,6 +725,11 @@ ExprPtr build_primary(const CstNode& node) {
         if (value.symbol == "IDENTIFIER") {
             return std::make_unique<IdentifierExpr>(value.token);
         }
+        if (value.symbol == "SELF") {
+            // `self` es un primario dedicado porque no debe confundirse con
+            // un identificador ordinario durante fases semánticas posteriores.
+            return std::make_unique<SelfExpr>(value.token);
+        }
     }
 
     // Caso agrupado: LPAREN Expr RPAREN
@@ -515,6 +737,19 @@ ExprPtr build_primary(const CstNode& node) {
         Token lparen = child(node, 0).token;
         auto expression = build_expr(child(node, 1));
         return std::make_unique<GroupedExpr>(std::move(lparen), std::move(expression));
+    }
+
+    // Instanciación directa: NEW IDENTIFIER LPAREN ArgListOpt RPAREN
+    if (node.children.size() == 5 && child(node, 0).symbol == "NEW") {
+        Token type_name = child(node, 1).token;
+        auto args = build_arg_list_opt(child(node, 3));
+        return std::make_unique<NewExpr>(std::move(type_name), std::move(args));
+    }
+
+    // Llamada explícita al constructor de la base: BASE LPAREN ArgListOpt RPAREN
+    if (node.children.size() == 4 && child(node, 0).symbol == "BASE") {
+        auto args = build_arg_list_opt(child(node, 2));
+        return std::make_unique<BaseCallExpr>(std::move(args));
     }
 
     throw std::runtime_error("Forma de Primary no soportada en la conversion CST -> AST");

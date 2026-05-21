@@ -121,6 +121,9 @@ BoolExpr::BoolExpr(Token token, bool value)
 IdentifierExpr::IdentifierExpr(Token token)
     : Expr(ExprKind::IDENTIFIER), token(std::move(token)) {}
 
+SelfExpr::SelfExpr(Token token)
+    : Expr(ExprKind::SELF_REF), token(std::move(token)) {}
+
 GroupedExpr::GroupedExpr(Token lparen, ExprPtr expression)
     : Expr(ExprKind::GROUPED),
       lparen(std::move(lparen)),
@@ -178,6 +181,13 @@ ForExpr::ForExpr(Token variable, ExprPtr iterable, ExprPtr body)
       iterable(std::move(iterable)),
       body(std::move(body)) {}
 
+WithExpr::WithExpr(ExprPtr value, Token alias, ExprPtr body, ExprPtr else_branch)
+    : Expr(ExprKind::WITH),
+      value(std::move(value)),
+      alias(std::move(alias)),
+      body(std::move(body)),
+      else_branch(std::move(else_branch)) {}
+
 NewExpr::NewExpr(Token type_name, std::vector<ExprPtr> args)
     : Expr(ExprKind::NEW_OBJ),
       type_name(std::move(type_name)),
@@ -208,6 +218,9 @@ std::string expr_to_string(const Expr& expr) {
         case ExprKind::IDENTIFIER: {
             const auto& identifier = static_cast<const IdentifierExpr&>(expr);
             return "Identifier(" + identifier.token.lexeme + ")";
+        }
+        case ExprKind::SELF_REF: {
+            return "Self";
         }
         case ExprKind::GROUPED: {
             const auto& grouped = static_cast<const GroupedExpr&>(expr);
@@ -285,6 +298,18 @@ std::string expr_to_string(const Expr& expr) {
         case ExprKind::FOR: {
             const auto& for_expr = static_cast<const ForExpr&>(expr);
             return "For(" + for_expr.variable.lexeme + " in " + expr_to_string(*for_expr.iterable) + ", " + expr_to_string(*for_expr.body) + ")";
+        }
+        case ExprKind::WITH: {
+            const auto& with_expr = static_cast<const WithExpr&>(expr);
+            std::ostringstream out;
+            out << "With(" << expr_to_string(*with_expr.value)
+                << " as " << with_expr.alias.lexeme
+                << ", " << expr_to_string(*with_expr.body);
+            if (with_expr.else_branch) {
+                out << ", " << expr_to_string(*with_expr.else_branch);
+            }
+            out << ")";
+            return out.str();
         }
         case ExprKind::NEW_OBJ: {
             const auto& new_expr = static_cast<const NewExpr&>(expr);

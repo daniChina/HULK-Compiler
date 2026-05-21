@@ -15,6 +15,7 @@ enum class ExprKind {
     NULL_VALUE,
     BOOL,
     IDENTIFIER,
+    SELF_REF,
     GROUPED,
     UNARY,
     BINARY,
@@ -25,6 +26,7 @@ enum class ExprKind {
     IF,
     WHILE,
     FOR,
+    WITH,
     NEW_OBJ,
     BASE_CALL
 };
@@ -133,6 +135,12 @@ struct IdentifierExpr final : Expr {
     Token token;
 };
 
+struct SelfExpr final : Expr {
+    explicit SelfExpr(Token token);
+
+    Token token;
+};
+
 struct GroupedExpr final : Expr {
     GroupedExpr(Token lparen, ExprPtr expression);
 
@@ -208,6 +216,17 @@ struct ForExpr final : Expr {
     Token variable;
     ExprPtr iterable;
     ExprPtr body;
+};
+
+struct WithExpr final : Expr {
+    // Este nodo conserva la forma sintactica de null-safety:
+    // `with (value as alias) body else fallback`.
+    WithExpr(ExprPtr value, Token alias, ExprPtr body, ExprPtr else_branch);
+
+    ExprPtr value;
+    Token alias;
+    ExprPtr body;
+    ExprPtr else_branch;
 };
 
 struct NewExpr final : Expr {

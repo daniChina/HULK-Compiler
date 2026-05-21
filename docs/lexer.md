@@ -19,18 +19,22 @@ Ahora mismo el lexer funciona con un **subconjunto “básico-intermedio” de H
 
 Lo que sí cubre (según [hulk_lexer.l](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Lexer/hulk_lexer.l) y [hulk_lexer.h](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Lexer/hulk_lexer.h)):
 
-- literales: `NUMBER_LITERAL`, `STRING_LITERAL`, `BOOLEAN_LITERAL`
-- control/estructura: `if`, `elif`, `else`, `while`, `for`, `let`, `in`
+- literales: `NUMBER_LITERAL`, `STRING_LITERAL`, `NULL_LITERAL`, `TRUE`, `FALSE`
+- control/estructura: `if`, `elif`, `else`, `while`, `for`, `with`, `let`, `in`
 - funciones/tipos/protocolos/macros: `function`, `type`, `protocol`, `def`, `new`, `inherits`, `self`, `base`, `is`, `as`
 - builtins: `print`, `sqrt`, `sin`, `cos`, `exp`, `log`, `rand`, `PI`, `E`, `range`
-- operadores/símbolos: `:=`, `=>`, `->`, `==`, `!=`, `<=`, `>=`, `=`, `@`, `+ - * / ^ ~ ! < >`, paréntesis/llaves/corchetes, `, ; . :`
+- operadores/símbolos: `:=`, `=>`, `->`, `==`, `!=`, `<=`, `>=`, `=`, `@`, `@@`, `%`, `+ - * / ^ ~ ! < >`, paréntesis/llaves/corchetes, `, ; . :`
 - manejo de comentarios, espacios, EOF y carácter desconocido
 
-Para “HULK completo” según [Hulk.md](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Hulk.md), faltan al menos estas piezas:
+Detalles relevantes del estado actual:
+
+- `Null` y `null` se tokenizan ambos como `NULL_LITERAL`
+- `with` ya se reconoce como keyword para soportar la sintaxis `with (<expr> as <id>) ... else ...`
+- `print`, `sqrt`, `sin`, `cos`, `exp`, `log`, `rand`, `range`, `PI` y `E` siguen entrando como `IDENTIFIER`, porque el parser no necesita una categoría léxica especial para ellos
+
+Para “HULK completo” según [Hulk.md](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Hulk.md), todavía faltan al menos estas piezas:
 
 - tokens léxicos que aparecen en el lenguaje y no están definidos explícitamente ahora:
-  - `%` (módulo; se usa en ejemplos del `.md`)
-  - `@@` (concatenación con espacio; documentado en el `.md`)
   - `&` y `|` si decides seguir la notación booleana de esa sección del `.md` (tu lexer hoy usa keywords `and`/`or`)
   - `**` si quieres soportar la notación de potencia usada en partes del `.md` (hoy solo hay `^`)
   - `extends` (aparece en ejemplos de protocolos más amplios, hoy sería `IDENTIFIER`)

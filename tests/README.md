@@ -34,6 +34,8 @@ El lexer actual ya sigue estas decisiones de diseño:
 
 - `print`, `sin`, `cos`, `sqrt`, `log`, `rand`, `range`, `PI`, `E` se reconocen como `IDENTIFIER`
 - `true` y `false` se reconocen como tokens propios `TRUE` y `FALSE`
+- `Null` y `null` se reconocen como `NULL_LITERAL`
+- `with` se reconoce como keyword `WITH`
 
 Motivo:
 

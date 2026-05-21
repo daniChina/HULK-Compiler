@@ -35,6 +35,7 @@ enum class TokenType : int {
     ELSE,
     WHILE,
     FOR,
+    WITH,
     FUNCTION,
     TYPE,
     PROTOCOL,
@@ -116,6 +117,7 @@ public:
             case TokenType::ELSE:             return "ELSE";
             case TokenType::WHILE:            return "WHILE";
             case TokenType::FOR:              return "FOR";
+            case TokenType::WITH:             return "WITH";
             case TokenType::FUNCTION:         return "FUNCTION";
             case TokenType::TYPE:             return "TYPE";
             case TokenType::PROTOCOL:         return "PROTOCOL";
