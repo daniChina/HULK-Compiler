@@ -919,10 +919,20 @@ case 29:
 YY_RULE_SETUP
 #line 162 "hulk_lexer.l"
 { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                // `class` es un alias sintactico de `type` en el parser actual.
+                if (lexeme_ == "class") {
+                    return static_cast<int>(TokenType::TYPE);
+                }
                 // Mientras el .cpp versionado no se regenere con flex, este
                 // fallback mantiene `with` como keyword aunque llegue por IDENT.
                 if (lexeme_ == "with") {
                     return static_cast<int>(TokenType::WITH);
+                }
+                if (lexeme_ == "case") {
+                    return static_cast<int>(TokenType::CASE);
+                }
+                if (lexeme_ == "of") {
+                    return static_cast<int>(TokenType::OF);
                 }
                 // `Null` se trata como literal dedicado aunque su patron base
                 // entre primero por identificador.

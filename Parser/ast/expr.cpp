@@ -72,7 +72,11 @@ std::string stmt_to_string(const Stmt& stmt) {
             }
             out << " {\n";
             for (const auto& attr : type_decl.attributes) {
-                out << "    " << attr.name.lexeme << " = " << expr_to_string(*attr.value) << ";\n";
+                out << "    " << attr.name.lexeme;
+                if (attr.declared_type) {
+                    out << ": " << attr.declared_type->lexeme;
+                }
+                out << " = " << expr_to_string(*attr.value) << ";\n";
             }
             for (const auto& method : type_decl.methods) {
                 out << "    " << method.name.lexeme << "(";
@@ -187,6 +191,11 @@ WithExpr::WithExpr(ExprPtr value, Token alias, ExprPtr body, ExprPtr else_branch
       alias(std::move(alias)),
       body(std::move(body)),
       else_branch(std::move(else_branch)) {}
+
+CaseExpr::CaseExpr(ExprPtr value, std::vector<CaseBranchDef> branches)
+    : Expr(ExprKind::CASE_EXPR),
+      value(std::move(value)),
+      branches(std::move(branches)) {}
 
 NewExpr::NewExpr(Token type_name, std::vector<ExprPtr> args)
     : Expr(ExprKind::NEW_OBJ),
@@ -309,6 +318,21 @@ std::string expr_to_string(const Expr& expr) {
                 out << ", " << expr_to_string(*with_expr.else_branch);
             }
             out << ")";
+            return out.str();
+        }
+        case ExprKind::CASE_EXPR: {
+            const auto& case_expr = static_cast<const CaseExpr&>(expr);
+            std::ostringstream out;
+            out << "Case(" << expr_to_string(*case_expr.value) << ", [";
+            for (std::size_t i = 0; i < case_expr.branches.size(); ++i) {
+                if (i > 0) {
+                    out << ", ";
+                }
+                out << case_expr.branches[i].name.lexeme
+                    << ": " << case_expr.branches[i].type_name.lexeme
+                    << " => " << expr_to_string(*case_expr.branches[i].body);
+            }
+            out << "])";
             return out.str();
         }
         case ExprKind::NEW_OBJ: {

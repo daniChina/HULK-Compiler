@@ -55,6 +55,46 @@ int main() {
         ok &= expect(
             cell_has_production(
                 ll1_table.table,
+                "Program",
+                "TYPE",
+                "Program -> TypeDeclList StmtList EOF_TOKEN"),
+            "M[Program, TYPE] starts optional class section");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "TypeParamsOpt",
+                "LBRACKET",
+                "TypeParamsOpt -> LBRACKET ArgIdListOpt RBRACKET"),
+            "M[TypeParamsOpt, LBRACKET] uses bracketed class params");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "TypeInheritanceOpt",
+                "IS",
+                "TypeInheritanceOpt -> IS IDENTIFIER TypeBaseArgsOpt"),
+            "M[TypeInheritanceOpt, IS] uses class inheritance alias");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "TypeAttrOrMethodTail",
+                "COLON",
+                "TypeAttrOrMethodTail -> TypeAnnotationOpt TypeAttributeAssign Expr SEMICOLON TypeAttrPhase"),
+            "M[TypeAttrOrMethodTail, COLON] uses typed attribute production");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "TypeAttrOrMethodTail",
+                "LPAREN",
+                "TypeAttrOrMethodTail -> LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody TypeMethodPhase"),
+            "M[TypeAttrOrMethodTail, LPAREN] starts method section");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
                 "IfBody",
                 "LBRACE",
                 "IfBody -> BlockExpr"),
@@ -139,6 +179,30 @@ int main() {
                 "WITH",
                 "Expr -> WithExpr"),
             "M[Expr, WITH] dispatches to with expression");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "Expr",
+                "CASE",
+                "Expr -> CaseExpr"),
+            "M[Expr, CASE] dispatches to case expression");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "CasePayload",
+                "LBRACE",
+                "CasePayload -> LBRACE CaseBranchList RBRACE"),
+            "M[CasePayload, LBRACE] uses block case form");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "CasePayload",
+                "IDENTIFIER",
+                "CasePayload -> CaseBranch"),
+            "M[CasePayload, IDENTIFIER] uses compact case form");
 
         ok &= expect(
             cell_has_production(
