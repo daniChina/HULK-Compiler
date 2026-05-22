@@ -23,6 +23,8 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::WHILE:          return TokenType::WHILE;
         case ::TokenType::FOR:            return TokenType::FOR;
         case ::TokenType::WITH:           return TokenType::WITH;
+        case ::TokenType::CASE:           return TokenType::CASE;
+        case ::TokenType::OF:             return TokenType::OF;
         case ::TokenType::FUNCTION:       return TokenType::FUNCTION;
         case ::TokenType::TYPE:           return TokenType::TYPE;
         case ::TokenType::PROTOCOL:       return TokenType::PROTOCOL;

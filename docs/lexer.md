@@ -21,7 +21,7 @@ Lo que sí cubre (según [hulk_lexer.l](/home/nebur02/Documents/3er Ano/2do SEME
 
 - literales: `NUMBER_LITERAL`, `STRING_LITERAL`, `NULL_LITERAL`, `TRUE`, `FALSE`
 - control/estructura: `if`, `elif`, `else`, `while`, `for`, `with`, `let`, `in`
-- funciones/tipos/protocolos/macros: `function`, `type`, `protocol`, `def`, `new`, `inherits`, `self`, `base`, `is`, `as`
+- funciones/tipos/protocolos/macros: `function`, `type`, `class` (alias léxico de `type`), `protocol`, `def`, `new`, `inherits`, `is`, `self`, `base`, `as`
 - builtins: `print`, `sqrt`, `sin`, `cos`, `exp`, `log`, `rand`, `PI`, `E`, `range`
 - operadores/símbolos: `:=`, `=>`, `->`, `==`, `!=`, `<=`, `>=`, `=`, `@`, `@@`, `%`, `+ - * / ^ ~ ! < >`, paréntesis/llaves/corchetes, `, ; . :`
 - manejo de comentarios, espacios, EOF y carácter desconocido
@@ -30,6 +30,7 @@ Detalles relevantes del estado actual:
 
 - `Null` y `null` se tokenizan ambos como `NULL_LITERAL`
 - `with` ya se reconoce como keyword para soportar la sintaxis `with (<expr> as <id>) ... else ...`
+- `class` ya se acepta como alias léxico de `type`, para que el parser procese cabeceras OO en la forma `class Nombre[...] is Base[...]`
 - `print`, `sqrt`, `sin`, `cos`, `exp`, `log`, `rand`, `range`, `PI` y `E` siguen entrando como `IDENTIFIER`, porque el parser no necesita una categoría léxica especial para ellos
 
 Para “HULK completo” según [Hulk.md](/home/nebur02/Documents/3er Ano/2do SEMESTRE/COMPILACION/proyecto/HULK-Compiler/Hulk.md), todavía faltan al menos estas piezas:

@@ -27,6 +27,7 @@ enum class ExprKind {
     WHILE,
     FOR,
     WITH,
+    CASE_EXPR,
     NEW_OBJ,
     BASE_CALL
 };
@@ -72,6 +73,7 @@ struct FunctionDecl final : Stmt {
 
 struct AttributeDef {
     Token name;
+    std::optional<Token> declared_type;
     ExprPtr value;
 };
 
@@ -227,6 +229,21 @@ struct WithExpr final : Expr {
     Token alias;
     ExprPtr body;
     ExprPtr else_branch;
+};
+
+struct CaseBranchDef {
+    Token name;
+    Token type_name;
+    ExprPtr body;
+};
+
+struct CaseExpr final : Expr {
+    // Modela `case value of ...` preservando las ramas ya tipadas para la
+    // fase semántica posterior.
+    CaseExpr(ExprPtr value, std::vector<CaseBranchDef> branches);
+
+    ExprPtr value;
+    std::vector<CaseBranchDef> branches;
 };
 
 struct NewExpr final : Expr {

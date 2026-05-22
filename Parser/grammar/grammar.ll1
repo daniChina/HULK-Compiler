@@ -10,14 +10,16 @@
 // - Los terminales usan exactamente los nombres expuestos por Parser/core/token.hpp
 // - ε representa epsilon
 
-Program         -> StmtList EOF_TOKEN
+Program         -> TypeDeclList StmtList EOF_TOKEN
+
+TypeDeclList    -> TypeDecl TypeDeclList
+                | ε
 
 StmtList        -> Stmt StmtList
                 | ε
 
 Stmt            -> ExprStmt
                 | FunctionDecl
-                | TypeDecl
 
 FunctionDecl    -> FUNCTION IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
 
@@ -32,13 +34,24 @@ FunctionBody    -> ARROW Expr SEMICOLON
                 | BlockExpr
 
 TypeDecl        -> TYPE IDENTIFIER TypeParamsOpt TypeInheritanceOpt LBRACE TypeBody RBRACE
-TypeParamsOpt   -> LPAREN ArgIdListOpt RPAREN | ε
-TypeInheritanceOpt -> INHERITS IDENTIFIER TypeBaseArgsOpt | ε
-TypeBaseArgsOpt -> LPAREN ArgListOpt RPAREN | ε
-TypeBody        -> TypeMember TypeBody | ε
-TypeMember      -> IDENTIFIER TypeMemberTail
-TypeMemberTail  -> ASSIGN Expr SEMICOLON
-                | LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
+TypeParamsOpt   -> LPAREN ArgIdListOpt RPAREN
+                | LBRACKET ArgIdListOpt RBRACKET
+                | ε
+TypeInheritanceOpt -> INHERITS IDENTIFIER TypeBaseArgsOpt
+                    | IS IDENTIFIER TypeBaseArgsOpt
+                    | ε
+TypeBaseArgsOpt -> LPAREN ArgListOpt RPAREN
+                | LBRACKET ArgListOpt RBRACKET
+                | ε
+TypeBody        -> TypeAttrPhase
+TypeAttrPhase   -> IDENTIFIER TypeAttrOrMethodTail
+                | ε
+TypeAttrOrMethodTail -> LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody TypeMethodPhase
+                     | TypeAnnotationOpt TypeAttributeAssign Expr SEMICOLON TypeAttrPhase
+TypeMethodPhase -> IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody TypeMethodPhase
+                | ε
+TypeAttributeAssign -> ASSIGN
+                    | EQUAL
 
 ExprStmt        -> Expr SEMICOLON
 
@@ -47,6 +60,7 @@ Expr            -> IfExpr
                 | WhileExpr
                 | ForExpr
                 | WithExpr
+                | CaseExpr
                 | AssignExpr
 
 AssignExpr      -> OrExpr AssignTail
@@ -54,6 +68,16 @@ AssignTail      -> ASSIGN AssignExpr
                 | ε
 
 ForExpr         -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
+
+CaseExpr        -> CASE Expr OF CasePayload
+CasePayload     -> LBRACE CaseBranchList RBRACE
+                | CaseBranch
+CaseBranchList  -> CaseBranch SEMICOLON CaseBranchListTail
+CaseBranchListTail -> CaseBranch SEMICOLON CaseBranchListTail
+                   | ε
+CaseBranch      -> IDENTIFIER COLON IDENTIFIER ARROW CaseBody
+CaseBody        -> BlockExpr
+                | Expr
 
 WithExpr        -> WITH LPAREN WithSourceExpr AS IDENTIFIER RPAREN WithBody WithElseOpt
 WithBody        -> BlockExpr

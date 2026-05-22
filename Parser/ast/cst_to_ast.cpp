@@ -36,6 +36,7 @@ ExprPtr build_if_expr(const CstNode& node);
 ExprPtr build_while_expr(const CstNode& node);
 ExprPtr build_for_expr(const CstNode& node);
 ExprPtr build_with_expr(const CstNode& node);
+ExprPtr build_case_expr(const CstNode& node);
 ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else);
 ExprPtr build_else_opt(const CstNode& node);
 ExprPtr build_let_expr(const CstNode& node);
@@ -45,10 +46,16 @@ ExprPtr build_while_body(const CstNode& node);
 ExprPtr build_while_else_opt(const CstNode& node);
 ExprPtr build_with_body(const CstNode& node);
 ExprPtr build_with_else_opt(const CstNode& node);
+ExprPtr build_case_body(const CstNode& node);
 using LetBindingData = std::tuple<Token, std::optional<Token>, ExprPtr>;
+using CaseBranchList = std::vector<CaseBranchDef>;
 void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings);
 void extract_binding(const CstNode& node, std::vector<LetBindingData>& bindings);
 void extract_binding_tail(const CstNode& node, std::vector<LetBindingData>& bindings);
+CaseBranchDef build_case_branch(const CstNode& node);
+CaseBranchList build_case_payload(const CstNode& node);
+CaseBranchList build_case_branch_list(const CstNode& node);
+void append_case_branch_list_tail(const CstNode& node, CaseBranchList& branches);
 
 ExprPtr build_assign_expr(const CstNode& node);
 ExprPtr build_assign_tail(ExprPtr left, const CstNode& node);
@@ -98,6 +105,7 @@ std::vector<ExprPtr> build_arg_list(const CstNode& node);
 void append_arg_list_tail(const CstNode& node, std::vector<ExprPtr>& args);
 
 void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts);
+void extract_type_decl_list(const CstNode& node, std::vector<StmtPtr>& stmts);
 StmtPtr build_stmt(const CstNode& node);
 StmtPtr build_expr_stmt(const CstNode& node);
 StmtPtr build_function_decl(const CstNode& node);
@@ -111,6 +119,9 @@ ExprPtr build_function_body(const CstNode& node);
 
 StmtPtr build_type_decl(const CstNode& node);
 void extract_type_body(const CstNode& node, std::vector<AttributeDef>& attributes, std::vector<MethodDef>& methods);
+void extract_type_attr_phase(const CstNode& node, std::vector<AttributeDef>& attributes, std::vector<MethodDef>& methods);
+void extract_type_attr_or_method_tail(const CstNode& node, Token member_name, std::vector<AttributeDef>& attributes, std::vector<MethodDef>& methods);
+void extract_type_method_phase(const CstNode& node, std::vector<MethodDef>& methods);
 
 StmtPtr build_stmt(const CstNode& node) {
     expect_symbol(node, "Stmt");
@@ -147,13 +158,16 @@ ExprPtr build_expr(const CstNode& node) {
     if (first_child.symbol == "WithExpr") {
         return build_with_expr(first_child);
     }
+    if (first_child.symbol == "CaseExpr") {
+        return build_case_expr(first_child);
+    }
     if (first_child.symbol == "LetExpr") {
         return build_let_expr(first_child);
     }
     if (first_child.symbol == "AssignExpr") {
         return build_assign_expr(first_child);
     }
-    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, WithExpr, LetExpr o AssignExpr");
+    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, WithExpr, CaseExpr, LetExpr o AssignExpr");
 }
 
 ExprPtr build_for_expr(const CstNode& node) {
@@ -179,6 +193,13 @@ ExprPtr build_with_expr(const CstNode& node) {
     ExprPtr body = build_with_body(child(node, 6));
     ExprPtr else_branch = build_with_else_opt(child(node, 7));
     return std::make_unique<WithExpr>(std::move(value), std::move(alias), std::move(body), std::move(else_branch));
+}
+
+ExprPtr build_case_expr(const CstNode& node) {
+    expect_symbol(node, "CaseExpr");
+    ExprPtr value = build_expr(child(node, 1));
+    auto branches = build_case_payload(child(node, 3));
+    return std::make_unique<CaseExpr>(std::move(value), std::move(branches));
 }
 
 ExprPtr build_if_expr(const CstNode& node) {
@@ -285,6 +306,15 @@ ExprPtr build_with_else_opt(const CstNode& node) {
     return build_with_body(child(node, 1));
 }
 
+ExprPtr build_case_body(const CstNode& node) {
+    expect_symbol(node, "CaseBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "BlockExpr") {
+        return build_block_expr(first_child);
+    }
+    return build_expr(first_child);
+}
+
 void extract_bindings(const CstNode& node, std::vector<LetBindingData>& bindings) {
     expect_symbol(node, "BindingList");
     extract_binding(child(node, 0), bindings);
@@ -306,6 +336,43 @@ void extract_binding_tail(const CstNode& node, std::vector<LetBindingData>& bind
     }
     extract_binding(child(node, 1), bindings);
     extract_binding_tail(child(node, 2), bindings);
+}
+
+CaseBranchDef build_case_branch(const CstNode& node) {
+    expect_symbol(node, "CaseBranch");
+    Token name = child(node, 0).token;
+    Token type_name = child(node, 2).token;
+    ExprPtr body = build_case_body(child(node, 4));
+    return {std::move(name), std::move(type_name), std::move(body)};
+}
+
+CaseBranchList build_case_payload(const CstNode& node) {
+    expect_symbol(node, "CasePayload");
+    if (child(node, 0).symbol == "LBRACE") {
+        return build_case_branch_list(child(node, 1));
+    }
+
+    CaseBranchList branches;
+    branches.push_back(build_case_branch(child(node, 0)));
+    return branches;
+}
+
+CaseBranchList build_case_branch_list(const CstNode& node) {
+    expect_symbol(node, "CaseBranchList");
+    CaseBranchList branches;
+    branches.push_back(build_case_branch(child(node, 0)));
+    append_case_branch_list_tail(child(node, 2), branches);
+    return branches;
+}
+
+void append_case_branch_list_tail(const CstNode& node, CaseBranchList& branches) {
+    expect_symbol(node, "CaseBranchListTail");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+
+    branches.push_back(build_case_branch(child(node, 0)));
+    append_case_branch_list_tail(child(node, 2), branches);
 }
 
 ExprPtr build_assign_expr(const CstNode& node) {
@@ -780,6 +847,18 @@ void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts) {
     extract_stmt_list(child(node, 1), stmts);
 }
 
+void extract_type_decl_list(const CstNode& node, std::vector<StmtPtr>& stmts) {
+    expect_symbol(node, "TypeDeclList");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+
+    // El programa ahora obliga a que todas las clases aparezcan antes que las
+    // funciones y expresiones globales, por eso se extraen en una lista aparte.
+    stmts.push_back(build_type_decl(child(node, 0)));
+    extract_type_decl_list(child(node, 1), stmts);
+}
+
 StmtPtr build_function_decl(const CstNode& node) {
     expect_symbol(node, "FunctionDecl");
     // FUNCTION IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
@@ -878,29 +957,53 @@ StmtPtr build_type_decl(const CstNode& node) {
 
 void extract_type_body(const CstNode& node, std::vector<AttributeDef>& attributes, std::vector<MethodDef>& methods) {
     expect_symbol(node, "TypeBody");
+    extract_type_attr_phase(child(node, 0), attributes, methods);
+}
+
+void extract_type_attr_phase(const CstNode& node, std::vector<AttributeDef>& attributes, std::vector<MethodDef>& methods) {
+    expect_symbol(node, "TypeAttrPhase");
     if (node.children.empty() || is_epsilon_node(child(node, 0))) {
         return;
     }
-    // TypeMember TypeBody
-    const auto& member = child(node, 0);
-    expect_symbol(member, "TypeMember");
-    Token member_name = child(member, 0).token;
-    const auto& tail = child(member, 1);
-    expect_symbol(tail, "TypeMemberTail");
-    
-    const auto& first_tail = child(tail, 0);
-    if (first_tail.symbol == "ASSIGN") {
-        // ASSIGN Expr SEMICOLON
-        attributes.push_back({std::move(member_name), build_expr(child(tail, 1))});
-    } else {
-        // LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
-        auto m_params = build_arg_id_list_opt(child(tail, 1));
-        auto m_ret = build_type_annotation_opt(child(tail, 3));
-        auto m_body = build_function_body(child(tail, 4));
+
+    Token member_name = child(node, 0).token;
+    extract_type_attr_or_method_tail(child(node, 1), std::move(member_name), attributes, methods);
+}
+
+void extract_type_attr_or_method_tail(const CstNode& node, Token member_name, std::vector<AttributeDef>& attributes, std::vector<MethodDef>& methods) {
+    expect_symbol(node, "TypeAttrOrMethodTail");
+    const auto& first_child = child(node, 0);
+
+    if (first_child.symbol == "LPAREN") {
+        // Al ver `(` entramos en la fase de métodos y ya no se permiten
+        // atributos después de este punto del cuerpo de la clase.
+        auto m_params = build_arg_id_list_opt(child(node, 1));
+        auto m_ret = build_type_annotation_opt(child(node, 3));
+        auto m_body = build_function_body(child(node, 4));
         methods.push_back({std::move(member_name), std::move(m_params), std::move(m_ret), std::move(m_body)});
+        extract_type_method_phase(child(node, 5), methods);
+        return;
     }
-    
-    extract_type_body(child(node, 1), attributes, methods);
+
+    // Si no era método, entonces es atributo: nombre + tipo opcional + `=`/`:=` + expr.
+    auto declared_type = build_type_annotation_opt(first_child);
+    ExprPtr value = build_expr(child(node, 2));
+    attributes.push_back({std::move(member_name), std::move(declared_type), std::move(value)});
+    extract_type_attr_phase(child(node, 4), attributes, methods);
+}
+
+void extract_type_method_phase(const CstNode& node, std::vector<MethodDef>& methods) {
+    expect_symbol(node, "TypeMethodPhase");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return;
+    }
+
+    Token method_name = child(node, 0).token;
+    auto m_params = build_arg_id_list_opt(child(node, 2));
+    auto m_ret = build_type_annotation_opt(child(node, 4));
+    auto m_body = build_function_body(child(node, 5));
+    methods.push_back({std::move(method_name), std::move(m_params), std::move(m_ret), std::move(m_body)});
+    extract_type_method_phase(child(node, 6), methods);
 }
 
 }  // namespace
@@ -908,7 +1011,8 @@ void extract_type_body(const CstNode& node, std::vector<AttributeDef>& attribute
 ProgramPtr cst_to_ast(const CstNode& root) {
     expect_symbol(root, "Program");
     auto prog = std::make_unique<Program>();
-    extract_stmt_list(child(root, 0), prog->stmts);
+    extract_type_decl_list(child(root, 0), prog->stmts);
+    extract_stmt_list(child(root, 1), prog->stmts);
     return prog;
 }
 
