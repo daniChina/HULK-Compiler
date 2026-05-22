@@ -197,6 +197,24 @@ CaseExpr::CaseExpr(ExprPtr value, std::vector<CaseBranchDef> branches)
       value(std::move(value)),
       branches(std::move(branches)) {}
 
+IsExpr::IsExpr(ExprPtr object, Token is_keyword, Token type_name)
+    : Expr(ExprKind::IS_EXPR),
+      object(std::move(object)),
+      is_keyword(std::move(is_keyword)),
+      type_name(std::move(type_name)) {}
+
+AsExpr::AsExpr(ExprPtr object, Token as_keyword, Token type_name)
+    : Expr(ExprKind::AS_EXPR),
+      object(std::move(object)),
+      as_keyword(std::move(as_keyword)),
+      type_name(std::move(type_name)) {}
+
+AssignExpr::AssignExpr(ExprPtr lhs, Token op, ExprPtr rhs)
+    : Expr(ExprKind::ASSIGN_EXPR),
+      lhs(std::move(lhs)),
+      op(std::move(op)),
+      rhs(std::move(rhs)) {}
+
 NewExpr::NewExpr(Token type_name, std::vector<ExprPtr> args)
     : Expr(ExprKind::NEW_OBJ),
       type_name(std::move(type_name)),
@@ -334,6 +352,19 @@ std::string expr_to_string(const Expr& expr) {
             }
             out << "])";
             return out.str();
+        }
+        case ExprKind::IS_EXPR: {
+            const auto& is_expr = static_cast<const IsExpr&>(expr);
+            return "Is(" + expr_to_string(*is_expr.object) + ", " + is_expr.type_name.lexeme + ")";
+        }
+        case ExprKind::AS_EXPR: {
+            const auto& as_expr = static_cast<const AsExpr&>(expr);
+            return "As(" + expr_to_string(*as_expr.object) + ", " + as_expr.type_name.lexeme + ")";
+        }
+        case ExprKind::ASSIGN_EXPR: {
+            const auto& assign_expr = static_cast<const AssignExpr&>(expr);
+            return "Assign(" + expr_to_string(*assign_expr.lhs) + ", " + assign_expr.op.lexeme + ", " +
+                   expr_to_string(*assign_expr.rhs) + ")";
         }
         case ExprKind::NEW_OBJ: {
             const auto& new_expr = static_cast<const NewExpr&>(expr);

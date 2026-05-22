@@ -76,6 +76,7 @@ ExprPtr build_power_tail(ExprPtr left, const CstNode& node);
 ExprPtr build_unary_expr(const CstNode& node);
 ExprPtr build_postfix_expr(const CstNode& node);
 ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node);
+ExprPtr build_as_expr_opt(ExprPtr left, const CstNode& node);
 
 // Esta familia paralela evita que el `as` propio de `with (...) as id`
 // sea absorbido por el cast postfix general de otras expresiones.
@@ -389,7 +390,7 @@ ExprPtr build_assign_tail(ExprPtr left, const CstNode& node) {
 
     Token op = child(node, 0).token;
     auto right = build_assign_expr(child(node, 1));
-    return std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+    return std::make_unique<AssignExpr>(std::move(left), std::move(op), std::move(right));
 }
 
 ExprPtr build_or_expr(const CstNode& node) {
@@ -442,16 +443,12 @@ ExprPtr build_cmp_tail(ExprPtr left, const CstNode& node) {
 
     const auto& op_node = child(node, 0);
     if (op_node.symbol == "IS") {
-        // En nuestro AST, representaremos `x is Type` como un CallExpr o lo ignoraremos por ahora,
-        // Wait, IsExpr no está en AST!
-        // No añadí IsExpr ni AsExpr al AST, solo modifiqué gramática!
-        // Entonces voy a simplemente retornar 'left' por ahora para IS/AS si no existen,
-        // o mejor, crear nodos temporales.
-        // Como el usuario no pidió explícitamente AST para is/as y no los puse en expr.hpp,
-        // devolveré 'left' para evitar compilar error. Ojo.
+        Token is_keyword = op_node.token;
+        Token type_name = child(node, 1).token;
+        auto is_expr = std::make_unique<IsExpr>(std::move(left), std::move(is_keyword), std::move(type_name));
+        return build_cmp_tail(std::move(is_expr), child(node, 2));
     }
-    
-    // Asumiendo que es <, <=, >, >=, ==, !=
+
     Token op = op_node.token;
     ExprPtr right = build_concat_expr(child(node, 1));
     auto new_left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
@@ -547,12 +544,23 @@ ExprPtr build_unary_expr(const CstNode& node) {
     return std::make_unique<UnaryExpr>(std::move(op), std::move(right));
 }
 
+ExprPtr build_as_expr_opt(ExprPtr left, const CstNode& node) {
+    expect_symbol(node, "AsExprOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return left;
+    }
+
+    Token as_keyword = child(node, 0).token;
+    Token type_name = child(node, 1).token;
+    auto as_expr = std::make_unique<AsExpr>(std::move(left), std::move(as_keyword), std::move(type_name));
+    return build_as_expr_opt(std::move(as_expr), child(node, 2));
+}
+
 ExprPtr build_postfix_expr(const CstNode& node) {
     expect_symbol(node, "PostfixExpr");
     auto left = build_primary(child(node, 0));
     left = build_postfix_tail(std::move(left), child(node, 1));
-    // AsExprOpt (child(node, 2)) no se mapea en el AST todavía.
-    return left;
+    return build_as_expr_opt(std::move(left), child(node, 2));
 }
 
 ExprPtr build_with_source_expr(const CstNode& node) {
@@ -569,7 +577,7 @@ ExprPtr build_with_source_assign_tail(ExprPtr left, const CstNode& node) {
 
     Token op = child(node, 0).token;
     auto right = build_with_source_expr(child(node, 1));
-    return std::make_unique<BinaryExpr>(std::move(left), std::move(op), std::move(right));
+    return std::make_unique<AssignExpr>(std::move(left), std::move(op), std::move(right));
 }
 
 ExprPtr build_with_source_or_expr(const CstNode& node) {
@@ -622,7 +630,10 @@ ExprPtr build_with_source_cmp_tail(ExprPtr left, const CstNode& node) {
 
     const auto& op_node = child(node, 0);
     if (op_node.symbol == "IS") {
-        return build_with_source_cmp_tail(std::move(left), child(node, 2));
+        Token is_keyword = op_node.token;
+        Token type_name = child(node, 1).token;
+        auto is_expr = std::make_unique<IsExpr>(std::move(left), std::move(is_keyword), std::move(type_name));
+        return build_with_source_cmp_tail(std::move(is_expr), child(node, 2));
     }
 
     Token op = op_node.token;
