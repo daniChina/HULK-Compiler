@@ -28,6 +28,9 @@ enum class ExprKind {
     FOR,
     WITH,
     CASE_EXPR,
+    IS_EXPR,
+    AS_EXPR,
+    ASSIGN_EXPR,
     NEW_OBJ,
     BASE_CALL
 };
@@ -244,6 +247,30 @@ struct CaseExpr final : Expr {
 
     ExprPtr value;
     std::vector<CaseBranchDef> branches;
+};
+
+struct IsExpr final : Expr {
+    IsExpr(ExprPtr object, Token is_keyword, Token type_name);
+
+    ExprPtr object;
+    Token is_keyword;
+    Token type_name;
+};
+
+struct AsExpr final : Expr {
+    AsExpr(ExprPtr object, Token as_keyword, Token type_name);
+
+    ExprPtr object;
+    Token as_keyword;
+    Token type_name;
+};
+
+struct AssignExpr final : Expr {
+    AssignExpr(ExprPtr lhs, Token op, ExprPtr rhs);
+
+    ExprPtr lhs;
+    Token op;
+    ExprPtr rhs;
 };
 
 struct NewExpr final : Expr {

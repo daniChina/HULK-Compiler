@@ -156,7 +156,7 @@ int main() {
             make_token(TokenType::SEMICOLON, ";", 16),
             make_token(TokenType::EOF_TOKEN, "", 17),
         },
-        "Binary(Identifier(y), :=, Binary(Identifier(x), :=, Binary(Number(5), +, Number(5))))");
+        "Assign(Identifier(y), :=, Assign(Identifier(x), :=, Binary(Number(5), +, Number(5))))");
 
     ok &= expect_expression(
         "parenthesized assignment before addition",
@@ -173,7 +173,7 @@ int main() {
             make_token(TokenType::SEMICOLON, ";", 17),
             make_token(TokenType::EOF_TOKEN, "", 18),
         },
-        "Binary(Identifier(y), :=, Binary(Grouped(Binary(Identifier(x), :=, Number(5))), +, Number(1)))");
+        "Assign(Identifier(y), :=, Binary(Grouped(Assign(Identifier(x), :=, Number(5))), +, Number(1)))");
 
     return ok ? 0 : 1;
 }

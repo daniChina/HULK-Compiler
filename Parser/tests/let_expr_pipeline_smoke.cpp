@@ -123,7 +123,7 @@ int main() {
             "let color = \"green\" in { print(color); color := \"blue\"; print(color); };",
             "Program(\n"
             "  ExprStmt(Let(color = String(\"\"green\"\") in Block(Call(Identifier(print), [Identifier(color)]), "
-            "Binary(Identifier(color), :=, String(\"\"blue\"\")), Call(Identifier(print), [Identifier(color)]))))\n"
+            "Assign(Identifier(color), :=, String(\"\"blue\"\")), Call(Identifier(print), [Identifier(color)]))))\n"
             ")");
 
         // Caso 8: `:=` asocia a la derecha y tiene menor prioridad que la aritmetica
@@ -134,10 +134,10 @@ int main() {
             ll1_table,
             "let x = 0, y = 0 in { y := x := 5 + 5; print(x); print(y); y := (x := 5) + 1; print(x); print(y); };",
             "Program(\n"
-            "  ExprStmt(Let(x = Number(0) in Let(y = Number(0) in Block(Binary(Identifier(y), :=, "
-            "Binary(Identifier(x), :=, Binary(Number(5), +, Number(5)))), Call(Identifier(print), [Identifier(x)]), "
-            "Call(Identifier(print), [Identifier(y)]), Binary(Identifier(y), :=, "
-            "Binary(Grouped(Binary(Identifier(x), :=, Number(5))), +, Number(1))), "
+            "  ExprStmt(Let(x = Number(0) in Let(y = Number(0) in Block(Assign(Identifier(y), :=, "
+            "Assign(Identifier(x), :=, Binary(Number(5), +, Number(5)))), Call(Identifier(print), [Identifier(x)]), "
+            "Call(Identifier(print), [Identifier(y)]), Assign(Identifier(y), :=, "
+            "Binary(Grouped(Assign(Identifier(x), :=, Number(5))), +, Number(1))), "
             "Call(Identifier(print), [Identifier(x)]), Call(Identifier(print), [Identifier(y)])))))\n"
             ")");
 

@@ -77,7 +77,7 @@ int main() {
             "let i:Number=0 in while (i < 3) { i := i + 1; };",
             "Program(\n"
             "  ExprStmt(Let(i: Number = Number(0) in While(Binary(Identifier(i), <, Number(3)), "
-            "Block(Binary(Identifier(i), :=, Binary(Identifier(i), +, Number(1)))))))\n"
+            "Block(Assign(Identifier(i), :=, Binary(Identifier(i), +, Number(1)))))))\n"
             ")");
 
         // Estilo gcd: let con while en bloque y valor final del bloque de la funcion.
@@ -97,8 +97,8 @@ int main() {
             "Program(\n"
             "  FunctionDecl(gcd(a: Number, b: Number): Number => Block(Let(q: Number = "
             "Binary(Identifier(a), %, Identifier(b)) in While(Binary(Identifier(q), !=, Number(0)), "
-            "Block(Binary(Identifier(a), :=, Identifier(b)), Binary(Identifier(b), :=, Identifier(q)), "
-            "Binary(Identifier(q), :=, Binary(Identifier(a), %, Identifier(b)))))), Identifier(b)))\n"
+            "Block(Assign(Identifier(a), :=, Identifier(b)), Assign(Identifier(b), :=, Identifier(q)), "
+            "Assign(Identifier(q), :=, Binary(Identifier(a), %, Identifier(b)))))), Identifier(b)))\n"
             ")");
 
         return ok ? 0 : 1;

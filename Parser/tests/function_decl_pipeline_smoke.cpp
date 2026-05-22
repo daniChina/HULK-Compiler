@@ -96,9 +96,9 @@ int main() {
             "function f(a:Number, b:Number, c:Number):Number { a := b + c; b := c + a; c := a + b; }\n"
             "let a:Number=1, b:Number=2, c:Number=3 in print(f(a,b,c));",
             "Program(\n"
-            "  FunctionDecl(f(a: Number, b: Number, c: Number): Number => Block(Binary(Identifier(a), :=, "
-            "Binary(Identifier(b), +, Identifier(c))), Binary(Identifier(b), :=, Binary(Identifier(c), +, Identifier(a))), "
-            "Binary(Identifier(c), :=, Binary(Identifier(a), +, Identifier(b)))))\n"
+            "  FunctionDecl(f(a: Number, b: Number, c: Number): Number => Block(Assign(Identifier(a), :=, "
+            "Binary(Identifier(b), +, Identifier(c))), Assign(Identifier(b), :=, Binary(Identifier(c), +, Identifier(a))), "
+            "Assign(Identifier(c), :=, Binary(Identifier(a), +, Identifier(b)))))\n"
             "  ExprStmt(Let(a: Number = Number(1) in Let(b: Number = Number(2) in Let(c: Number = Number(3) in "
             "Call(Identifier(print), [Call(Identifier(f), [Identifier(a), Identifier(b), Identifier(c)])])))))\n"
             ")");
