@@ -39,6 +39,9 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::AS:             return TokenType::AS;
         case ::TokenType::AND:            return TokenType::AND;
         case ::TokenType::OR:             return TokenType::OR;
+        case ::TokenType::REPEAT:         return TokenType::REPEAT;
+        case ::TokenType::UNLESS:         return TokenType::UNLESS;
+        case ::TokenType::LOOP:           return TokenType::LOOP;
         case ::TokenType::LPAREN:         return TokenType::LPAREN;
         case ::TokenType::RPAREN:         return TokenType::RPAREN;
         case ::TokenType::LBRACE:         return TokenType::LBRACE;

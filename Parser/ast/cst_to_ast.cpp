@@ -35,6 +35,10 @@ ExprPtr build_expr(const CstNode& node);
 ExprPtr build_if_expr(const CstNode& node);
 ExprPtr build_while_expr(const CstNode& node);
 ExprPtr build_for_expr(const CstNode& node);
+std::optional<Token> build_for_type_opt(const CstNode& node);
+ExprPtr build_unless_expr(const CstNode& node);
+ExprPtr build_repeat_expr(const CstNode& node);
+ExprPtr build_loop_while_expr(const CstNode& node);
 ExprPtr build_with_expr(const CstNode& node);
 ExprPtr build_case_expr(const CstNode& node);
 ExprPtr build_elif_chain_opt(const CstNode& node, ExprPtr final_else);
@@ -168,15 +172,55 @@ ExprPtr build_expr(const CstNode& node) {
     if (first_child.symbol == "AssignExpr") {
         return build_assign_expr(first_child);
     }
-    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, WithExpr, CaseExpr, LetExpr o AssignExpr");
+    if (first_child.symbol == "UnlessExpr") {
+        return build_unless_expr(first_child);
+    }
+    if (first_child.symbol == "RepeatExpr") {
+        return build_repeat_expr(first_child);
+    }
+    if (first_child.symbol == "LoopWhileExpr") {
+        return build_loop_while_expr(first_child);
+    }
+    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, WithExpr, CaseExpr, LetExpr, AssignExpr, UnlessExpr, RepeatExpr o LoopWhileExpr");
+}
+
+std::optional<Token> build_for_type_opt(const CstNode& node) {
+    expect_symbol(node, "ForTypeOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return std::nullopt;
+    }
+    return child(node, 1).token;
 }
 
 ExprPtr build_for_expr(const CstNode& node) {
     expect_symbol(node, "ForExpr");
     Token variable = child(node, 2).token;
-    ExprPtr iterable = build_expr(child(node, 4));
-    ExprPtr body = build_expr(child(node, 6));
-    return std::make_unique<ForExpr>(std::move(variable), std::move(iterable), std::move(body));
+    auto declared_type = build_for_type_opt(child(node, 3));
+    ExprPtr iterable = build_expr(child(node, 5));
+    ExprPtr body = build_expr(child(node, 7));
+    return std::make_unique<ForExpr>(std::move(variable), std::move(declared_type), std::move(iterable), std::move(body));
+}
+
+ExprPtr build_unless_expr(const CstNode& node) {
+    expect_symbol(node, "UnlessExpr");
+    ExprPtr cond = build_expr(child(node, 2));
+    ExprPtr then_branch = build_expr(child(node, 4));
+    ExprPtr else_branch = build_else_opt(child(node, 5));
+    return std::make_unique<UnlessExpr>(std::move(cond), std::move(then_branch), std::move(else_branch));
+}
+
+ExprPtr build_repeat_expr(const CstNode& node) {
+    expect_symbol(node, "RepeatExpr");
+    ExprPtr count = build_expr(child(node, 2));
+    ExprPtr body = build_expr(child(node, 4));
+    return std::make_unique<RepeatExpr>(std::move(count), std::move(body));
+}
+
+ExprPtr build_loop_while_expr(const CstNode& node) {
+    expect_symbol(node, "LoopWhileExpr");
+    ExprPtr body = build_expr(child(node, 1));
+    ExprPtr condition = build_expr(child(node, 4));
+    return std::make_unique<LoopWhileExpr>(std::move(body), std::move(condition));
 }
 
 ExprPtr build_while_expr(const CstNode& node) {
@@ -1021,10 +1065,10 @@ void extract_type_method_phase(const CstNode& node, std::vector<MethodDef>& meth
 
 ProgramPtr cst_to_ast(const CstNode& root) {
     expect_symbol(root, "Program");
-    auto prog = std::make_unique<Program>();
-    extract_type_decl_list(child(root, 0), prog->stmts);
-    extract_stmt_list(child(root, 1), prog->stmts);
-    return prog;
+    std::vector<StmtPtr> stmts;
+    extract_type_decl_list(child(root, 0), stmts);
+    extract_stmt_list(child(root, 1), stmts);
+    return std::make_unique<Program>(std::move(stmts));
 }
 
 }  // namespace parser

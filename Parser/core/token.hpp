@@ -38,6 +38,9 @@ enum class TokenType {
     AS,
     AND,
     OR,
+    REPEAT,
+    UNLESS,
+    LOOP,
 
     LPAREN,
     RPAREN,
@@ -114,6 +117,9 @@ inline const char* token_name(TokenType type) {
         case TokenType::AS: return "AS";
         case TokenType::AND: return "AND";
         case TokenType::OR: return "OR";
+        case TokenType::REPEAT: return "REPEAT";
+        case TokenType::UNLESS: return "UNLESS";
+        case TokenType::LOOP: return "LOOP";
         case TokenType::LPAREN: return "LPAREN";
         case TokenType::RPAREN: return "RPAREN";
         case TokenType::LBRACE: return "LBRACE";

@@ -47,3 +47,13 @@ Para “HULK completo” según [Hulk.md](/home/nebur02/Documents/3er Ano/2do SE
   - backend (intérprete o generación de código/IR)
 
 En resumen: el lexer actual **sí sirve para un subconjunto útil de HULK**, pero **no cubre aún todos los símbolos/construcciones del HULK completo** definido en la documentación.
+
+### Actualización de Extensiones (Fase 0 - Final)
+
+Se han añadido y registrado formalmente las palabras clave dedicadas para las 4 extensiones de control de flujo en el lexer:
+- `"unless"` -> Devuelve el token `UNLESS`
+- `"repeat"` -> Devuelve el token `REPEAT`
+- `"loop"` -> Devuelve el token `LOOP`
+
+Estos tokens permiten tokenizar correctamente los nuevos constructores sintácticos de HULK.
+
