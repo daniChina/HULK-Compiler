@@ -1,0 +1,1 @@
+for (x: Number in range(10)) print(x);

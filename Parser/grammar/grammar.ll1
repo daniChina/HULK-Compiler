@@ -62,12 +62,23 @@ Expr            -> IfExpr
                 | WithExpr
                 | CaseExpr
                 | AssignExpr
+                | UnlessExpr
+                | RepeatExpr
+                | LoopWhileExpr
 
 AssignExpr      -> OrExpr AssignTail
 AssignTail      -> ASSIGN AssignExpr
                 | ε
 
-ForExpr         -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
+ForExpr         -> FOR LPAREN IDENTIFIER ForTypeOpt IN Expr RPAREN Expr
+ForTypeOpt      -> COLON IDENTIFIER
+                | ε
+
+UnlessExpr      -> UNLESS LPAREN Expr RPAREN Expr ElseOpt
+
+RepeatExpr      -> REPEAT LPAREN Expr RPAREN Expr
+
+LoopWhileExpr   -> LOOP Expr WHILE LPAREN Expr RPAREN
 
 CaseExpr        -> CASE Expr OF CasePayload
 CasePayload     -> LBRACE CaseBranchList RBRACE

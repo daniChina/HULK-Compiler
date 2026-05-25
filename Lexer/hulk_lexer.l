@@ -159,6 +159,9 @@ IDENT       {ALPHA}{ALNUM_}*
 "as"          { UPD(AS);         }
 "and"         { UPD(AND);        }
 "or"          { UPD(OR);         }
+"repeat"      { UPD(REPEAT);     }
+"unless"      { UPD(UNLESS);     }
+"loop"        { UPD(LOOP);       }
 
  /* ── 7. Identificadores y nombres globales ─────────────── */
 {IDENT}       { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
