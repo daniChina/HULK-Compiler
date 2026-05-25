@@ -1,0 +1,9 @@
+
+# Build artifacts
+hulk.exe
+*.o
+Lexer/hulk_lexer.cpp
+
+# Editor / tooling
+.vscode/
+.codex
