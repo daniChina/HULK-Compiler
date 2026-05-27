@@ -70,6 +70,9 @@ public:
         // Create global scope
         pushScope();
 
+        // Add built-in types and their root hierarchy.
+        addBuiltinTypes();
+
         // Add built-in functions
         addBuiltinFunctions();
     }
@@ -423,6 +426,23 @@ public:
     }
 
 private:
+    /**
+     * @brief Add built-in types to symbol table
+     */
+    void addBuiltinTypes()
+    {
+        // Root of nominal hierarchy
+        declareType("Object", "Object");
+
+        // Primitive/special builtins represented as declared types for lookup consistency.
+        declareType("Number", "Object");
+        declareType("String", "Object");
+        declareType("Boolean", "Object");
+        declareType("Null", "Object");
+        declareType("Void", "Object");
+        declareType("Unknown", "Object");
+    }
+
     /**
      * @brief Add built-in functions to symbol table
      */
