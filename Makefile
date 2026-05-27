@@ -1,4 +1,4 @@
-.PHONY: all compile lexer clean execute
+.PHONY: all compile lexer clean execute test_types
 
 # Compilador y flags
 CXX = g++
@@ -15,9 +15,11 @@ SOURCES = Lexer/hulk_lexer.cpp \
           Parser/generator/first_follow.cpp \
           Parser/generator/ll1_table.cpp \
           Parser/syntax/ll1_parser.cpp \
+          Types/type_info.cpp \
           Compiler/main.cpp
 
 TARGET = hulk.exe
+TYPE_TEST_TARGET = type_info_smoke
 FILE ?= Parser/tests/valid_expr_pipeline.hulk
 
 all: compile
@@ -31,5 +33,9 @@ compile:
 execute: compile
 	./$(TARGET) --tokens --cst --ast $(FILE)
 
+test_types:
+	$(CXX) $(CXXFLAGS) Types/tests/type_info_smoke.cpp Types/type_info.cpp Parser/ast/expr.cpp -o $(TYPE_TEST_TARGET)
+	./$(TYPE_TEST_TARGET)
+
 clean:
-	rm -f $(TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(TYPE_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
