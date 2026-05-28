@@ -33,7 +33,9 @@ TypeAnnotationOpt -> COLON IDENTIFIER | ε
 FunctionBody    -> ARROW Expr SEMICOLON
                 | BlockExpr
 
-TypeDecl        -> TYPE IDENTIFIER TypeParamsOpt TypeInheritanceOpt LBRACE TypeBody RBRACE
+TypeDecl        -> TYPE IDENTIFIER TypeParamsOpt TypeInheritanceOpt LBRACE TypeBody RBRACE TypeDeclSemicolonOpt
+TypeDeclSemicolonOpt -> SEMICOLON
+                      | ε
 TypeParamsOpt   -> LPAREN ArgIdListOpt RPAREN
                 | LBRACKET ArgIdListOpt RBRACKET
                 | ε

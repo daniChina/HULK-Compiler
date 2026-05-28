@@ -1,8 +1,11 @@
-.PHONY: all compile lexer clean execute test_types
+.PHONY: all compile lexer clean execute test_types test_symbols
 
 # Compilador y flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -I. -ILexer -IParser/core -IParser/ast -IParser/generator -IParser/syntax -I/usr/include -IC:/ghcup/msys64/usr/include
+# FlexLexer.h: MSYS2/ghcup o WinFlexBison (winget install WinFlexBison.win_flex_bison)
+FLEX_WIN = $(LOCALAPPDATA)/Microsoft/WinGet/Packages/WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe
+CXXFLAGS = -std=c++17 -Wall -I. -ILexer -IParser/core -IParser/ast -IParser/generator -IParser/syntax \
+           -I/usr/include -IC:/ghcup/msys64/usr/include -I$(FLEX_WIN)
 
 # Archivos fuente
 SOURCES = Lexer/hulk_lexer.cpp \
@@ -16,10 +19,15 @@ SOURCES = Lexer/hulk_lexer.cpp \
           Parser/generator/ll1_table.cpp \
           Parser/syntax/ll1_parser.cpp \
           Types/type_info.cpp \
+          SymbolTable/decl_collector.cpp \
           Compiler/main.cpp
 
 TARGET = hulk.exe
 TYPE_TEST_TARGET = type_info_smoke
+SYMBOL_SMOKE_TARGET = symbol_table_smoke
+SYMBOL_SCOPE_TEST_TARGET = symbol_table_scope_tests
+SYMBOL_TEST_AST = Types/type_info.cpp Parser/ast/expr.cpp
+SYMBOL_TEST_AST_COLLECTOR = $(SYMBOL_TEST_AST) SymbolTable/decl_collector.cpp
 FILE ?= Parser/tests/valid_expr_pipeline.hulk
 
 all: compile
@@ -37,5 +45,15 @@ test_types:
 	$(CXX) $(CXXFLAGS) Types/tests/type_info_smoke.cpp Types/type_info.cpp Parser/ast/expr.cpp -o $(TYPE_TEST_TARGET)
 	./$(TYPE_TEST_TARGET)
 
+test_symbols: test_symbols_smoke test_symbols_scope
+
+test_symbols_smoke:
+	$(CXX) $(CXXFLAGS) SymbolTable/tests/symbol_table_smoke.cpp $(SYMBOL_TEST_AST_COLLECTOR) -o $(SYMBOL_SMOKE_TARGET)
+	./$(SYMBOL_SMOKE_TARGET)
+
+test_symbols_scope:
+	$(CXX) $(CXXFLAGS) SymbolTable/tests/symbol_table_scope_tests.cpp $(SYMBOL_TEST_AST) -o $(SYMBOL_SCOPE_TEST_TARGET)
+	./$(SYMBOL_SCOPE_TEST_TARGET)
+
 clean:
-	rm -f $(TARGET) $(TYPE_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
