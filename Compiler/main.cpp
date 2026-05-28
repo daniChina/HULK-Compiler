@@ -6,6 +6,9 @@
 
 #include "../Parser/ast/cst_to_ast.hpp"
 #include "../Parser/core/token_adapter.hpp"
+#include "../SymbolTable/decl_collector.hpp"
+#include "../SymbolTable/symbol_table.hpp"
+#include "../Types/type_info.hpp"
 #include "../Parser/generator/first_follow.hpp"
 #include "../Parser/generator/grammar_reader.hpp"
 #include "../Parser/generator/ll1_table.hpp"
@@ -17,12 +20,13 @@ struct Options {
     bool print_tokens = false;
     bool print_cst = false;
     bool print_ast = false;
+    bool print_symbols = false;
     std::string input_path;
 };
 
 void print_usage(const char* program_name) {
     std::cerr
-        << "Uso: " << program_name << " [--tokens] [--cst] [--ast] [archivo.hulk]\n"
+        << "Uso: " << program_name << " [--tokens] [--cst] [--ast] [--symbols] [archivo.hulk]\n"
         << "  Si no se pasa archivo, lee desde stdin.\n";
 }
 
@@ -43,6 +47,10 @@ Options parse_options(int argc, char* argv[]) {
         }
         if (arg == "--ast") {
             options.print_ast = true;
+            continue;
+        }
+        if (arg == "--symbols") {
+            options.print_symbols = true;
             continue;
         }
         if (arg == "--help" || arg == "-h") {
@@ -109,10 +117,24 @@ int main(int argc, char* argv[]) {
             std::cout << parser::cst_to_string(*parse_result.cst_root);
         }
 
-        if (options.print_ast && parse_result.cst_root) {
+        if (parse_result.cst_root) {
             auto ast = parser::cst_to_ast(*parse_result.cst_root);
-            std::cout << "== AST ==\n";
-            std::cout << parser::program_to_string(*ast) << "\n";
+
+            SymbolTable symbol_table;
+            TypeInfo::setSymbolTable(&symbol_table);
+            const auto decl_stats = collectTopLevelDeclarations(*ast, symbol_table);
+
+            if (options.print_ast) {
+                std::cout << "== AST ==\n";
+                std::cout << parser::program_to_string(*ast) << "\n";
+            }
+
+            if (options.print_symbols) {
+                std::cout << "== Symbols ==\n"
+                          << "  functions registered: " << decl_stats.functions_registered << "\n"
+                          << "  types registered: " << decl_stats.types_registered << "\n"
+                          << "  stmts skipped (non-decl): " << decl_stats.skipped_stmts << "\n";
+            }
         }
 
         return 0;

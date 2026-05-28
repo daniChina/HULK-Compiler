@@ -5,8 +5,6 @@
 #include <map>
 #include <vector>
 #include <memory>
-#include <sstream>
-#include <iostream>
 /**
  * @brief Symbol information for variables and functions
  */
@@ -73,7 +71,8 @@ public:
         // Add built-in types and their root hierarchy.
         addBuiltinTypes();
 
-        // Add built-in functions
+        // Add built-in constants and functions
+        addBuiltinVariables();
         addBuiltinFunctions();
     }
 
@@ -131,18 +130,7 @@ public:
             return false; // Variable already declared
         }
 
-        std::cout << "[DEBUG] SymbolTable::declareVariable - storing variable " << name
-                  << " with type: " << type.toString()
-                  << " (typeName: '" << type.getTypeName() << "')" << std::endl;
-
         current_scope[name] = Symbol(name, type, is_mutable, line);
-
-        // Verify what was actually stored
-        auto &stored_symbol = current_scope[name];
-        std::cout << "[DEBUG] SymbolTable::declareVariable - stored symbol has type: "
-                  << stored_symbol.type.toString()
-                  << " (typeName: '" << stored_symbol.type.getTypeName() << "')" << std::endl;
-
         return true;
     }
 
@@ -156,9 +144,6 @@ public:
             auto found = it->find(name);
             if (found != it->end())
             {
-                std::cout << "[DEBUG] SymbolTable::lookupVariable - found variable " << name
-                          << " with type: " << found->second.type.toString()
-                          << " (typeName: '" << found->second.type.getTypeName() << "')" << std::endl;
                 return &found->second;
             }
         }
@@ -426,6 +411,15 @@ public:
     }
 
 private:
+    /**
+     * @brief Add built-in global constants (PI, E)
+     */
+    void addBuiltinVariables()
+    {
+        declareVariable("PI", TypeInfo(TypeInfo::Kind::Number), false);
+        declareVariable("E", TypeInfo(TypeInfo::Kind::Number), false);
+    }
+
     /**
      * @brief Add built-in types to symbol table
      */
