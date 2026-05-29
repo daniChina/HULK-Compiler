@@ -140,11 +140,11 @@ int main() {
             "pipeline builds AssignExpr for self member inside type method",
             grammar,
             ll1_table,
-            "type Counter[count:Number] { count:Number = 0; bump() => self.count := self.count + 1; }",
+            "class Counter(count:Number) { count:Number = count; bump() -> self.count := self.count + 1; }",
             "Program(\n"
-            "  TypeDecl(Counter(count: Number) {\n"
-            "    count: Number = Number(0);\n"
-            "    bump() => Assign(GetAttr(Self, count), :=, Binary(GetAttr(Self, count), +, Number(1)));\n"
+            "  ClassDecl(Counter(count: Number) {\n"
+            "    count: Number = Identifier(count);\n"
+            "    bump() -> Assign(GetAttr(Self, count), :=, Binary(GetAttr(Self, count), +, Number(1)));\n"
             "})\n"
             ")");
 

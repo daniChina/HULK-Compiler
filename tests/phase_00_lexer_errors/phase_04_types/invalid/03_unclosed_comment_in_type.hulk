@@ -1,4 +1,4 @@
-// El lexer debe reportar comentario de bloque sin cerrar dentro de un type.
-type Point(x, y) {
+// El lexer debe reportar comentario de bloque sin cerrar dentro de una clase.
+class Point(x:Number, y:Number) {
     /* comentario
-};
+}

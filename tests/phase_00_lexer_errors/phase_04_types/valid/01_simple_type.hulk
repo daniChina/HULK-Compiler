@@ -1,5 +1,5 @@
-type Point(x, y) {
-    x = x;
-    y = y;
-};
+class Point(x:Number, y:Number) {
+    x:Number = x;
+    y:Number = y;
+}
 new Point(1, 2);
