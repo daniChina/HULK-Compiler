@@ -56,16 +56,16 @@ int main() {
             "class Late {}");
 
         ok &= expect_parse_error(
-            "rejects malformed class header missing closing bracket",
+            "rejects malformed class header missing closing parenthesis",
             grammar,
             ll1_table,
-            "class Point[x:Number, y:Number { x = x; }");
+            "class Point(x:Number, y:Number { x:Number = x; }");
 
         ok &= expect_parse_error(
             "rejects attribute declared after first method",
             grammar,
             ll1_table,
-            "class Point { length():Number => 0; x:Number = 0; }");
+            "class Point { length() -> 0; x:Number = 0; }");
 
         ok &= expect_parse_error(
             "rejects attribute without initializer",

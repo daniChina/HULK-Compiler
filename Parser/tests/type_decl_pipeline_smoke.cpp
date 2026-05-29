@@ -103,32 +103,32 @@ int main() {
         bool ok = true;
 
         {
-            const auto tokens = tokenize_source("class Point[x:Number, y:Number] is Object[] { x = x; }");
+            const auto tokens = tokenize_source("class Point(x:Number, y:Number) is Object() { x:Number = x; }");
             ok &= expect_token_types(
-                "lexer recognizes class alias, bracket params and is inheritance",
+                "lexer recognizes class keyword, paren params and is inheritance",
                 tokens,
-                {parser::TokenType::CLASS, parser::TokenType::IDENTIFIER, parser::TokenType::LBRACKET,
+                {parser::TokenType::CLASS, parser::TokenType::IDENTIFIER, parser::TokenType::LPAREN,
                  parser::TokenType::IDENTIFIER, parser::TokenType::COLON, parser::TokenType::IDENTIFIER,
                  parser::TokenType::COMMA, parser::TokenType::IDENTIFIER, parser::TokenType::COLON,
-                 parser::TokenType::IDENTIFIER, parser::TokenType::RBRACKET, parser::TokenType::IS,
-                 parser::TokenType::IDENTIFIER, parser::TokenType::LBRACKET, parser::TokenType::RBRACKET,
-                 parser::TokenType::LBRACE, parser::TokenType::IDENTIFIER, parser::TokenType::EQUAL,
-                 parser::TokenType::IDENTIFIER, parser::TokenType::SEMICOLON, parser::TokenType::RBRACE,
-                 parser::TokenType::EOF_TOKEN});
+                 parser::TokenType::IDENTIFIER, parser::TokenType::RPAREN, parser::TokenType::IS,
+                 parser::TokenType::IDENTIFIER, parser::TokenType::LPAREN, parser::TokenType::RPAREN,
+                 parser::TokenType::LBRACE, parser::TokenType::IDENTIFIER, parser::TokenType::COLON,
+                 parser::TokenType::IDENTIFIER, parser::TokenType::EQUAL, parser::TokenType::IDENTIFIER,
+                 parser::TokenType::SEMICOLON, parser::TokenType::RBRACE, parser::TokenType::EOF_TOKEN});
         }
 
         ok &= expect_program_ast(
             "class syntax with typed attributes reaches canonical type AST",
             grammar,
             ll1_table,
-            "class Point[x:Number, y:Number] { x:Number = x; y:Number = y; norm():Number => self.x * self.x + self.y * self.y; }\n"
+            "class Point(x:Number, y:Number) { x:Number = x; y:Number = y; norm() -> self.x * self.x + self.y * self.y; }\n"
             "function dist(p:Point):Number => p.norm();\n"
             "new Point(3, 4).norm();",
             "Program(\n"
-            "  TypeDecl(Point(x: Number, y: Number) {\n"
+            "  ClassDecl(Point(x: Number, y: Number) {\n"
             "    x: Number = Identifier(x);\n"
             "    y: Number = Identifier(y);\n"
-            "    norm(): Number => Binary(Binary(GetAttr(Self, x), *, GetAttr(Self, x)), +, Binary(GetAttr(Self, y), *, GetAttr(Self, y)));\n"
+            "    norm() -> Binary(Binary(GetAttr(Self, x), *, GetAttr(Self, x)), +, Binary(GetAttr(Self, y), *, GetAttr(Self, y)));\n"
             "})\n"
             "  FunctionDecl(dist(p: Point): Number => Call(GetAttr(Identifier(p), norm), []))\n"
             "  ExprStmt(Call(GetAttr(New(Point(Number(3), Number(4))), norm), []))\n"
@@ -139,21 +139,21 @@ int main() {
             grammar,
             ll1_table,
             "class Point(x:Number, y:Number) { x:Number = x; y:Number = y; }\n"
-            "class ColoredPoint[x:Number, y:Number, c:String] is Point[x, y] {\n"
+            "class ColoredPoint(x:Number, y:Number, c:String) is Point(x, y) {\n"
             "  color:String = c;\n"
-            "  parent():Object => base(x, y);\n"
-            "  label():String => self.color;\n"
+            "  parent() -> base(x, y);\n"
+            "  label() -> self.color;\n"
             "}\n"
             "new ColoredPoint(1, 2, \"red\").label();",
             "Program(\n"
-            "  TypeDecl(Point(x: Number, y: Number) {\n"
+            "  ClassDecl(Point(x: Number, y: Number) {\n"
             "    x: Number = Identifier(x);\n"
             "    y: Number = Identifier(y);\n"
             "})\n"
-            "  TypeDecl(ColoredPoint(x: Number, y: Number, c: String) inherits Point(Identifier(x), Identifier(y)) {\n"
+            "  ClassDecl(ColoredPoint(x: Number, y: Number, c: String) is Point(Identifier(x), Identifier(y)) {\n"
             "    color: String = Identifier(c);\n"
-            "    parent(): Object => BaseCall(Identifier(x), Identifier(y));\n"
-            "    label(): String => GetAttr(Self, color);\n"
+            "    parent() -> BaseCall(Identifier(x), Identifier(y));\n"
+            "    label() -> GetAttr(Self, color);\n"
             "})\n"
             "  ExprStmt(Call(GetAttr(New(ColoredPoint(Number(1), Number(2), String(\"\"red\"\"))), label), []))\n"
             ")");

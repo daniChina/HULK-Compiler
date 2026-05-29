@@ -135,13 +135,13 @@ int main() {
             "  d:D -> print(\"D\");\n"
             "};",
             "Program(\n"
-            "  TypeDecl(A() {\n"
+            "  ClassDecl(A {\n"
             "})\n"
-            "  TypeDecl(B() inherits A() {\n"
+            "  ClassDecl(B is A {\n"
             "})\n"
-            "  TypeDecl(C() inherits B() {\n"
+            "  ClassDecl(C is B {\n"
             "})\n"
-            "  TypeDecl(D() inherits A() {\n"
+            "  ClassDecl(D is A {\n"
             "})\n"
             "  ExprStmt(Case(New(C()), [a: A => Call(Identifier(print), [String(\"\"A\"\")]), b: B => Call(Identifier(print), [String(\"\"B\"\")]), d: D => Call(Identifier(print), [String(\"\"D\"\")])]))\n"
             ")");
