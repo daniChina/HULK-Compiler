@@ -146,7 +146,7 @@ IDENT       {ALPHA}{ALNUM_}*
 "case"        { UPD(CASE);       }
 "of"          { UPD(OF);         }
 "function"    { UPD(FUNCTION);   }
-"type"        { UPD(TYPE);       }
+"class"       { UPD(CLASS);      }
 "protocol"    { UPD(PROTOCOL);   }
 "def"         { UPD(DEF);        }
 "let"         { UPD(LET);        }
@@ -165,10 +165,6 @@ IDENT       {ALPHA}{ALNUM_}*
 
  /* ── 7. Identificadores y nombres globales ─────────────── */
 {IDENT}       { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
-                // `class` es un alias sintactico de `type` en el parser actual.
-                if (lexeme_ == "class") {
-                    return static_cast<int>(TokenType::TYPE);
-                }
                 // Mientras el .cpp versionado no se regenere con flex, este
                 // fallback mantiene `with` como keyword aunque llegue por IDENT.
                 if (lexeme_ == "with") {

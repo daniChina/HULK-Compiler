@@ -53,7 +53,7 @@ using ExprPtr = std::unique_ptr<Expr>;
 enum class StmtKind {
     EXPR,
     FUNCTION_DECL,
-    TYPE_DECL,
+    CLASS_DECL,
     PROGRAM,
     METHOD_DECL,
     ATTRIBUTE_DECL
@@ -96,14 +96,13 @@ struct AttributeDef {
 struct MethodDef {
     Token name;
     std::vector<std::pair<Token, std::optional<Token>>> params;
-    std::optional<Token> return_type;
     ExprPtr body;
 };
 
-struct TypeDecl final : Stmt {
-    TypeDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params,
-             std::optional<Token> parent_name, std::vector<ExprPtr> parent_args,
-             std::vector<AttributeDef> attributes, std::vector<MethodDef> methods);
+struct ClassDecl final : Stmt {
+    ClassDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params,
+              std::optional<Token> parent_name, std::vector<ExprPtr> parent_args,
+              std::vector<AttributeDef> attributes, std::vector<MethodDef> methods);
     void accept(StmtVisitor* visitor) override;
 
     Token name;

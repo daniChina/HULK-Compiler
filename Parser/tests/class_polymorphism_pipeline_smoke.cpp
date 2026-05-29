@@ -108,7 +108,7 @@ int main() {
             ok &= expect_token_types(
                 "lexer recognizes inherited class and overriding method syntax",
                 tokens,
-                {parser::TokenType::TYPE, parser::TokenType::IDENTIFIER, parser::TokenType::IS,
+                {parser::TokenType::CLASS, parser::TokenType::IDENTIFIER, parser::TokenType::IS,
                  parser::TokenType::IDENTIFIER, parser::TokenType::LBRACE, parser::TokenType::IDENTIFIER,
                  parser::TokenType::LPAREN, parser::TokenType::RPAREN, parser::TokenType::ARROW,
                  parser::TokenType::STRING_LITERAL, parser::TokenType::CONCAT_WS, parser::TokenType::SELF,
@@ -122,19 +122,19 @@ int main() {
             ll1_table,
             "class Person(name:String) {\n"
             "  name:String = name;\n"
-            "  greet():String -> \"Hello\" @@ self.name;\n"
+            "  greet() -> \"Hello\" @@ self.name;\n"
             "}\n"
             "class Colleague is Person {\n"
-            "  greet():String -> \"Hi\" @@ self.name;\n"
+            "  greet() -> \"Hi\" @@ self.name;\n"
             "}\n"
             "let p:Person = new Colleague(\"Pete\") in print(p.greet());",
             "Program(\n"
-            "  TypeDecl(Person(name: String) {\n"
+            "  ClassDecl(Person(name: String) {\n"
             "    name: String = Identifier(name);\n"
-            "    greet(): String => Binary(String(\"\"Hello\"\"), @@, GetAttr(Self, name));\n"
+            "    greet() -> Binary(String(\"\"Hello\"\"), @@, GetAttr(Self, name));\n"
             "})\n"
-            "  TypeDecl(Colleague() inherits Person() {\n"
-            "    greet(): String => Binary(String(\"\"Hi\"\"), @@, GetAttr(Self, name));\n"
+            "  ClassDecl(Colleague is Person {\n"
+            "    greet() -> Binary(String(\"\"Hi\"\"), @@, GetAttr(Self, name));\n"
             "})\n"
             "  ExprStmt(Let(p: Person = New(Colleague(String(\"\"Pete\"\"))) in Call(Identifier(print), [Call(GetAttr(Identifier(p), greet), [])])))\n"
             ")");
@@ -145,16 +145,16 @@ int main() {
             ll1_table,
             "class Person(name:String) {\n"
             "  name:String = name;\n"
-            "  greet():String -> \"Hello\" @@ self.name;\n"
+            "  greet() -> \"Hello\" @@ self.name;\n"
             "}\n"
             "class Noble(title:String, who:String) is Person(title @@ who) { }\n"
             "let p = new Noble(\"Sir\", \"Thomas\") in print(p.greet());",
             "Program(\n"
-            "  TypeDecl(Person(name: String) {\n"
+            "  ClassDecl(Person(name: String) {\n"
             "    name: String = Identifier(name);\n"
-            "    greet(): String => Binary(String(\"\"Hello\"\"), @@, GetAttr(Self, name));\n"
+            "    greet() -> Binary(String(\"\"Hello\"\"), @@, GetAttr(Self, name));\n"
             "})\n"
-            "  TypeDecl(Noble(title: String, who: String) inherits Person(Binary(Identifier(title), @@, Identifier(who))) {\n"
+            "  ClassDecl(Noble(title: String, who: String) is Person(Binary(Identifier(title), @@, Identifier(who))) {\n"
             "})\n"
             "  ExprStmt(Let(p = New(Noble(String(\"\"Sir\"\"), String(\"\"Thomas\"\"))) in Call(Identifier(print), [Call(GetAttr(Identifier(p), greet), [])])))\n"
             ")");

@@ -41,10 +41,10 @@ parser::ProgramPtr makeSampleProgram()
         std::move(squareBody));
     stmts.push_back(std::move(square));
 
-    auto pointType = std::make_unique<parser::TypeDecl>(
+    auto pointType = std::make_unique<parser::ClassDecl>(
         identToken("Point"),
         std::vector<std::pair<parser::Token, std::optional<parser::Token>>>{},
-        identToken("Object"),
+        std::nullopt,
         std::vector<parser::ExprPtr>{},
         std::vector<parser::AttributeDef>{},
         std::vector<parser::MethodDef>{});
@@ -91,7 +91,7 @@ int main()
     ok &= expect(collected.skipped_stmts == 1, "AST walk skips non-declaration statements");
     ok &= expect(table.isFunctionDeclared("square"), "square is visible after AST collection");
     ok &= expect(table.isTypeDeclared("Point"), "Point is visible after AST collection");
-    ok &= expect(table.getTypeDeclaration("Point") != nullptr, "Point TypeDecl pointer is stored for later phases");
+    ok &= expect(table.getTypeDeclaration("Point") != nullptr, "Point ClassDecl pointer is stored for later phases");
 
     return ok ? 0 : 1;
 }

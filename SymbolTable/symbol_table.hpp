@@ -60,7 +60,7 @@ private:
     std::vector<std::map<std::string, Symbol>> variable_scopes_;
     std::map<std::string, std::shared_ptr<FunctionSymbol>> functions_;
     std::map<std::string, std::shared_ptr<TypeSymbol>> types_; // Track declared types with full info
-    std::map<std::string, TypeDecl *> type_declarations_;      // Store type declarations for parameter checking
+    std::map<std::string, parser::ClassDecl *> type_declarations_;      // Store class declarations for parameter checking
 
 public:
     SymbolTable()
@@ -295,7 +295,7 @@ public:
     /**
      * @brief Store a type declaration for parameter checking
      */
-    void storeTypeDeclaration(const std::string &name, TypeDecl *declaration)
+    void storeTypeDeclaration(const std::string &name, parser::ClassDecl *declaration)
     {
         type_declarations_[name] = declaration;
     }
@@ -303,7 +303,7 @@ public:
     /**
      * @brief Get a type declaration for parameter checking
      */
-    TypeDecl *getTypeDeclaration(const std::string &name) const
+    parser::ClassDecl *getTypeDeclaration(const std::string &name) const
     {
         auto found = type_declarations_.find(name);
         return (found != type_declarations_.end()) ? found->second : nullptr;

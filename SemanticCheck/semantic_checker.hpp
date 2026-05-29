@@ -98,7 +98,7 @@ public:
     void visit(Program *prog) override;
     void visit(ExprStmt *stmt) override;
     void visit(FunctionDecl *stmt) override;
-    void visit(TypeDecl *stmt) override;
+    void visit(parser::ClassDecl *stmt) override;
     void visit(MethodDecl *stmt) override;
     void visit(AttributeDecl *stmt) override;
 

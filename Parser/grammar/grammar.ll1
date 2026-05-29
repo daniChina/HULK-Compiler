@@ -1,6 +1,6 @@
 // Primera gramatica LL(1) formal del proyecto.
 // Alcance actual:
-// - programa: lista de sentencias (expresion global, funciones globales, declaraciones type)
+// - programa: lista de sentencias (expresion global, funciones globales, declaraciones class)
 // - condicionales if / elif / else (cuerpos IfBody: expresion o bloque)
 // - while (cuerpo WhileBody; else opcional WhileElseOpt)
 // - expresiones y precedencia de operadores
@@ -10,9 +10,9 @@
 // - Los terminales usan exactamente los nombres expuestos por Parser/core/token.hpp
 // - ε representa epsilon
 
-Program         -> TypeDeclList StmtList EOF_TOKEN
+Program         -> ClassDeclList StmtList EOF_TOKEN
 
-TypeDeclList    -> TypeDecl TypeDeclList
+ClassDeclList   -> ClassDecl ClassDeclList
                 | ε
 
 StmtList        -> Stmt StmtList
@@ -29,31 +29,32 @@ ArgIdListTail   -> COMMA ArgId ArgIdListTail | ε
 ArgId           -> IDENTIFIER TypeAnnotationOpt
 
 TypeAnnotationOpt -> COLON IDENTIFIER | ε
+TypeAnnotation  -> COLON IDENTIFIER
 
 FunctionBody    -> ARROW Expr SEMICOLON
                 | BlockExpr
 
-TypeDecl        -> TYPE IDENTIFIER TypeParamsOpt TypeInheritanceOpt LBRACE TypeBody RBRACE TypeDeclSemicolonOpt
-TypeDeclSemicolonOpt -> SEMICOLON
-                      | ε
-TypeParamsOpt   -> LPAREN ArgIdListOpt RPAREN
-                | LBRACKET ArgIdListOpt RBRACKET
-                | ε
-TypeInheritanceOpt -> INHERITS IDENTIFIER TypeBaseArgsOpt
-                    | IS IDENTIFIER TypeBaseArgsOpt
+ClassDecl           -> CLASS IDENTIFIER ClassParamsOpt ClassInheritanceOpt LBRACE ClassBody RBRACE
+ClassParamsOpt      -> LPAREN ArgIdListOpt RPAREN
                     | ε
-TypeBaseArgsOpt -> LPAREN ArgListOpt RPAREN
-                | LBRACKET ArgListOpt RBRACKET
+ClassInheritanceOpt -> IS IDENTIFIER ClassBaseArgsOpt
+                    | ε
+ClassBaseArgsOpt    -> LPAREN ArgListOpt RPAREN
+                    | ε
+ClassBody       -> ClassAttrList ClassMethodList
+
+// Atributos: ClassAttr (B4). El primer miembro tras un nombre se desambigua en ClassAttrListHead
+// (COLON => atributo; LPAREN => primer metodo + ClassMethodList para el resto, B5).
+ClassAttrList   -> IDENTIFIER ClassAttrListHead ClassAttrList
                 | ε
-TypeBody        -> TypeAttrPhase
-TypeAttrPhase   -> IDENTIFIER TypeAttrOrMethodTail
+
+ClassAttrListHead -> TypeAnnotation EQUAL Expr SEMICOLON
+                  | LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON ClassMethodList
+
+ClassMethodList -> ClassMethod ClassMethodList
                 | ε
-TypeAttrOrMethodTail -> LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody TypeMethodPhase
-                     | TypeAnnotationOpt TypeAttributeAssign Expr SEMICOLON TypeAttrPhase
-TypeMethodPhase -> IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody TypeMethodPhase
-                | ε
-TypeAttributeAssign -> ASSIGN
-                    | EQUAL
+
+ClassMethod     -> IDENTIFIER LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON
 
 ExprStmt        -> Expr SEMICOLON
 

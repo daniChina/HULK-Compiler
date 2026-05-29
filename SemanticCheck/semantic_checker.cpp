@@ -65,10 +65,10 @@ void SemanticAnalyzer::collectFunctions(Program *program)
             symbol_table_.declareFunction(funcDecl->name, paramTypes, TypeInfo(TypeInfo::Kind::Unknown));
             std::cout << "[DEBUG] Function " << funcDecl->name << " declared with Unknown types" << std::endl;
         }
-        else if (auto typeDecl = dynamic_cast<TypeDecl *>(stmt.get()))
+        else if (auto typeDecl = dynamic_cast<ClassDecl *>(stmt.get()))
         {
             // Comment out this check temporarily to see if it's causing the issue
-            // if (symbol_table_.isTypeDeclared(typeDecl->name))
+            // if (symbol_table_.isClassDeclared(typeDecl->name))
             // {
             //     error_manager_.reportError(ErrorType::REDEFINED_TYPE,
             //                                "Tipo '" + typeDecl->name + "' ya está definido",
@@ -1020,7 +1020,7 @@ void SemanticAnalyzer::visit(FunctionDecl *stmt)
     }
 }
 
-void SemanticAnalyzer::visit(TypeDecl *stmt)
+void SemanticAnalyzer::visit(ClassDecl *stmt)
 {
     // Validar recursivamente la cadena de herencia y detectar ciclos
     std::set<std::string> visited;
@@ -1029,18 +1029,18 @@ void SemanticAnalyzer::visit(TypeDecl *stmt)
         return;
     }
 
-    std::cout << "[DEBUG] Processing TypeDecl: " << stmt->name << std::endl;
+    std::cout << "[DEBUG] Processing ClassDecl: " << stmt->name << std::endl;
 
     // --- Herencia implícita de parámetros ---
     if (stmt->baseType != "Object" && stmt->params.empty() && stmt->baseArgs.empty())
     {
-        auto baseTypeDecl = symbol_table_.getTypeDeclaration(stmt->baseType);
-        if (baseTypeDecl)
+        auto baseClassDecl = symbol_table_.getClassDeclaration(stmt->baseType);
+        if (baseClassDecl)
         {
-            stmt->params = baseTypeDecl->params;
-            stmt->paramTypes = baseTypeDecl->paramTypes;
+            stmt->params = baseClassDecl->params;
+            stmt->paramTypes = baseClassDecl->paramTypes;
             // Generar baseArgs para pasar los parámetros al constructor del padre
-            for (const auto &param : baseTypeDecl->params)
+            for (const auto &param : baseClassDecl->params)
             {
                 stmt->baseArgs.push_back(std::make_unique<VariableExpr>(param));
             }
@@ -1060,7 +1060,7 @@ void SemanticAnalyzer::visit(TypeDecl *stmt)
             return;
         }
         // El tipo base debe existir
-        if (!symbol_table_.isTypeDeclared(stmt->baseType))
+        if (!symbol_table_.isClassDeclared(stmt->baseType))
         {
             reportError(ErrorType::UNDEFINED_TYPE,
                         "Base type '" + stmt->baseType + "' is not defined",
@@ -1071,7 +1071,7 @@ void SemanticAnalyzer::visit(TypeDecl *stmt)
 
     // Check if type is already declared
     std::cout << "[DEBUG] Checking if type '" << stmt->name << "' is already declared" << std::endl;
-    if (symbol_table_.isTypeDeclared(stmt->name))
+    if (symbol_table_.isClassDeclared(stmt->name))
     {
         std::cout << "[DEBUG] Type '" << stmt->name << "' is already declared!" << std::endl;
         reportError(ErrorType::REDEFINED_TYPE,
@@ -1091,7 +1091,7 @@ void SemanticAnalyzer::visit(TypeDecl *stmt)
     }
 
     // Store the type declaration for parameter checking
-    symbol_table_.storeTypeDeclaration(stmt->name, stmt);
+    symbol_table_.storeClassDeclaration(stmt->name, stmt);
 
     // Enter new scope for type analysis
     symbol_table_.enterScope();
@@ -1188,10 +1188,10 @@ void SemanticAnalyzer::visit(TypeDecl *stmt)
         bool sameSignature = false;
 
         // Check if method exists in inheritance chain for polymorphic override
-        auto baseTypeDecl = symbol_table_.getTypeDeclaration(stmt->baseType);
-        if (baseTypeDecl && baseTypeDecl->baseType != "Object")
+        auto baseClassDecl = symbol_table_.getClassDeclaration(stmt->baseType);
+        if (baseClassDecl && baseClassDecl->baseType != "Object")
         {
-            auto inheritedMethod = symbol_table_.lookupMethod(baseTypeDecl->baseType, method->name);
+            auto inheritedMethod = symbol_table_.lookupMethod(baseClassDecl->baseType, method->name);
             if (inheritedMethod)
             {
                 // Check if signatures match for polymorphic override
@@ -1250,15 +1250,15 @@ void SemanticAnalyzer::visit(TypeDecl *stmt)
     // Exit type scope
     symbol_table_.exitScope();
 
-    // Set the inferred type of the TypeDecl itself
+    // Set the inferred type of the ClassDecl itself
     stmt->inferredType = std::make_shared<TypeInfo>(TypeInfo::Kind::Object, stmt->name);
 
-    std::cout << "[DEBUG] TypeDecl " << stmt->name << " processed successfully" << std::endl;
+    std::cout << "[DEBUG] ClassDecl " << stmt->name << " processed successfully" << std::endl;
 
     if (stmt->baseType != "Object")
     {
-        auto baseTypeDecl = symbol_table_.getTypeDeclaration(stmt->baseType);
-        if (!baseTypeDecl)
+        auto baseClassDecl = symbol_table_.getClassDeclaration(stmt->baseType);
+        if (!baseClassDecl)
         {
             // Ya se reportó error antes si no existe, pero por seguridad:
             reportError(ErrorType::UNDEFINED_TYPE,
@@ -1266,7 +1266,7 @@ void SemanticAnalyzer::visit(TypeDecl *stmt)
                         stmt, "declaración de tipo");
             return;
         }
-        size_t baseParamCount = baseTypeDecl->getParams().size();
+        size_t baseParamCount = baseClassDecl->getParams().size();
         size_t baseArgsCount = stmt->baseArgs.size();
 
         if (baseArgsCount > 0 && baseArgsCount == baseParamCount)
@@ -1323,7 +1323,7 @@ void SemanticAnalyzer::visit(NewExpr *expr)
     }
 
     // Get the type declaration to check constructor parameters
-    auto typeDecl = symbol_table_.getTypeDeclaration(expr->typeName);
+    auto typeDecl = symbol_table_.getClassDeclaration(expr->typeName);
     if (!typeDecl)
     {
         reportError(ErrorType::UNDEFINED_TYPE,
@@ -1358,7 +1358,7 @@ void SemanticAnalyzer::visit(NewExpr *expr)
         expr->args[i]->accept(this);
         std::cout << "[DEBUG] Argument " << i << " type: " << current_type_.toString() << std::endl;
 
-        // For now, we accept any type since parameter types are not stored in TypeDecl
+        // For now, we accept any type since parameter types are not stored in ClassDecl
         // In a more complete implementation, we would check against the parameter types
         // stored in the symbol table or type declaration
     }
@@ -1558,11 +1558,11 @@ void SemanticAnalyzer::visit(BaseCallExpr *expr)
         else
         {
             // Look up the method in the base type to get its return type
-            auto baseTypeDecl = symbol_table_.getTypeDeclaration(typeInfo->base_type);
-            if (baseTypeDecl)
+            auto baseClassDecl = symbol_table_.getClassDeclaration(typeInfo->base_type);
+            if (baseClassDecl)
             {
                 // Find the method in the base type using currentMethodName_
-                for (const auto &method : baseTypeDecl->methods)
+                for (const auto &method : baseClassDecl->methods)
                 {
                     if (method->name == currentMethodName_)
                     {
@@ -1693,7 +1693,7 @@ void SemanticAnalyzer::analyze(Program *program)
     std::cout << "DEBUG: Processing type declarations" << std::endl;
     for (auto &stmt : program->stmts)
     {
-        if (auto typeDecl = dynamic_cast<TypeDecl *>(stmt.get()))
+        if (auto typeDecl = dynamic_cast<ClassDecl *>(stmt.get()))
         {
             std::cout << "DEBUG: Processing type declaration: " << typeDecl->name << std::endl;
             typeDecl->accept(this);
@@ -1743,7 +1743,7 @@ void SemanticAnalyzer::analyze(Program *program)
                               << " to " << funcDecl->returnType->toString() << std::endl;
                 }
             }
-            else if (auto typeDecl = dynamic_cast<TypeDecl *>(stmt.get()))
+            else if (auto typeDecl = dynamic_cast<ClassDecl *>(stmt.get()))
             {
                 // Skip type declarations as they were already processed
                 continue;
@@ -1873,22 +1873,22 @@ bool SemanticAnalyzer::validateInheritanceChain(const std::string &typeName, std
         return false;
     }
     visited.insert(typeName);
-    auto baseTypeDecl = symbol_table_.getTypeDeclaration(typeName);
-    if (!baseTypeDecl)
+    auto baseClassDecl = symbol_table_.getClassDeclaration(typeName);
+    if (!baseClassDecl)
     {
         reportError(ErrorType::UNDEFINED_TYPE,
                     "Base type '" + typeName + "' is not defined",
                     "declaración de tipo");
         return false;
     }
-    if (baseTypeDecl->baseType == "Number" || baseTypeDecl->baseType == "String" || baseTypeDecl->baseType == "Boolean")
+    if (baseClassDecl->baseType == "Number" || baseClassDecl->baseType == "String" || baseClassDecl->baseType == "Boolean")
     {
         reportError(ErrorType::INVALID_BASE_TYPE,
-                    "Cannot inherit from built-in type '" + baseTypeDecl->baseType + "'",
+                    "Cannot inherit from built-in type '" + baseClassDecl->baseType + "'",
                     "declaración de tipo");
         return false;
     }
-    return validateInheritanceChain(baseTypeDecl->baseType, visited);
+    return validateInheritanceChain(baseClassDecl->baseType, visited);
 }
 
 void SemanticAnalyzer::visit(IsExpr *expr)
@@ -1898,7 +1898,7 @@ void SemanticAnalyzer::visit(IsExpr *expr)
     TypeInfo leftType = current_type_;
 
     // Buscar el tipo a la derecha en la tabla de símbolos
-    auto typeDecl = symbol_table_.getTypeDeclaration(expr->typeName);
+    auto typeDecl = symbol_table_.getClassDeclaration(expr->typeName);
     if (!typeDecl)
     {
         reportError(ErrorType::UNDEFINED_TYPE,
@@ -1921,8 +1921,8 @@ void SemanticAnalyzer::visit(AsExpr *expr)
     TypeInfo leftType = current_type_;
 
     // Buscar el tipo destino en la tabla de símbolos
-    auto targetTypeDecl = symbol_table_.getTypeDeclaration(expr->typeName);
-    if (!targetTypeDecl)
+    auto targetClassDecl = symbol_table_.getClassDeclaration(expr->typeName);
+    if (!targetClassDecl)
     {
         reportError(ErrorType::UNDEFINED_TYPE,
                     "Tipo no definido en el operador 'as': " + expr->typeName,

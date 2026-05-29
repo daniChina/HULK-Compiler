@@ -1,10 +1,11 @@
-type Person(firstname, lastname) {
-    firstname = firstname;
-    lastname = lastname;
-    name() => self.firstname @@ self.lastname;
-};
+class Person(firstname:String, lastname:String) {
+    firstname:String = firstname;
+    lastname:String = lastname;
+    name() -> self.firstname @@ self.lastname;
+}
 
-type Knight(firstname, lastname) inherits Person(firstname, lastname) {
-    name() => "Sir" @@ base();
-};
+class Knight(firstname:String, lastname:String) is Person(firstname, lastname) {
+    name() -> "Sir" @@ self.firstname;
+}
+
 new Knight("Phil", "Collins").name();

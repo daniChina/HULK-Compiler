@@ -23,7 +23,7 @@ using parser::FunctionDecl;
 using parser::IfExpr;
 using parser::WhileExpr;
 using parser::ForExpr;
-using parser::TypeDecl;
+using parser::ClassDecl;
 using parser::AttributeDef;
 using parser::MethodDef;
 using parser::NewExpr;

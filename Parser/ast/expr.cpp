@@ -23,10 +23,10 @@ void FunctionDecl::accept(StmtVisitor* visitor) {
     visitor->visit(this);
 }
 
-TypeDecl::TypeDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params,
-             std::optional<Token> parent_name, std::vector<ExprPtr> parent_args,
-             std::vector<AttributeDef> attributes, std::vector<MethodDef> methods)
-    : Stmt(StmtKind::TYPE_DECL),
+ClassDecl::ClassDecl(Token name, std::vector<std::pair<Token, std::optional<Token>>> params,
+                     std::optional<Token> parent_name, std::vector<ExprPtr> parent_args,
+                     std::vector<AttributeDef> attributes, std::vector<MethodDef> methods)
+    : Stmt(StmtKind::CLASS_DECL),
       name(std::move(name)),
       params(std::move(params)),
       parent_name(std::move(parent_name)),
@@ -34,7 +34,7 @@ TypeDecl::TypeDecl(Token name, std::vector<std::pair<Token, std::optional<Token>
       attributes(std::move(attributes)),
       methods(std::move(methods)) {}
 
-void TypeDecl::accept(StmtVisitor* visitor) {
+void ClassDecl::accept(StmtVisitor* visitor) {
     visitor->visit(this);
 }
 
@@ -90,35 +90,41 @@ std::string stmt_to_string(const Stmt& stmt) {
             out << " => " << expr_to_string(*func.body) << ")";
             return out.str();
         }
-        case StmtKind::TYPE_DECL: {
-            const auto& type_decl = static_cast<const TypeDecl&>(stmt);
+        case StmtKind::CLASS_DECL: {
+            const auto& class_decl = static_cast<const ClassDecl&>(stmt);
             std::ostringstream out;
-            out << "TypeDecl(" << type_decl.name.lexeme << "(";
-            for (std::size_t i = 0; i < type_decl.params.size(); ++i) {
-                if (i > 0) out << ", ";
-                out << type_decl.params[i].first.lexeme;
-                if (type_decl.params[i].second) {
-                    out << ": " << type_decl.params[i].second->lexeme;
-                }
-            }
-            out << ")";
-            if (type_decl.parent_name) {
-                out << " inherits " << type_decl.parent_name->lexeme << "(";
-                for (std::size_t i = 0; i < type_decl.parent_args.size(); ++i) {
+            out << "ClassDecl(" << class_decl.name.lexeme;
+            if (!class_decl.params.empty()) {
+                out << "(";
+                for (std::size_t i = 0; i < class_decl.params.size(); ++i) {
                     if (i > 0) out << ", ";
-                    out << expr_to_string(*type_decl.parent_args[i]);
+                    out << class_decl.params[i].first.lexeme;
+                    if (class_decl.params[i].second) {
+                        out << ": " << class_decl.params[i].second->lexeme;
+                    }
                 }
                 out << ")";
             }
+            if (class_decl.parent_name) {
+                out << " is " << class_decl.parent_name->lexeme;
+                if (!class_decl.parent_args.empty()) {
+                    out << "(";
+                    for (std::size_t i = 0; i < class_decl.parent_args.size(); ++i) {
+                        if (i > 0) out << ", ";
+                        out << expr_to_string(*class_decl.parent_args[i]);
+                    }
+                    out << ")";
+                }
+            }
             out << " {\n";
-            for (const auto& attr : type_decl.attributes) {
+            for (const auto& attr : class_decl.attributes) {
                 out << "    " << attr.name.lexeme;
                 if (attr.declared_type) {
                     out << ": " << attr.declared_type->lexeme;
                 }
                 out << " = " << expr_to_string(*attr.value) << ";\n";
             }
-            for (const auto& method : type_decl.methods) {
+            for (const auto& method : class_decl.methods) {
                 out << "    " << method.name.lexeme << "(";
                 for (std::size_t i = 0; i < method.params.size(); ++i) {
                     if (i > 0) out << ", ";
@@ -127,11 +133,7 @@ std::string stmt_to_string(const Stmt& stmt) {
                         out << ": " << method.params[i].second->lexeme;
                     }
                 }
-                out << ")";
-                if (method.return_type) {
-                    out << ": " << method.return_type->lexeme;
-                }
-                out << " => " << expr_to_string(*method.body) << ";\n";
+                out << ") -> " << expr_to_string(*method.body) << ";\n";
             }
             out << "})";
             return out.str();

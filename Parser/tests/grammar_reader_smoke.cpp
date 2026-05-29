@@ -42,22 +42,28 @@ int main() {
         ok &= expect(grammar.non_terminals.count("Primary") == 1, "Primary recognized as non-terminal");
         ok &= expect(grammar.terminals.count("NUMBER_LITERAL") == 1, "NUMBER_LITERAL recognized as terminal");
         ok &= expect(grammar.terminals.count("CARET") == 1, "CARET recognized as terminal");
-        ok &= expect(contains_production(grammar, "Program -> TypeDeclList StmtList EOF_TOKEN"),
-                     "Program production loaded with type section before statement list");
+        ok &= expect(contains_production(grammar, "Program -> ClassDeclList StmtList EOF_TOKEN"),
+                     "Program production loaded with class section before statement list");
         ok &= expect(contains_production(grammar, "PowerExprTail -> CARET PowerExpr"),
                      "right-associative power production loaded");
         ok &= expect(contains_production(grammar, "WithExpr -> WITH LPAREN WithSourceExpr AS IDENTIFIER RPAREN WithBody WithElseOpt"),
                      "with null-safety production loaded");
         ok &= expect(contains_production(grammar, "CaseExpr -> CASE Expr OF CasePayload"),
                      "case expression production loaded");
-        ok &= expect(contains_production(grammar, "TypeInheritanceOpt -> IS IDENTIFIER TypeBaseArgsOpt"),
-                     "class inheritance alias with is loaded");
-        ok &= expect(contains_production(grammar, "TypeParamsOpt -> LBRACKET ArgIdListOpt RBRACKET"),
-                     "class parameter bracket form loaded");
-        ok &= expect(contains_production(grammar, "TypeAttrOrMethodTail -> TypeAnnotationOpt TypeAttributeAssign Expr SEMICOLON TypeAttrPhase"),
-                     "typed attribute production loaded");
-        ok &= expect(contains_production(grammar, "TypeMethodPhase -> IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody TypeMethodPhase"),
-                     "method-only phase after first method loaded");
+        ok &= expect(contains_production(grammar, "ClassInheritanceOpt -> IS IDENTIFIER ClassBaseArgsOpt"),
+                     "class inheritance with is only (B7)");
+        ok &= expect(contains_production(grammar, "ClassBaseArgsOpt -> LPAREN ArgListOpt RPAREN"),
+                     "parent constructor args use parentheses only (B8)");
+        ok &= expect(contains_production(grammar, "ClassParamsOpt -> LPAREN ArgIdListOpt RPAREN"),
+                     "class parameter parenthesized form loaded");
+        ok &= expect(contains_production(grammar, "ClassDecl -> CLASS IDENTIFIER ClassParamsOpt ClassInheritanceOpt LBRACE ClassBody RBRACE"),
+                     "class declaration without semicolon after RBRACE (B6)");
+        ok &= expect(contains_production(grammar, "ClassBody -> ClassAttrList ClassMethodList"),
+                     "class body splits attributes and methods (B3)");
+        ok &= expect(contains_production(grammar, "ClassAttrListHead -> TypeAnnotation EQUAL Expr SEMICOLON"),
+                     "typed class attribute with = only (B4)");
+        ok &= expect(contains_production(grammar, "ClassMethod -> IDENTIFIER LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON"),
+                     "class method uses arrow expression body (B5)");
         ok &= expect(contains_production(grammar, "OrExprTail -> ε"),
                      "epsilon alternative loaded");
         ok &= expect(contains_production(grammar, "Primary -> LPAREN Expr RPAREN"),
