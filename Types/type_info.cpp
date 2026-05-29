@@ -59,7 +59,7 @@ bool TypeInfo::isSubtypeOf(const std::string &baseTypeName) const
     if (!symbolTable_)
         return false;
 
-    auto getParentNameOrObject = [](const TypeDecl* decl) -> std::string {
+    auto getParentNameOrObject = [](const parser::ClassDecl* decl) -> std::string {
         if (!decl)
             return "Object";
         // En el AST local, el padre está en `parent_name` (optional<Token>)
@@ -150,7 +150,7 @@ std::string TypeInfo::findLowestCommonAncestor(const std::string &type1, const s
     if (type1 == type2)
         return type1;
 
-    auto getParentNameOrObject = [](const TypeDecl* decl) -> std::string {
+    auto getParentNameOrObject = [](const parser::ClassDecl* decl) -> std::string {
         if (!decl)
             return "Object";
         if (decl->parent_name.has_value())

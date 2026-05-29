@@ -56,41 +56,65 @@ int main() {
             cell_has_production(
                 ll1_table.table,
                 "Program",
-                "TYPE",
-                "Program -> TypeDeclList StmtList EOF_TOKEN"),
-            "M[Program, TYPE] starts optional class section");
+                "CLASS",
+                "Program -> ClassDeclList StmtList EOF_TOKEN"),
+            "M[Program, CLASS] starts optional class section");
 
         ok &= expect(
             cell_has_production(
                 ll1_table.table,
-                "TypeParamsOpt",
-                "LBRACKET",
-                "TypeParamsOpt -> LBRACKET ArgIdListOpt RBRACKET"),
-            "M[TypeParamsOpt, LBRACKET] uses bracketed class params");
-
-        ok &= expect(
-            cell_has_production(
-                ll1_table.table,
-                "TypeInheritanceOpt",
-                "IS",
-                "TypeInheritanceOpt -> IS IDENTIFIER TypeBaseArgsOpt"),
-            "M[TypeInheritanceOpt, IS] uses class inheritance alias");
-
-        ok &= expect(
-            cell_has_production(
-                ll1_table.table,
-                "TypeAttrOrMethodTail",
-                "COLON",
-                "TypeAttrOrMethodTail -> TypeAnnotationOpt TypeAttributeAssign Expr SEMICOLON TypeAttrPhase"),
-            "M[TypeAttrOrMethodTail, COLON] uses typed attribute production");
-
-        ok &= expect(
-            cell_has_production(
-                ll1_table.table,
-                "TypeAttrOrMethodTail",
+                "ClassParamsOpt",
                 "LPAREN",
-                "TypeAttrOrMethodTail -> LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody TypeMethodPhase"),
-            "M[TypeAttrOrMethodTail, LPAREN] starts method section");
+                "ClassParamsOpt -> LPAREN ArgIdListOpt RPAREN"),
+            "M[ClassParamsOpt, LPAREN] uses parenthesized typed class params");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ClassParamsOpt",
+                "IS",
+                std::string("ClassParamsOpt -> ") + parser::generator::kEpsilonSymbol),
+            "M[ClassParamsOpt, IS] omits class params before inheritance");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ClassInheritanceOpt",
+                "IS",
+                "ClassInheritanceOpt -> IS IDENTIFIER ClassBaseArgsOpt"),
+            "M[ClassInheritanceOpt, IS] uses is-inheritance (B7)");
+
+        ok &= expect(
+            !cell_has_production(
+                ll1_table.table,
+                "ClassDeclList",
+                "SEMICOLON",
+                "ClassDeclList -> ClassDecl ClassDeclList"),
+            "M[ClassDeclList, SEMICOLON] has no class-decl production (B6 rejects }; )");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ClassAttrListHead",
+                "COLON",
+                "ClassAttrListHead -> TypeAnnotation EQUAL Expr SEMICOLON"),
+            "M[ClassAttrListHead, COLON] uses typed attribute (B4)");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ClassAttrListHead",
+                "LPAREN",
+                "ClassAttrListHead -> LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON ClassMethodList"),
+            "M[ClassAttrListHead, LPAREN] starts method via arrow body (B5)");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ClassMethod",
+                "IDENTIFIER",
+                "ClassMethod -> IDENTIFIER LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON"),
+            "M[ClassMethod, IDENTIFIER] uses arrow method production (B5)");
 
         ok &= expect(
             cell_has_production(

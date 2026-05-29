@@ -16,8 +16,7 @@ namespace {
 
 using parser::TokenList;
 
-// Deja visible la forma léxica exacta para depurar rápidamente alias como
-// `class` -> `TYPE` o `is` en cabeceras de clases.
+// Deja visible la forma léxica exacta (p. ej. CLASS + is en cabeceras de clases).
 std::string join_token_types(const TokenList& tokens) {
     std::ostringstream out;
     for (std::size_t i = 0; i < tokens.size(); ++i) {
@@ -108,7 +107,7 @@ int main() {
             ok &= expect_token_types(
                 "lexer recognizes class alias, bracket params and is inheritance",
                 tokens,
-                {parser::TokenType::TYPE, parser::TokenType::IDENTIFIER, parser::TokenType::LBRACKET,
+                {parser::TokenType::CLASS, parser::TokenType::IDENTIFIER, parser::TokenType::LBRACKET,
                  parser::TokenType::IDENTIFIER, parser::TokenType::COLON, parser::TokenType::IDENTIFIER,
                  parser::TokenType::COMMA, parser::TokenType::IDENTIFIER, parser::TokenType::COLON,
                  parser::TokenType::IDENTIFIER, parser::TokenType::RBRACKET, parser::TokenType::IS,

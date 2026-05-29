@@ -2,11 +2,11 @@
 
 namespace {
 
-std::string parentTypeName(const parser::TypeDecl &typeDecl)
+std::string parentTypeName(const parser::ClassDecl &classDecl)
 {
-    if (typeDecl.parent_name.has_value())
+    if (classDecl.parent_name.has_value())
     {
-        return typeDecl.parent_name->lexeme;
+        return classDecl.parent_name->lexeme;
     }
     return "Object";
 }
@@ -40,12 +40,12 @@ DeclCollectorResult collectTopLevelDeclarations(const parser::Program &program, 
             continue;
         }
 
-        if (auto *typeDecl = dynamic_cast<parser::TypeDecl *>(stmt.get()))
+        if (auto *classDecl = dynamic_cast<parser::ClassDecl *>(stmt.get()))
         {
-            const std::string base = parentTypeName(*typeDecl);
-            if (table.declareType(typeDecl->name.lexeme, base))
+            const std::string base = parentTypeName(*classDecl);
+            if (table.declareType(classDecl->name.lexeme, base))
             {
-                table.storeTypeDeclaration(typeDecl->name.lexeme, typeDecl);
+                table.storeTypeDeclaration(classDecl->name.lexeme, classDecl);
                 ++result.types_registered;
             }
             continue;

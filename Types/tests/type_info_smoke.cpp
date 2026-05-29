@@ -36,7 +36,7 @@ void registerNominalType(SymbolTable &symbolTable, const std::string &name, cons
         parentToken = identToken(parent);
     }
 
-    auto typeDecl = std::make_unique<parser::TypeDecl>(
+    auto typeDecl = std::make_unique<parser::ClassDecl>(
         identToken(name),
         std::vector<std::pair<parser::Token, std::optional<parser::Token>>>{},
         parentToken,
@@ -47,7 +47,7 @@ void registerNominalType(SymbolTable &symbolTable, const std::string &name, cons
     symbolTable.storeTypeDeclaration(name, typeDecl.get());
 
     // Keep declaration alive for the full test execution.
-    static std::vector<std::unique_ptr<parser::TypeDecl>> typeDeclStorage;
+    static std::vector<std::unique_ptr<parser::ClassDecl>> typeDeclStorage;
     typeDeclStorage.push_back(std::move(typeDecl));
 }
 

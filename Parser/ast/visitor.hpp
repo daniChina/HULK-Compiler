@@ -38,7 +38,7 @@ struct LoopWhileExpr;
 struct ExprStmt;
 struct Program;
 struct FunctionDecl;
-struct TypeDecl;
+struct ClassDecl;
 struct MethodDecl;
 struct AttributeDecl;
 
@@ -83,7 +83,7 @@ struct StmtVisitor {
     virtual void visit(ExprStmt* stmt) = 0;
     virtual void visit(Program* stmt) = 0;
     virtual void visit(FunctionDecl* stmt) = 0;
-    virtual void visit(TypeDecl* stmt) = 0;
+    virtual void visit(ClassDecl* stmt) = 0;
     virtual void visit(MethodDecl* stmt) = 0;
     virtual void visit(AttributeDecl* stmt) = 0;
 };

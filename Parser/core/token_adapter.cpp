@@ -26,7 +26,7 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::CASE:           return TokenType::CASE;
         case ::TokenType::OF:             return TokenType::OF;
         case ::TokenType::FUNCTION:       return TokenType::FUNCTION;
-        case ::TokenType::TYPE:           return TokenType::TYPE;
+        case ::TokenType::CLASS:          return TokenType::CLASS;
         case ::TokenType::PROTOCOL:       return TokenType::PROTOCOL;
         case ::TokenType::DEF:            return TokenType::DEF;
         case ::TokenType::LET:            return TokenType::LET;
