@@ -1,5 +1,7 @@
 #pragma once
 
+#include <set>
+#include <string>
 #include <vector>
 
 #include "../Parser/ast/expr.hpp"
@@ -62,6 +64,11 @@ private:
                 const std::string& context = "");
     void visitExpr(parser::Expr* expr);
     void visitStmt(parser::Stmt* stmt);
+
+    void checkUniqueParamNames(const std::vector<std::pair<parser::Token, std::optional<parser::Token>>>& params,
+                               int line, int col, const std::string& context);
+    void registerFunctionDecl(parser::FunctionDecl* stmt);
+    void resolveVariableUse(const parser::Token& token, const std::string& context);
 };
 
 }  // namespace semantic

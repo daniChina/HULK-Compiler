@@ -5,7 +5,9 @@
 
 /**
  * Recorre declaraciones de primer nivel en un Program (sin analizar cuerpos).
- * Usado en Fase 1 (C3) para validar que SymbolTable puede registrar lo que el AST expone.
+ * Solo para `hulk.exe --symbols` (Fase 1): registra todas las funciones del archivo de una vez.
+ * No usar antes de `--semantic`: Phase2Analyzer usa su propia SymbolTable y orden textual (R4).
+ * Builtins (PI, print, …) vienen solo del constructor de SymbolTable.
  */
 struct DeclCollectorResult
 {

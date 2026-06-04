@@ -1,0 +1,2 @@
+*.sh text eol=lf
+tests/semantic/manifest.tsv text eol=lf
