@@ -13,13 +13,14 @@
 
 namespace {
 
-// Estas pruebas fijan justo la restricción de 8.2.11: ciertas expresiones
-// de baja prioridad solo pueden aparecer dentro de otras si van parentizadas.
+// El operador '+' (y el resto de la cadena aritmética) solo acepta operandos
+// multiplicativos; let/if/while/with son expresiones de nivel superior.
 bool expect_parse_error(
     const std::string& name,
     const parser::generator::Grammar& grammar,
     const parser::generator::Ll1TableResult& ll1_table,
-    const std::string& source) {
+    const std::string& source,
+    const std::string& message_substring = "") {
     try {
         std::istringstream input(source);
         auto tokens = parser::tokenize_stream(input);
@@ -31,7 +32,14 @@ bool expect_parse_error(
                   << "  se esperaba ParseError y el programa fue aceptado\n";
         return false;
     } catch (const parser::ParseError& error) {
-        std::cout << "[OK] " << name << " -> " << error.what() << "\n";
+        const std::string message = error.what();
+        if (!message_substring.empty() && message.find(message_substring) == std::string::npos) {
+            std::cerr << "[FAIL] " << name << "\n"
+                      << "  mensaje sin fragmento esperado \"" << message_substring << "\"\n"
+                      << "  obtenido: " << message << "\n";
+            return false;
+        }
+        std::cout << "[OK] " << name << " -> " << message << "\n";
         return true;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] " << name << "\n"
@@ -54,7 +62,8 @@ int main() {
             "rejects unparenthesized let inside addition",
             grammar,
             ll1_table,
-            "let x:Number=5 in x + let y:Number=8 in y;");
+            "let x:Number=5 in x + let y:Number=8 in y;",
+            "solo combina expresiones multiplicativas");
 
         ok &= expect_parse_error(
             "rejects unparenthesized if inside addition",
