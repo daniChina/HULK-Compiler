@@ -18,7 +18,8 @@ bool expect_parse_error(
     const std::string& name,
     const parser::generator::Grammar& grammar,
     const parser::generator::Ll1TableResult& ll1_table,
-    const std::string& source) {
+    const std::string& source,
+    const std::string& message_substring = "") {
     try {
         std::istringstream input(source);
         auto tokens = parser::tokenize_stream(input);
@@ -30,7 +31,14 @@ bool expect_parse_error(
                   << "  se esperaba ParseError y el programa fue aceptado\n";
         return false;
     } catch (const parser::ParseError& error) {
-        std::cout << "[OK] " << name << " -> " << error.what() << "\n";
+        const std::string message = error.what();
+        if (!message_substring.empty() && message.find(message_substring) == std::string::npos) {
+            std::cerr << "[FAIL] " << name << "\n"
+                      << "  mensaje sin fragmento esperado \"" << message_substring << "\"\n"
+                      << "  obtenido: " << message << "\n";
+            return false;
+        }
+        std::cout << "[OK] " << name << " -> " << message << "\n";
         return true;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] " << name << "\n"
@@ -84,26 +92,42 @@ int main() {
             ll1_table,
             "let msg: = \"hola\" in msg;");
 
-        // un bloque no puede aparecer como inicializador de let.
+        // SYN.2 — bloque no es expresion (inicializador de let).
         ok &= expect_parse_error(
-            "rejects block as let initializer",
+            "SYN.2 rejects block as let initializer",
             grammar,
             ll1_table,
-            "let x = { 0; 1; } in print(x);");
+            "let x={0;1} in print(x);",
+            "no es una expresion");
 
-        // un bloque ya no es una expresion global por si mismo.
+        ok &= expect_parse_error(
+            "rejects block as let initializer (spaced)",
+            grammar,
+            ll1_table,
+            "let x = { 0; 1; } in print(x);",
+            "no es una expresion");
+
+        // SYN.3 — bloque no es sentencia ni operando de suma.
+        ok &= expect_parse_error(
+            "SYN.3 rejects two blocks in addition",
+            grammar,
+            ll1_table,
+            "{1;2} + {3;4};",
+            "no puede ser una sentencia del programa");
+
         ok &= expect_parse_error(
             "rejects standalone block expression statement",
             grammar,
             ll1_table,
-            "{ 1; 2; };");
+            "{ 1; 2; };",
+            "no puede ser una sentencia del programa");
 
-        // tampoco se puede usar un bloque dentro de una suma.
         ok &= expect_parse_error(
             "rejects block used inside arithmetic expression",
             grammar,
             ll1_table,
-            "{ 1; 2; } + 3;");
+            "{ 1; 2; } + 3;",
+            "no puede ser una sentencia del programa");
 
         // ni como argumento de llamada, porque no es Expr general.
         ok &= expect_parse_error(
@@ -118,7 +142,8 @@ int main() {
             "rejects block on rhs inside let body expression",
             grammar,
             ll1_table,
-            "let x = 1 in x + { 2; 3; };");
+            "let x = 1 in x + { 2; 3; };",
+            "no es un operando valido");
 
         return ok ? 0 : 1;
     } catch (const std::exception& error) {

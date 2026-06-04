@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "../../SemanticCheck/binding_list.hpp"
+#include "../core/parse_error.hpp"
 #include "../generator/production.hpp"
 
 namespace parser {
@@ -288,6 +290,8 @@ ExprPtr build_let_expr(const CstNode& node) {
     
     std::vector<LetBindingData> bindings;
     extract_bindings(child(node, 1), bindings);
+
+    semantic::ensureUniqueLetBindingsOrThrow(bindings);
     
     ExprPtr body = build_let_body(child(node, 3));
     

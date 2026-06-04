@@ -24,6 +24,10 @@ bool is_top_level_expr_lookahead(const std::string& lookahead) {
            lookahead == "UNLESS" || lookahead == "REPEAT" || lookahead == "LOOP";
 }
 
+bool is_program_stmt_only_lookahead(const std::string& lookahead) {
+    return lookahead == "FUNCTION" || lookahead == "CLASS";
+}
+
 const char* keyword_for_top_level_expr(const std::string& lookahead) {
     if (lookahead == "LET") return "let";
     if (lookahead == "IF") return "if";
@@ -34,6 +38,8 @@ const char* keyword_for_top_level_expr(const std::string& lookahead) {
     if (lookahead == "UNLESS") return "unless";
     if (lookahead == "REPEAT") return "repeat";
     if (lookahead == "LOOP") return "loop";
+    if (lookahead == "FUNCTION") return "function";
+    if (lookahead == "CLASS") return "class";
     return nullptr;
 }
 
@@ -76,10 +82,69 @@ const char* operator_lexeme_for(TokenType op) {
     }
 }
 
+std::string program_stmt_only_message(const std::string& non_terminal,
+                                      const std::string& lookahead) {
+    const char* keyword = keyword_for_top_level_expr(lookahead);
+    if (keyword == nullptr || !is_program_stmt_only_lookahead(lookahead)) {
+        return {};
+    }
+
+    if (non_terminal == "Expr" || non_terminal == "LetBody" || non_terminal == "IfBody" ||
+        non_terminal == "WhileBody" || non_terminal == "WithBody" || non_terminal == "AssignExpr" ||
+        non_terminal == "OrExpr" || non_terminal == "AndExpr" || non_terminal == "CmpExpr" ||
+        non_terminal == "ConcatExpr" || non_terminal == "AddExpr" || non_terminal == "MulExpr" ||
+        non_terminal == "PowerExpr" || non_terminal == "UnaryExpr" || non_terminal == "PostfixExpr" ||
+        non_terminal == "Primary") {
+        return std::string("'") + keyword +
+               "' solo puede declararse como sentencia de programa (nivel global), "
+               "no dentro de una expresion ni del cuerpo de un let";
+    }
+
+    return {};
+}
+
+std::string block_context_message(
+    const std::string& non_terminal,
+    const Token& previous_token) {
+    if (non_terminal == "Expr") {
+        return "Un bloque '{ ... }' no es una expresion; solo puede usarse como cuerpo de "
+               "let, if, while, with o como cuerpo en llaves de una function";
+    }
+    if (non_terminal == "Program") {
+        return "Un bloque '{ ... }' no puede ser una sentencia del programa por si solo; "
+               "use let, if, while, function u otra expresion";
+    }
+    if (non_terminal == "ArgListOpt" || non_terminal == "ArgList") {
+        return "Un bloque '{ ... }' no puede usarse como argumento de llamada";
+    }
+
+    const char* operand_category = operand_category_after(previous_token.type);
+    const char* op_lexeme = operator_lexeme_for(previous_token.type);
+    if (operand_category != nullptr && op_lexeme != nullptr &&
+        is_operand_non_terminal(non_terminal)) {
+        return std::string("El operador '") + op_lexeme + "' solo combina " + operand_category +
+               "; un bloque '{ ... }' no es un operando valido aqui";
+    }
+
+    return {};
+}
+
 std::string build_missing_production_message(
     const std::string& non_terminal,
     const std::string& lookahead,
     const Token& previous_token) {
+    if (lookahead == "LBRACE") {
+        const std::string block_message = block_context_message(non_terminal, previous_token);
+        if (!block_message.empty()) {
+            return block_message;
+        }
+    }
+
+    const std::string stmt_only_message = program_stmt_only_message(non_terminal, lookahead);
+    if (!stmt_only_message.empty()) {
+        return stmt_only_message;
+    }
+
     const char* keyword = keyword_for_top_level_expr(lookahead);
     const char* operand_category = operand_category_after(previous_token.type);
     const char* op_lexeme = operator_lexeme_for(previous_token.type);
