@@ -1,25 +1,23 @@
 #pragma once
 
-#include <set>
-#include <string>
-#include <vector>
+#include <iostream>
+#include <memory>
 
 #include "../Parser/ast/expr.hpp"
-#include "../Parser/ast/visitor.hpp"
-#include "../SymbolTable/symbol_table.hpp"
-#include "binding_list.hpp"
-#include "error.hpp"
+#include "../Value/value.hpp"
+#include "env_frame.hpp"
 
-namespace semantic {
+namespace eval {
 
-// Analizador Fase 2 sobre el AST local (`parser::`). Sustituye el port amabe en SemanticCheck/semantic_checker.* para R1–R4.
-class Phase2Analyzer : public parser::ExprVisitor, public parser::StmtVisitor {
+// Fase 3 — intérprete sobre AST local (paridad progresiva con amabe Evaluator).
+class Evaluator : public parser::ExprVisitor, public parser::StmtVisitor {
 public:
-    void analyze(parser::Program* program);
+    explicit Evaluator(std::ostream& out = std::cout);
 
-    bool hasErrors() const { return error_manager_.hasErrors(); }
-    void printErrors(std::ostream& out = std::cerr) const { error_manager_.printErrors(out); }
-    const std::vector<SemanticError>& getErrors() const { return error_manager_.getErrors(); }
+    value::Value evaluate(parser::Program* program);
+
+    bool hadError() const { return had_error_; }
+    const std::string& lastError() const { return last_error_; }
 
     void visit(parser::NumberExpr* expr) override;
     void visit(parser::StringExpr* expr) override;
@@ -58,23 +56,15 @@ public:
     void visit(parser::AttributeDecl* stmt) override;
 
 private:
-    SymbolTable symbol_table_;
-    ErrorManager error_manager_;
+    std::ostream& out_;
+    std::shared_ptr<EnvFrame> global_;
+    value::Value current_{0.0};
+    bool had_error_ = false;
+    std::string last_error_;
 
-    void report(ErrorType type, const std::string& message, int line, int col,
-                const std::string& context = "");
     void visitExpr(parser::Expr* expr);
     void visitStmt(parser::Stmt* stmt);
-
-    void checkUniqueParamNames(const std::vector<std::pair<parser::Token, std::optional<parser::Token>>>& params,
-                               int line, int col, const std::string& context);
-    void registerFunctionDecl(parser::FunctionDecl* stmt);
-    void resolveVariableUse(const parser::Token& token, const std::string& context);
-    void resolveFunctionCall(const parser::Token& name_token, size_t arity, const std::string& context);
-
-    void collectClassDeclarations(parser::Program* program);
-    void registerClassDecl(parser::ClassDecl* stmt);
-    bool isBuiltinNominalType(const std::string& name) const;
+    void setError(const std::string& message);
 };
 
-}  // namespace semantic
+}  // namespace eval

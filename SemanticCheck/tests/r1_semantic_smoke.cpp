@@ -34,15 +34,7 @@ bool expect_r1_error_on_source(const std::string& name, const std::string& sourc
             return true;
         }
 
-        std::cerr << "[FAIL] " << name << " — se esperaba error R1\n";
-        return false;
-    } catch (const parser::ParseError& error) {
-        const std::string message = error.what();
-        if (message.find("ya está definida") != std::string::npos) {
-            std::cout << "[OK] " << name << " -> " << message << "\n";
-            return true;
-        }
-        std::cerr << "[FAIL] " << name << " — ParseError inesperado: " << message << "\n";
+        std::cerr << "[FAIL] " << name << " — se esperaba error R1 semántico\n";
         return false;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] " << name << " — excepcion: " << error.what() << "\n";

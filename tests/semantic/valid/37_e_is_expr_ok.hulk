@@ -1,0 +1,3 @@
+class Person(x:Number) { x:Number = x; }
+
+let n = 1 in n is Person;

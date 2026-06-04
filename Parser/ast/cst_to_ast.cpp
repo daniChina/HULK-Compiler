@@ -291,7 +291,7 @@ ExprPtr build_let_expr(const CstNode& node) {
     std::vector<LetBindingData> bindings;
     extract_bindings(child(node, 1), bindings);
 
-    semantic::ensureUniqueLetBindingsOrThrow(bindings);
+    semantic::enqueueDuplicateLetBindingErrors(bindings);
     
     ExprPtr body = build_let_body(child(node, 3));
     

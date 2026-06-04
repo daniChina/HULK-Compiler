@@ -1,0 +1,3 @@
+function sin(x) => x;
+
+print(sin(1));

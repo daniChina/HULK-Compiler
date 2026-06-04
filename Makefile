@@ -1,11 +1,11 @@
-.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins
+.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_eval
 
 # Compilador y flags
 CXX = g++
 # FlexLexer.h: MSYS2/ghcup o WinFlexBison (winget install WinFlexBison.win_flex_bison)
 FLEX_WIN = $(LOCALAPPDATA)/Microsoft/WinGet/Packages/WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe
 CXXFLAGS = -std=c++17 -Wall -I. -ILexer -IParser/core -IParser/ast -IParser/generator -IParser/syntax \
-           -ISemanticCheck -ISymbolTable -ITypes \
+           -ISemanticCheck -ISymbolTable -ITypes -IValue -IEvaluator \
            -I/usr/include -IC:/ghcup/msys64/usr/include -I$(FLEX_WIN)
 
 # Archivos fuente
@@ -35,6 +35,7 @@ R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
 R3_R4_SEMANTIC_TEST_TARGET = r3_r4_semantic_smoke
 A4_BUILTINS_TEST_TARGET = a4_builtins_smoke
+EVAL_TEST_TARGET = eval_smoke
 
 TARGET = hulk.exe
 TYPE_TEST_TARGET = type_info_smoke
@@ -87,6 +88,10 @@ test_a4_builtins:
 
 test_semantic: test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins
 
+test_eval:
+	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_TEST_TARGET)
+	./$(EVAL_TEST_TARGET)
+
 ifeq ($(OS),Windows_NT)
 test_semantic_fixtures: compile
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_semantic.ps1
@@ -96,4 +101,4 @@ test_semantic_fixtures: compile
 endif
 
 clean:
-	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o

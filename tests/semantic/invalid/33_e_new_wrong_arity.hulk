@@ -1,0 +1,3 @@
+class P(x:Number, y:Number) { }
+
+let z = new P(1) in print(z);

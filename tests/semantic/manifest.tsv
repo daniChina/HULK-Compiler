@@ -1,8 +1,8 @@
 # invalid/<archivo>	kind	fragmento en stderr (ASCII, sin depender de tildes)
 # kind: semantic | parse | any
-invalid/01_r1_duplicate_bindings_same_let.hulk	parse	ya est
+invalid/01_r1_duplicate_bindings_same_let.hulk	semantic	ya est
 invalid/02_r1_redefine_pi.hulk	semantic	ya est
-invalid/03_r1_duplicate_let_in_function.hulk	parse	ya est
+invalid/03_r1_duplicate_let_in_function.hulk	semantic	ya est
 invalid/06_r2_use_before_let.hulk	semantic	no est
 invalid/07_r2_free_identifier.hulk	semantic	Variable 'z'
 invalid/08_r2_var_inside_function_used_outside.hulk	semantic	no est
@@ -18,3 +18,12 @@ invalid/17_r4_mutual_forward.hulk	semantic	no est
 invalid/18_r4_call_before_any_function_decl.hulk	semantic	no est
 invalid/19_block_multi_let_without_in.hulk	parse	BindingTail
 invalid/20_block_stmt_alone.hulk	parse	no puede ser una sentencia
+invalid/21_a4_redefine_e.hulk	semantic	ya est
+invalid/22_a4_redefine_builtin_sin.hulk	semantic	ya est
+invalid/23_r2_assign_without_let.hulk	semantic	no est
+invalid/24_r4_print_wrong_arity.hulk	semantic	no acepta
+invalid/30_e_child_before_parent.hulk	semantic	no est
+invalid/31_e_undefined_type_new.hulk	semantic	no est
+invalid/32_e_redefined_class.hulk	semantic	ya est
+invalid/33_e_new_wrong_arity.hulk	semantic	espera
+invalid/46_e_is_undefined_type.hulk	semantic	no est

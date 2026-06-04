@@ -1,0 +1,3 @@
+class Child() is Parent { }
+
+class Parent() { }

@@ -1,0 +1,6 @@
+# Fase 4 — manifest LLVM fixtures
+# Formato (cuando existan archivos):
+#   valid/<nombre.hulk>    llvm_ok    <subcadena en .ll o stdout tras lli>
+#   invalid/<nombre.hulk>  llvm       <fragmento stderr o nota exit!=0>
+#
+# Ritual y criterios: docs/planning/fase4_generacion_llvm.md, docs/reference/compilador_referencia.md
