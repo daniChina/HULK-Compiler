@@ -12,6 +12,89 @@ struct StackItem {
     CstNode* node = nullptr;
 };
 
+bool is_operand_non_terminal(const std::string& non_terminal) {
+    return non_terminal == "Primary" || non_terminal == "PostfixExpr" ||
+           non_terminal == "UnaryExpr" || non_terminal == "PowerExpr" ||
+           non_terminal == "MulExpr";
+}
+
+bool is_top_level_expr_lookahead(const std::string& lookahead) {
+    return lookahead == "LET" || lookahead == "IF" || lookahead == "WHILE" ||
+           lookahead == "FOR" || lookahead == "WITH" || lookahead == "CASE" ||
+           lookahead == "UNLESS" || lookahead == "REPEAT" || lookahead == "LOOP";
+}
+
+const char* keyword_for_top_level_expr(const std::string& lookahead) {
+    if (lookahead == "LET") return "let";
+    if (lookahead == "IF") return "if";
+    if (lookahead == "WHILE") return "while";
+    if (lookahead == "FOR") return "for";
+    if (lookahead == "WITH") return "with";
+    if (lookahead == "CASE") return "case";
+    if (lookahead == "UNLESS") return "unless";
+    if (lookahead == "REPEAT") return "repeat";
+    if (lookahead == "LOOP") return "loop";
+    return nullptr;
+}
+
+const char* operand_category_after(TokenType op) {
+    switch (op) {
+    case TokenType::PLUS:
+    case TokenType::MINUS:
+        return "expresiones multiplicativas";
+    case TokenType::STAR:
+    case TokenType::SLASH:
+    case TokenType::PERCENT:
+        return "expresiones potencia";
+    case TokenType::CARET:
+        return "expresiones unarias";
+    case TokenType::CONCAT:
+    case TokenType::CONCAT_WS:
+        return "expresiones aditivas";
+    case TokenType::OR:
+        return "expresiones de comparacion";
+    case TokenType::AND:
+        return "expresiones logicas de comparacion";
+    default:
+        return nullptr;
+    }
+}
+
+const char* operator_lexeme_for(TokenType op) {
+    switch (op) {
+    case TokenType::PLUS: return "+";
+    case TokenType::MINUS: return "-";
+    case TokenType::STAR: return "*";
+    case TokenType::SLASH: return "/";
+    case TokenType::PERCENT: return "%";
+    case TokenType::CARET: return "^";
+    case TokenType::CONCAT: return "@";
+    case TokenType::CONCAT_WS: return "@@";
+    case TokenType::OR: return "||";
+    case TokenType::AND: return "&&";
+    default: return nullptr;
+    }
+}
+
+std::string build_missing_production_message(
+    const std::string& non_terminal,
+    const std::string& lookahead,
+    const Token& previous_token) {
+    const char* keyword = keyword_for_top_level_expr(lookahead);
+    const char* operand_category = operand_category_after(previous_token.type);
+    const char* op_lexeme = operator_lexeme_for(previous_token.type);
+
+    if (keyword != nullptr && operand_category != nullptr && op_lexeme != nullptr &&
+        is_operand_non_terminal(non_terminal) && is_top_level_expr_lookahead(lookahead)) {
+        return std::string("El operador '") + op_lexeme +
+               "' solo combina " + operand_category +
+               " (literales, identificadores, llamadas, agrupacion con parentesis, etc.); '" +
+               keyword + "' inicia una expresion de otro tipo y no puede usarse como operando aqui";
+    }
+
+    return "No hay produccion LL(1) para " + non_terminal + " con lookahead " + lookahead;
+}
+
 }  // namespace
 
 Ll1Parser::Ll1Parser(
@@ -119,7 +202,7 @@ const generator::Production& Ll1Parser::select_production(const std::string& non
     if (entry == row->second.end()) {
         throw ParseError(
             tokens_.current(),
-            "No hay produccion LL(1) para " + non_terminal + " con lookahead " + lookahead);
+            build_missing_production_message(non_terminal, lookahead, tokens_.previous()));
     }
 
     return entry->second;
