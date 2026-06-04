@@ -49,27 +49,27 @@ let i = 5 in while (i >= 0) {
 
 for (x in range(0, 10)) print(x);
 
-// 7. Types, Inheritance and self
-type Point(x, y) {
-    x = x;
-    y = y;
-    getX() => self.x;
-    getY() => self.y;
+// 7. Classes, inheritance and self (syntax Fase 0: class, ->, is)
+class Point(x:Number, y:Number) {
+    x:Number = x;
+    y:Number = y;
+    getX() -> self.x;
+    getY() -> self.y;
 }
 
-type PolarPoint(phi, rho) inherits Point(rho * sin(phi), rho * cos(phi)) {
-    rho() => sqrt(self.getX() ^ 2 + self.getY() ^ 2);
+class PolarPoint(phi:Number, rho:Number) is Point(rho * sin(phi), rho * cos(phi)) {
+    rho() -> sqrt(self.getX() ^ 2 + self.getY() ^ 2);
 }
 
-// 8. Polymorphism, base and @@ (spaced concatenation)
-type Person(firstname, lastname) {
-    firstname = firstname;
-    lastname = lastname;
-    name() => self.firstname @@ self.lastname;
+// 8. Polymorphism and @@ (spaced concatenation)
+class Person(firstname:String, lastname:String) {
+    firstname:String = firstname;
+    lastname:String = lastname;
+    name() -> self.firstname @@ self.lastname;
 }
 
-type Knight inherits Person {
-    name() => "Sir" @@ base();
+class Knight(firstname:String, lastname:String) is Person(firstname, lastname) {
+    name() -> "Sir" @@ self.firstname;
 }
 
 // 9. Type Checking (is) and Downcasting (as)

@@ -1,0 +1,3 @@
+function inc(x) => x + 1;
+
+let outer = 1 in print(inc(outer));

@@ -159,6 +159,31 @@ int main() {
             "  ExprStmt(Let(p = New(Noble(String(\"\"Sir\"\"), String(\"\"Thomas\"\"))) in Call(Identifier(print), [Call(GetAttr(Identifier(p), greet), [])])))\n"
             ")");
 
+        ok &= expect_program_ast(
+            "fixture 03_inherits_base_call: Knight is Person with forwarded args (decision 8d)",
+            grammar,
+            ll1_table,
+            "class Person(firstname:String, lastname:String) {\n"
+            "  firstname:String = firstname;\n"
+            "  lastname:String = lastname;\n"
+            "  name() -> self.firstname @@ self.lastname;\n"
+            "}\n"
+            "class Knight(firstname:String, lastname:String) is Person(firstname, lastname) {\n"
+            "  name() -> \"Sir\" @@ self.firstname;\n"
+            "}\n"
+            "new Knight(\"Phil\", \"Collins\").name();",
+            "Program(\n"
+            "  ClassDecl(Person(firstname: String, lastname: String) {\n"
+            "    firstname: String = Identifier(firstname);\n"
+            "    lastname: String = Identifier(lastname);\n"
+            "    name() -> Binary(GetAttr(Self, firstname), @@, GetAttr(Self, lastname));\n"
+            "})\n"
+            "  ClassDecl(Knight(firstname: String, lastname: String) is Person(Identifier(firstname), Identifier(lastname)) {\n"
+            "    name() -> Binary(String(\"\"Sir\"\"), @@, GetAttr(Self, firstname));\n"
+            "})\n"
+            "  ExprStmt(Call(GetAttr(New(Knight(String(\"\"Phil\"\"), String(\"\"Collins\"\"))), name), []))\n"
+            ")");
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] class polymorphism pipeline smoke threw exception: " << error.what() << "\n";

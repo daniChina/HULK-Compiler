@@ -1,0 +1,3 @@
+function h() => let f = 1 in let f = 2 in f;
+
+print(0);

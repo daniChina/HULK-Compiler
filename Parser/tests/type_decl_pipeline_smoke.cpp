@@ -118,7 +118,7 @@ int main() {
         }
 
         ok &= expect_program_ast(
-            "class syntax with typed attributes reaches canonical type AST",
+            "class syntax with typed attributes reaches canonical ClassDecl AST",
             grammar,
             ll1_table,
             "class Point(x:Number, y:Number) { x:Number = x; y:Number = y; norm() -> self.x * self.x + self.y * self.y; }\n"
@@ -135,7 +135,7 @@ int main() {
             ")");
 
         ok &= expect_program_ast(
-            "class inheritance alias is with bracket base init and self/base bodies",
+            "class inheritance with is passes parent args as expressions",
             grammar,
             ll1_table,
             "class Point(x:Number, y:Number) { x:Number = x; y:Number = y; }\n"

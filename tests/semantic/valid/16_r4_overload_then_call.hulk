@@ -1,0 +1,5 @@
+function suma(a, b) => a + b;
+function suma(a, b, c) => a + b + c;
+
+print(suma(1, 2));
+print(suma(1, 2, 3));

@@ -1,0 +1,4 @@
+function b() => 1;
+function a() => b();
+
+print(a());

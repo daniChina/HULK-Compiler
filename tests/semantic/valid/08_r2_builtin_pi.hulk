@@ -1,0 +1,2 @@
+print(PI);
+print(sin(1));

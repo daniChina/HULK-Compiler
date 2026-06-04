@@ -1,0 +1,2 @@
+let r = f(1) in print(r);
+function f(n) => n;
