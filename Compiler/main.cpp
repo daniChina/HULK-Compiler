@@ -126,16 +126,16 @@ int main(int argc, char* argv[]) {
         if (parse_result.cst_root) {
             auto ast = parser::cst_to_ast(*parse_result.cst_root);
 
-            SymbolTable symbol_table;
-            TypeInfo::setSymbolTable(&symbol_table);
-            const auto decl_stats = collectTopLevelDeclarations(*ast, symbol_table);
-
             if (options.print_ast) {
                 std::cout << "== AST ==\n";
                 std::cout << parser::program_to_string(*ast) << "\n";
             }
 
+            // Fase 1 (--symbols): recorrido declarativo; no comparte tabla con --semantic (R4 orden textual).
             if (options.print_symbols) {
+                SymbolTable symbol_table;
+                TypeInfo::setSymbolTable(&symbol_table);
+                const auto decl_stats = collectTopLevelDeclarations(*ast, symbol_table);
                 std::cout << "== Symbols ==\n"
                           << "  functions registered: " << decl_stats.functions_registered << "\n"
                           << "  types registered: " << decl_stats.types_registered << "\n"

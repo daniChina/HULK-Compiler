@@ -1,4 +1,4 @@
-.PHONY: all compile lexer clean execute test_types test_symbols test_r1_semantic
+.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins
 
 # Compilador y flags
 CXX = g++
@@ -32,6 +32,9 @@ PARSER_TEST_COMMON = Lexer/hulk_lexer.cpp Parser/core/token_adapter.cpp Parser/c
           SemanticCheck/binding_list.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
+R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
+R3_R4_SEMANTIC_TEST_TARGET = r3_r4_semantic_smoke
+A4_BUILTINS_TEST_TARGET = a4_builtins_smoke
 
 TARGET = hulk.exe
 TYPE_TEST_TARGET = type_info_smoke
@@ -70,5 +73,27 @@ test_r1_semantic:
 	$(CXX) $(CXXFLAGS) SemanticCheck/tests/r1_semantic_smoke.cpp $(PARSER_TEST_COMMON) SemanticCheck/phase2_checker.cpp -o $(R1_SEMANTIC_TEST_TARGET)
 	./$(R1_SEMANTIC_TEST_TARGET)
 
+test_r2_semantic:
+	$(CXX) $(CXXFLAGS) SemanticCheck/tests/r2_semantic_smoke.cpp $(PARSER_TEST_COMMON) SemanticCheck/phase2_checker.cpp -o $(R2_SEMANTIC_TEST_TARGET)
+	./$(R2_SEMANTIC_TEST_TARGET)
+
+test_r3_r4_semantic:
+	$(CXX) $(CXXFLAGS) SemanticCheck/tests/r3_r4_semantic_smoke.cpp $(PARSER_TEST_COMMON) SemanticCheck/phase2_checker.cpp -o $(R3_R4_SEMANTIC_TEST_TARGET)
+	./$(R3_R4_SEMANTIC_TEST_TARGET)
+
+test_a4_builtins:
+	$(CXX) $(CXXFLAGS) SemanticCheck/tests/a4_builtins_smoke.cpp $(PARSER_TEST_COMMON) SemanticCheck/phase2_checker.cpp -o $(A4_BUILTINS_TEST_TARGET)
+	./$(A4_BUILTINS_TEST_TARGET)
+
+test_semantic: test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins
+
+ifeq ($(OS),Windows_NT)
+test_semantic_fixtures: compile
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_semantic.ps1
+else
+test_semantic_fixtures: compile
+	bash scripts/run_semantic.sh
+endif
+
 clean:
-	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o

@@ -3,6 +3,7 @@
 #include "../AST/ast.hpp"
 #include <string>
 #include <map>
+#include <set>
 #include <vector>
 #include <memory>
 /**
@@ -58,7 +59,9 @@ class SymbolTable
 {
 private:
     std::vector<std::map<std::string, Symbol>> variable_scopes_;
-    std::map<std::string, std::shared_ptr<FunctionSymbol>> functions_;
+    std::map<std::string, std::vector<std::shared_ptr<FunctionSymbol>>> functions_;
+    std::set<std::string> builtin_function_names_;
+    std::set<std::string> builtin_variable_names_;
     std::map<std::string, std::shared_ptr<TypeSymbol>> types_; // Track declared types with full info
     std::map<std::string, parser::ClassDecl *> type_declarations_;      // Store class declarations for parameter checking
 
@@ -151,32 +154,67 @@ public:
     }
 
     /**
-     * @brief Declare a function
+     * @brief Declare a user function (R3: overload by arity; builtins cannot be redeclared)
      */
     bool declareFunction(const std::string &name, const std::vector<TypeInfo> &params,
                          const TypeInfo &return_type, int line = 0)
     {
-        // Check if function already exists
-        if (functions_.find(name) != functions_.end())
+        if (builtin_function_names_.find(name) != builtin_function_names_.end())
         {
             return false;
         }
 
-        functions_[name] = std::make_shared<FunctionSymbol>(name, params, return_type, line);
+        const size_t arity = params.size();
+        auto &overloads = functions_[name];
+        for (const auto &existing : overloads)
+        {
+            if (existing->parameter_types.size() == arity)
+            {
+                return false;
+            }
+        }
+
+        overloads.push_back(
+            std::make_shared<FunctionSymbol>(name, params, return_type, line));
         return true;
     }
 
     /**
-     * @brief Look up a function
+     * @brief Look up a function overload by name and argument count (R4)
+     */
+    std::shared_ptr<FunctionSymbol> lookupFunction(const std::string &name, size_t arity)
+    {
+        auto found = functions_.find(name);
+        if (found == functions_.end())
+        {
+            return nullptr;
+        }
+
+        for (const auto &overload : found->second)
+        {
+            if (overload->parameter_types.size() == arity)
+            {
+                return overload;
+            }
+        }
+        return nullptr;
+    }
+
+    /**
+     * @brief Look up a function by name (first overload; for builtins and single-overload names)
      */
     std::shared_ptr<FunctionSymbol> lookupFunction(const std::string &name)
     {
         auto found = functions_.find(name);
-        return (found != functions_.end()) ? found->second : nullptr;
+        if (found == functions_.end() || found->second.empty())
+        {
+            return nullptr;
+        }
+        return found->second.front();
     }
 
     /**
-     * @brief Update function signature with new parameter and return types
+     * @brief Update function signature with new parameter and return types (matching arity)
      */
     bool updateFunctionSignature(const std::string &name, const std::vector<TypeInfo> &params,
                                  const TypeInfo &return_type)
@@ -184,13 +222,20 @@ public:
         auto found = functions_.find(name);
         if (found == functions_.end())
         {
-            return false; // Function not found
+            return false;
         }
 
-        // Update the existing function with new types
-        found->second->parameter_types = params;
-        found->second->return_type = return_type;
-        return true;
+        const size_t arity = params.size();
+        for (auto &overload : found->second)
+        {
+            if (overload->parameter_types.size() == arity)
+            {
+                overload->parameter_types = params;
+                overload->return_type = return_type;
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -246,16 +291,29 @@ public:
         return functions_.find(name) != functions_.end();
     }
 
+    /** @brief Built-in global constant (PI, E) — única fuente de registro en el constructor. */
+    bool isBuiltinVariable(const std::string &name) const
+    {
+        return builtin_variable_names_.find(name) != builtin_variable_names_.end();
+    }
+
+    /** @brief Built-in function name (print, sin, …) — no redeclarable por el usuario. */
+    bool isBuiltinFunction(const std::string &name) const
+    {
+        return builtin_function_names_.find(name) != builtin_function_names_.end();
+    }
+
     /**
      * @brief Get function parameters (simplified for compatibility)
      */
     std::vector<std::string> getFunctionParams(const std::string &name) const
     {
         auto found = functions_.find(name);
-        if (found != functions_.end())
+        if (found != functions_.end() && !found->second.empty())
         {
             std::vector<std::string> params;
-            for (size_t i = 0; i < found->second->parameter_types.size(); ++i)
+            const auto &overload = found->second.front();
+            for (size_t i = 0; i < overload->parameter_types.size(); ++i)
             {
                 params.push_back("param" + std::to_string(i));
             }
@@ -414,10 +472,16 @@ private:
     /**
      * @brief Add built-in global constants (PI, E)
      */
+    void registerBuiltinVariable(const std::string &name, const TypeInfo &type)
+    {
+        builtin_variable_names_.insert(name);
+        declareVariable(name, type, false);
+    }
+
     void addBuiltinVariables()
     {
-        declareVariable("PI", TypeInfo(TypeInfo::Kind::Number), false);
-        declareVariable("E", TypeInfo(TypeInfo::Kind::Number), false);
+        registerBuiltinVariable("PI", TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinVariable("E", TypeInfo(TypeInfo::Kind::Number));
     }
 
     /**
@@ -440,18 +504,29 @@ private:
     /**
      * @brief Add built-in functions to symbol table
      */
+    void registerBuiltinFunction(const std::string &name, const std::vector<TypeInfo> &params,
+                                 const TypeInfo &return_type)
+    {
+        builtin_function_names_.insert(name);
+        functions_[name].push_back(
+            std::make_shared<FunctionSymbol>(name, params, return_type, 0));
+    }
+
     void addBuiltinFunctions()
     {
-        // Math functions
-        declareFunction("sin", {TypeInfo(TypeInfo::Kind::Number)}, TypeInfo(TypeInfo::Kind::Number));
-        declareFunction("cos", {TypeInfo(TypeInfo::Kind::Number)}, TypeInfo(TypeInfo::Kind::Number));
-        declareFunction("sqrt", {TypeInfo(TypeInfo::Kind::Number)}, TypeInfo(TypeInfo::Kind::Number));
-        declareFunction("exp", {TypeInfo(TypeInfo::Kind::Number)}, TypeInfo(TypeInfo::Kind::Number));
-        declareFunction("log", {TypeInfo(TypeInfo::Kind::Number), TypeInfo(TypeInfo::Kind::Number)},
-                        TypeInfo(TypeInfo::Kind::Number));
-        declareFunction("rand", {}, TypeInfo(TypeInfo::Kind::Number));
-
-        // String functions
-        declareFunction("print", {TypeInfo(TypeInfo::Kind::Unknown)}, TypeInfo(TypeInfo::Kind::Void));
+        registerBuiltinFunction("sin", {TypeInfo(TypeInfo::Kind::Number)},
+                                TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinFunction("cos", {TypeInfo(TypeInfo::Kind::Number)},
+                                TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinFunction("sqrt", {TypeInfo(TypeInfo::Kind::Number)},
+                                TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinFunction("exp", {TypeInfo(TypeInfo::Kind::Number)},
+                                TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinFunction("log",
+                                {TypeInfo(TypeInfo::Kind::Number), TypeInfo(TypeInfo::Kind::Number)},
+                                TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinFunction("rand", {}, TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinFunction("print", {TypeInfo(TypeInfo::Kind::Unknown)},
+                                TypeInfo(TypeInfo::Kind::Void));
     }
 };

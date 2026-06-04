@@ -1,0 +1,20 @@
+# invalid/<archivo>	kind	fragmento en stderr (ASCII, sin depender de tildes)
+# kind: semantic | parse | any
+invalid/01_r1_duplicate_bindings_same_let.hulk	parse	ya est
+invalid/02_r1_redefine_pi.hulk	semantic	ya est
+invalid/03_r1_duplicate_let_in_function.hulk	parse	ya est
+invalid/06_r2_use_before_let.hulk	semantic	no est
+invalid/07_r2_free_identifier.hulk	semantic	Variable 'z'
+invalid/08_r2_var_inside_function_used_outside.hulk	semantic	no est
+invalid/09_r2_self_in_initializer.hulk	semantic	no est
+invalid/10_r3_duplicate_params.hulk	semantic	ya est
+invalid/11_r3_duplicate_params_three.hulk	semantic	ya est
+invalid/12_r3_method_duplicate_params.hulk	semantic	ya est
+invalid/13_r3_overload_same_arity.hulk	semantic	ya est
+invalid/14_r4_undefined_call.hulk	semantic	no est
+invalid/15_r4_typo_undefined_function.hulk	semantic	prnt
+invalid/16_r4_forward_reference_in_program.hulk	semantic	no est
+invalid/17_r4_mutual_forward.hulk	semantic	no est
+invalid/18_r4_call_before_any_function_decl.hulk	semantic	no est
+invalid/19_block_multi_let_without_in.hulk	parse	BindingTail
+invalid/20_block_stmt_alone.hulk	parse	no puede ser una sentencia
