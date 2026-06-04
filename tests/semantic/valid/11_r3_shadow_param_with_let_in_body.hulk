@@ -1,0 +1,3 @@
+function f(x) => let x = "a" in x;
+
+print(f(1));

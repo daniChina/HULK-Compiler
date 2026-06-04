@@ -1,0 +1,3 @@
+function bad(x, x) => x;
+
+print(bad(1));

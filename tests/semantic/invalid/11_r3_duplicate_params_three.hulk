@@ -1,0 +1,3 @@
+function g(a, b, a) => a;
+
+print(g(1, 2));

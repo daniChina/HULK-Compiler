@@ -73,6 +73,24 @@ int main() {
             ll1_table,
             "class Point { x:Number; }");
 
+        ok &= expect_parse_error(
+            "rejects semicolon after class closing brace (B6)",
+            grammar,
+            ll1_table,
+            "class Point { x:Number = 0; };");
+
+        ok &= expect_parse_error(
+            "rejects inherits keyword in class header (only is allowed)",
+            grammar,
+            ll1_table,
+            "class Child inherits Parent { }");
+
+        ok &= expect_parse_error(
+            "rejects type keyword as class declaration (type is a normal identifier)",
+            grammar,
+            ll1_table,
+            "type Point { x:Number = 0; }");
+
         return ok ? 0 : 1;
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] type decl invalid smoke threw exception: " << error.what() << "\n";
