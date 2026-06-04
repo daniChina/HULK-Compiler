@@ -27,6 +27,8 @@ void Phase2Analyzer::analyze(parser::Program* program) {
         return;
     }
     TypeInfo::setSymbolTable(&symbol_table_);
+    drainPendingLetBindingErrors(error_manager_);
+    collectClassDeclarations(program);
     program->accept(this);
 }
 
@@ -50,8 +52,31 @@ void Phase2Analyzer::resolveVariableUse(const parser::Token& token, const std::s
     }
 }
 
+void Phase2Analyzer::resolveFunctionCall(const parser::Token& name_token, size_t arity,
+                                         const std::string& context) {
+    const std::string& name = name_token.lexeme;
+    if (symbol_table_.lookupFunction(name, arity)) {
+        return;
+    }
+    if (symbol_table_.lookupFunction(name)) {
+        report(ErrorType::ARGUMENT_COUNT_MISMATCH,
+               "La función '" + name + "' no acepta " + std::to_string(arity) + " argumento(s)",
+               name_token.line, name_token.col, context);
+        return;
+    }
+    report(ErrorType::UNDEFINED_FUNCTION, "Función '" + name + "' no está definida", name_token.line,
+           name_token.col, context);
+}
+
 void Phase2Analyzer::registerFunctionDecl(parser::FunctionDecl* stmt) {
     checkUniqueParamNames(stmt->params, stmt->name.line, stmt->name.col, "declaración de función");
+
+    if (symbol_table_.isBuiltinFunction(stmt->name.lexeme)) {
+        report(ErrorType::REDEFINED_FUNCTION,
+               "Función '" + stmt->name.lexeme + "' ya está definida", stmt->name.line,
+               stmt->name.col, "declaración de función");
+        return;
+    }
 
     std::vector<TypeInfo> param_types;
     param_types.reserve(stmt->params.size());
@@ -88,6 +113,60 @@ void Phase2Analyzer::visit(parser::FunctionDecl* stmt) {
     symbol_table_.exitScope();
 }
 
+bool Phase2Analyzer::isBuiltinNominalType(const std::string& name) const {
+    return name == "Object" || name == "Number" || name == "String" || name == "Boolean" ||
+           name == "Null" || name == "Void" || name == "Unknown";
+}
+
+void Phase2Analyzer::collectClassDeclarations(parser::Program* program) {
+    for (const auto& stmt : program->stmts) {
+        if (auto* class_decl = dynamic_cast<parser::ClassDecl*>(stmt.get())) {
+            registerClassDecl(class_decl);
+        }
+    }
+}
+
+void Phase2Analyzer::registerClassDecl(parser::ClassDecl* stmt) {
+    const std::string& name = stmt->name.lexeme;
+    std::string base = "Object";
+    if (stmt->parent_name) {
+        base = stmt->parent_name->lexeme;
+        if (base == "Number" || base == "String" || base == "Boolean") {
+            report(ErrorType::INVALID_BASE_TYPE,
+                   "No se puede heredar del tipo primitivo '" + base + "'", stmt->name.line,
+                   stmt->name.col, "declaración de clase");
+            return;
+        }
+        if (!isBuiltinNominalType(base) && !symbol_table_.isTypeDeclared(base)) {
+            report(ErrorType::UNDEFINED_TYPE, "Tipo '" + base + "' no está definido",
+                   stmt->parent_name->line, stmt->parent_name->col, "declaración de clase");
+            return;
+        }
+    }
+
+    if (!symbol_table_.declareType(name, base, stmt->name.line)) {
+        report(ErrorType::REDEFINED_TYPE, "Tipo '" + name + "' ya está definido", stmt->name.line,
+               stmt->name.col, "declaración de clase");
+        return;
+    }
+    symbol_table_.storeTypeDeclaration(name, stmt);
+
+    for (const auto& method : stmt->methods) {
+        checkUniqueParamNames(method.params, method.name.line, method.name.col,
+                              "declaración de método");
+    }
+    for (const auto& attr : stmt->attributes) {
+        for (const auto& method : stmt->methods) {
+            if (attr.name.lexeme == method.name.lexeme) {
+                report(ErrorType::REDEFINED_ATTRIBUTE,
+                       "Atributo '" + attr.name.lexeme + "' ya está definido en tipo '" + name +
+                           "'",
+                       attr.name.line, attr.name.col, "declaración de atributo");
+            }
+        }
+    }
+}
+
 void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
     for (const auto& method : stmt->methods) {
         checkUniqueParamNames(method.params, method.name.line, method.name.col,
@@ -117,11 +196,7 @@ void Phase2Analyzer::visit(parser::BinaryExpr* expr) {
 
 void Phase2Analyzer::visit(parser::CallExpr* expr) {
     if (auto* callee_id = dynamic_cast<parser::IdentifierExpr*>(expr->callee.get())) {
-        const std::string& name = callee_id->token.lexeme;
-        if (!symbol_table_.lookupFunction(name, expr->args.size())) {
-            report(ErrorType::UNDEFINED_FUNCTION, "Función '" + name + "' no está definida",
-                   callee_id->token.line, callee_id->token.col, "llamada a función");
-        }
+        resolveFunctionCall(callee_id->token, expr->args.size(), "llamada a función");
     } else {
         visitExpr(expr->callee.get());
     }
@@ -173,8 +248,23 @@ void Phase2Analyzer::visit(parser::CaseExpr* expr) {
         visitExpr(branch.body.get());
     }
 }
-void Phase2Analyzer::visit(parser::IsExpr* expr) { visitExpr(expr->object.get()); }
-void Phase2Analyzer::visit(parser::AsExpr* expr) { visitExpr(expr->object.get()); }
+void Phase2Analyzer::visit(parser::IsExpr* expr) {
+    visitExpr(expr->object.get());
+    const std::string& type_name = expr->type_name.lexeme;
+    if (!symbol_table_.isTypeDeclared(type_name)) {
+        report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
+               expr->type_name.line, expr->type_name.col, "expresión is");
+    }
+}
+
+void Phase2Analyzer::visit(parser::AsExpr* expr) {
+    visitExpr(expr->object.get());
+    const std::string& type_name = expr->type_name.lexeme;
+    if (!symbol_table_.isTypeDeclared(type_name)) {
+        report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
+               expr->type_name.line, expr->type_name.col, "expresión as");
+    }
+}
 void Phase2Analyzer::visit(parser::AssignExpr* expr) {
     visitExpr(expr->rhs.get());
 
@@ -185,6 +275,20 @@ void Phase2Analyzer::visit(parser::AssignExpr* expr) {
     }
 }
 void Phase2Analyzer::visit(parser::NewExpr* expr) {
+    const std::string& type_name = expr->type_name.lexeme;
+    if (!symbol_table_.isTypeDeclared(type_name)) {
+        report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
+               expr->type_name.line, expr->type_name.col, "instanciación de objeto");
+    } else {
+        auto* class_decl = symbol_table_.getTypeDeclaration(type_name);
+        if (class_decl && expr->args.size() != class_decl->params.size()) {
+            report(ErrorType::ARGUMENT_COUNT_MISMATCH,
+                   "El constructor de '" + type_name + "' espera " +
+                       std::to_string(class_decl->params.size()) + " parámetro(s) pero se recibieron " +
+                       std::to_string(expr->args.size()),
+                   expr->type_name.line, expr->type_name.col, "instanciación de objeto");
+        }
+    }
     for (const auto& arg : expr->args) {
         visitExpr(arg.get());
     }

@@ -1,8 +1,12 @@
 #include "binding_list.hpp"
 
-#include "../Parser/core/parse_error.hpp"
+#include <vector>
 
 namespace semantic {
+
+namespace {
+std::vector<SemanticError> pending_let_binding_errors_;
+}  // namespace
 
 std::optional<SemanticError> findDuplicateLetBinding(const std::vector<LetBindingEntry>& bindings) {
     std::unordered_set<std::string> seen;
@@ -22,17 +26,21 @@ std::optional<SemanticError> findDuplicateLetBinding(const std::vector<LetBindin
     return std::nullopt;
 }
 
-void ensureUniqueLetBindingsOrThrow(const std::vector<LetBindingEntry>& bindings) {
-    std::unordered_set<std::string> seen;
-    for (const auto& entry : bindings) {
-        const parser::Token& name_token = std::get<0>(entry);
-        const std::string& name = name_token.lexeme;
-        if (!seen.insert(name).second) {
-            throw parser::ParseError(
-                name_token,
-                "Variable '" + name + "' ya está definida en este ámbito");
-        }
+void enqueueDuplicateLetBindingErrors(const std::vector<LetBindingEntry>& bindings) {
+    if (auto err = findDuplicateLetBinding(bindings)) {
+        pending_let_binding_errors_.push_back(*err);
     }
+}
+
+void drainPendingLetBindingErrors(ErrorManager& into) {
+    for (const auto& err : pending_let_binding_errors_) {
+        into.reportError(err.type, err.message, err.line, err.column, err.context, err.source);
+    }
+    pending_let_binding_errors_.clear();
+}
+
+void clearPendingLetBindingErrors() {
+    pending_let_binding_errors_.clear();
 }
 
 }  // namespace semantic
