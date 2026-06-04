@@ -13,6 +13,7 @@
 #include "../Parser/generator/grammar_reader.hpp"
 #include "../Parser/generator/ll1_table.hpp"
 #include "../Parser/syntax/ll1_parser.hpp"
+#include "../SemanticCheck/phase2_checker.hpp"
 
 namespace {
 
@@ -21,12 +22,13 @@ struct Options {
     bool print_cst = false;
     bool print_ast = false;
     bool print_symbols = false;
+    bool run_semantic = false;
     std::string input_path;
 };
 
 void print_usage(const char* program_name) {
     std::cerr
-        << "Uso: " << program_name << " [--tokens] [--cst] [--ast] [--symbols] [archivo.hulk]\n"
+        << "Uso: " << program_name << " [--tokens] [--cst] [--ast] [--symbols] [--semantic] [archivo.hulk]\n"
         << "  Si no se pasa archivo, lee desde stdin.\n";
 }
 
@@ -51,6 +53,10 @@ Options parse_options(int argc, char* argv[]) {
         }
         if (arg == "--symbols") {
             options.print_symbols = true;
+            continue;
+        }
+        if (arg == "--semantic") {
+            options.run_semantic = true;
             continue;
         }
         if (arg == "--help" || arg == "-h") {
@@ -134,6 +140,17 @@ int main(int argc, char* argv[]) {
                           << "  functions registered: " << decl_stats.functions_registered << "\n"
                           << "  types registered: " << decl_stats.types_registered << "\n"
                           << "  stmts skipped (non-decl): " << decl_stats.skipped_stmts << "\n";
+            }
+
+            if (options.run_semantic) {
+                semantic::Phase2Analyzer analyzer;
+                analyzer.analyze(ast.get());
+                if (analyzer.hasErrors()) {
+                    std::cerr << "== Semantic errors ==\n";
+                    analyzer.printErrors();
+                    return 1;
+                }
+                std::cout << "Semantic OK\n";
             }
         }
 
