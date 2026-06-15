@@ -1,11 +1,14 @@
 #pragma once
 
 #include <iostream>
+#include <map>
 #include <memory>
+#include <string>
 
 #include "../Parser/ast/expr.hpp"
 #include "../Value/value.hpp"
 #include "env_frame.hpp"
+#include "user_function.hpp"
 
 namespace eval {
 
@@ -58,6 +61,7 @@ public:
 private:
     std::ostream& out_;
     std::shared_ptr<EnvFrame> global_;
+    std::map<std::string, FunctionOverloadMap> functions_;
     value::Value current_{0.0};
     bool had_error_ = false;
     std::string last_error_;
@@ -65,6 +69,11 @@ private:
     void visitExpr(parser::Expr* expr);
     void visitStmt(parser::Stmt* stmt);
     void setError(const std::string& message);
+
+    static bool isBuiltinFunctionName(const std::string& name);
+    void registerFunction(parser::FunctionDecl* decl);
+    void invokeUserFunction(const UserFunction& fn, const std::vector<parser::ExprPtr>& args);
+    bool callBuiltin(const std::string& name, const std::vector<parser::ExprPtr>& args);
 };
 
 }  // namespace eval

@@ -6,11 +6,10 @@
 #include <string>
 #include <variant>
 
-namespace value {
+#include "iterable.hpp"
+#include "instance.hpp"
 
-struct Instance;
-struct RangeValue;
-struct RangeIterator;
+namespace value {
 
 using ValueStorage = std::variant<double, std::string, bool, std::shared_ptr<RangeValue>,
                                   std::shared_ptr<RangeIterator>, std::shared_ptr<Instance>>;
@@ -28,11 +27,19 @@ public:
     bool isNumber() const { return std::holds_alternative<double>(storage_); }
     bool isString() const { return std::holds_alternative<std::string>(storage_); }
     bool isBool() const { return std::holds_alternative<bool>(storage_); }
+    bool isRange() const { return std::holds_alternative<std::shared_ptr<RangeValue>>(storage_); }
+    bool isRangeIterator() const {
+        return std::holds_alternative<std::shared_ptr<RangeIterator>>(storage_);
+    }
     bool isInstance() const { return std::holds_alternative<std::shared_ptr<Instance>>(storage_); }
 
     double asNumber() const { return std::get<double>(storage_); }
     const std::string& asString() const { return std::get<std::string>(storage_); }
     bool asBool() const { return std::get<bool>(storage_); }
+    std::shared_ptr<RangeValue> asRange() const { return std::get<std::shared_ptr<RangeValue>>(storage_); }
+    std::shared_ptr<RangeIterator> asRangeIterator() const {
+        return std::get<std::shared_ptr<RangeIterator>>(storage_);
+    }
     std::shared_ptr<Instance> asInstance() const { return std::get<std::shared_ptr<Instance>>(storage_); }
 
     std::string toString() const;

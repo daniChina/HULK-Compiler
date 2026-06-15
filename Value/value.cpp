@@ -16,6 +16,14 @@ std::string Value::toString() const {
     if (isBool()) {
         return asBool() ? "true" : "false";
     }
+    if (isRange()) {
+        const auto range = asRange();
+        return "<range " + std::to_string(static_cast<int>(range->start)) + ".." +
+               std::to_string(static_cast<int>(range->end)) + ")>";
+    }
+    if (isRangeIterator()) {
+        return "<iterator>";
+    }
     if (isInstance()) {
         return "<instance>";
     }
@@ -31,6 +39,9 @@ std::string Value::getTypeName() const {
     }
     if (isBool()) {
         return "Boolean";
+    }
+    if (isRange() || isRangeIterator()) {
+        return "Iterable";
     }
     if (isInstance()) {
         return "Instance";

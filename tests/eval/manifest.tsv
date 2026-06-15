@@ -1,0 +1,7 @@
+# valid/<archivo>	expected_stdout (literal, incluye \n final)
+valid/31_v3_assign.hulk	3\n
+valid/50_v5_function.hulk	3\n
+valid/51_v5_recursion.hulk	120\n
+valid/52_v5_forward_reference.hulk	1\n
+valid/60_v6_sin.hulk	0\n
+valid/62_v6_range_print.hulk	0\n1\n2\n
