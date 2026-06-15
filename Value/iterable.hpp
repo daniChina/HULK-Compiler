@@ -5,6 +5,8 @@
 
 namespace value {
 
+struct RangeIterator;
+
 // Rango numérico [start, end) — producto de range(start, end).
 struct RangeValue {
     double start = 0.0;

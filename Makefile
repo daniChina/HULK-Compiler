@@ -23,13 +23,15 @@ SOURCES = Lexer/hulk_lexer.cpp \
           SemanticCheck/phase2_checker.cpp \
           Types/type_info.cpp \
           SymbolTable/decl_collector.cpp \
+          Value/value.cpp \
+          Evaluator/evaluator.cpp \
           Compiler/main.cpp
 
 PARSER_TEST_COMMON = Lexer/hulk_lexer.cpp Parser/core/token_adapter.cpp Parser/core/token_stream.cpp \
           Parser/ast/expr.cpp Parser/ast/cst_nodes.cpp Parser/ast/cst_to_ast.cpp \
           Parser/generator/grammar_reader.cpp Parser/generator/first_follow.cpp \
           Parser/generator/ll1_table.cpp Parser/syntax/ll1_parser.cpp \
-          SemanticCheck/binding_list.cpp
+          SemanticCheck/binding_list.cpp Types/type_info.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
@@ -38,6 +40,8 @@ A4_BUILTINS_TEST_TARGET = a4_builtins_smoke
 EVAL_TEST_TARGET = eval_smoke
 EVAL_FUNCTIONS_TEST_TARGET = eval_functions_smoke
 EVAL_OPS_TEST_TARGET = eval_ops_smoke
+EVAL_LOOPS_TEST_TARGET = eval_loops_smoke
+EVAL_WITH_TEST_TARGET = eval_with_smoke
 
 TARGET = hulk_c.exe
 TYPE_TEST_TARGET = type_info_smoke
@@ -97,6 +101,10 @@ test_eval:
 	./$(EVAL_FUNCTIONS_TEST_TARGET)
 	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_ops_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_OPS_TEST_TARGET)
 	./$(EVAL_OPS_TEST_TARGET)
+	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_loops_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_LOOPS_TEST_TARGET)
+	./$(EVAL_LOOPS_TEST_TARGET)
+	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_with_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_WITH_TEST_TARGET)
+	./$(EVAL_WITH_TEST_TARGET)
 
 ifeq ($(OS),Windows_NT)
 test_semantic_fixtures: compile
@@ -107,4 +115,4 @@ test_semantic_fixtures: compile
 endif
 
 clean:
-	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o

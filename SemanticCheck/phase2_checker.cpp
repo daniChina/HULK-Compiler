@@ -29,6 +29,7 @@ void Phase2Analyzer::analyze(parser::Program* program) {
     TypeInfo::setSymbolTable(&symbol_table_);
     drainPendingLetBindingErrors(error_manager_);
     collectClassDeclarations(program);
+    collectFunctionDeclarations(program);
     program->accept(this);
 }
 
@@ -106,8 +107,6 @@ void Phase2Analyzer::visit(parser::ExprStmt* stmt) {
 }
 
 void Phase2Analyzer::visit(parser::FunctionDecl* stmt) {
-    registerFunctionDecl(stmt);
-
     symbol_table_.enterScope();
     for (const auto& param : stmt->params) {
         validateTypeExists(param.second);
@@ -154,6 +153,14 @@ void Phase2Analyzer::collectClassDeclarations(parser::Program* program) {
     for (const auto& stmt : program->stmts) {
         if (auto* class_decl = dynamic_cast<parser::ClassDecl*>(stmt.get())) {
             registerClassDecl(class_decl);
+        }
+    }
+}
+
+void Phase2Analyzer::collectFunctionDeclarations(parser::Program* program) {
+    for (const auto& stmt : program->stmts) {
+        if (auto* fn = dynamic_cast<parser::FunctionDecl*>(stmt.get())) {
+            registerFunctionDecl(fn);
         }
     }
 }
@@ -603,12 +610,21 @@ void Phase2Analyzer::visit(parser::ForExpr* expr) {
 void Phase2Analyzer::visit(parser::WithExpr* expr) {
     visitExpr(expr->value.get());
     TypeInfo val_type = current_type_;
-    symbol_table_.enterScope();
-    symbol_table_.declareVariable(expr->alias.lexeme, val_type);
-    visitExpr(expr->body.get());
-    symbol_table_.exitScope();
+    TypeInfo body_type = TypeInfo(TypeInfo::Kind::Void);
+
+    if (val_type.getKind() != TypeInfo::Kind::Null) {
+        symbol_table_.enterScope();
+        symbol_table_.declareVariable(expr->alias.lexeme, val_type);
+        visitExpr(expr->body.get());
+        body_type = current_type_;
+        symbol_table_.exitScope();
+    }
+
     if (expr->else_branch) {
         visitExpr(expr->else_branch.get());
+        current_type_ = TypeInfo::getLowestCommonAncestor({body_type, current_type_});
+    } else {
+        current_type_ = body_type;
     }
 }
 

@@ -528,5 +528,8 @@ private:
         registerBuiltinFunction("rand", {}, TypeInfo(TypeInfo::Kind::Number));
         registerBuiltinFunction("print", {TypeInfo(TypeInfo::Kind::Unknown)},
                                 TypeInfo(TypeInfo::Kind::Void));
+        registerBuiltinFunction("range",
+                                {TypeInfo(TypeInfo::Kind::Number), TypeInfo(TypeInfo::Kind::Number)},
+                                TypeInfo(TypeInfo::Kind::Object, "Iterable"));
     }
 };

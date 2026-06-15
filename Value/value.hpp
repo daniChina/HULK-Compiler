@@ -11,12 +11,14 @@
 
 namespace value {
 
-using ValueStorage = std::variant<double, std::string, bool, std::shared_ptr<RangeValue>,
-                                  std::shared_ptr<RangeIterator>, std::shared_ptr<Instance>>;
+using ValueStorage = std::variant<std::monostate, double, std::string, bool,
+                                  std::shared_ptr<RangeValue>, std::shared_ptr<RangeIterator>,
+                                  std::shared_ptr<Instance>>;
 
 class Value {
 public:
     Value() : storage_(0.0) {}
+    static Value null() { return Value(std::monostate{}); }
     explicit Value(double d) : storage_(d) {}
     explicit Value(const std::string& s) : storage_(s) {}
     explicit Value(bool b) : storage_(b) {}
@@ -24,6 +26,7 @@ public:
     explicit Value(std::shared_ptr<RangeIterator> it) : storage_(std::move(it)) {}
     explicit Value(std::shared_ptr<Instance> inst) : storage_(std::move(inst)) {}
 
+    bool isNull() const { return std::holds_alternative<std::monostate>(storage_); }
     bool isNumber() const { return std::holds_alternative<double>(storage_); }
     bool isString() const { return std::holds_alternative<std::string>(storage_); }
     bool isBool() const { return std::holds_alternative<bool>(storage_); }
@@ -46,6 +49,8 @@ public:
     std::string getTypeName() const;
 
 private:
+    explicit Value(std::monostate) : storage_(std::monostate{}) {}
+
     ValueStorage storage_;
 };
 

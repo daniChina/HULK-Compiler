@@ -1,7 +1,14 @@
 # valid/<archivo>	expected_stdout (literal, incluye \n final)
 valid/31_v3_assign.hulk	3\n
+valid/40_v4_if.hulk	1\n
+valid/41_v4_while.hulk	3\n
+valid/43_v9_unless.hulk	1\n
+valid/44_v9_repeat.hulk	3\n
+valid/45_v9_loop_while.hulk	7\n
 valid/50_v5_function.hulk	3\n
 valid/51_v5_recursion.hulk	120\n
 valid/52_v5_forward_reference.hulk	1\n
 valid/60_v6_sin.hulk	0\n
 valid/62_v6_range_print.hulk	0\n1\n2\n
+valid/80_v8_with.hulk	1\n
+valid/81_v8_with_null_else.hulk	42\n

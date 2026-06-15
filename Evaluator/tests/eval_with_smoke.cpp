@@ -49,13 +49,9 @@ bool runProgram(const std::string& source, const std::string& expected_stdout, c
 int main() {
     bool ok = true;
 
-    ok &= runProgram("print(7 % 3);", "1\n", "B4: modulo");
-    ok &= runProgram("print(2 ^ 3);", "8\n", "B4: power");
-    ok &= runProgram("print(true and false);", "false\n", "B4: logical and");
-    ok &= runProgram("print(true or false);", "true\n", "B4: logical or");
-    ok &= runProgram("print(let x = 0 in { x := 3; x; });", "3\n", "B11: assign in let");
-    ok &= runProgram("print(sin(0));", "0\n", "B10: sin builtin");
-    ok &= runProgram("for (i in range(0, 3)) print(i);", "0\n1\n2\n", "A3/B10: range + for");
+    ok &= runProgram("print(with (1 as a) a);", "1\n", "B7: with binds alias");
+    ok &= runProgram("print(with (Null as x) x else 42);", "42\n", "B7: with null else");
+    ok &= runProgram("with (1 as a) print(a);", "1\n", "B7: with stmt body");
 
     return ok ? 0 : 1;
 }

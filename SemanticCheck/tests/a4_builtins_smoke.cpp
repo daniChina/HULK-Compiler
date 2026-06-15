@@ -43,6 +43,12 @@ bool expect_table_builtins() {
     } else {
         std::cout << "[OK] SymbolTable: print/sin registrados como builtin\n";
     }
+    if (!table.isBuiltinFunction("range")) {
+        std::cerr << "[FAIL] SymbolTable no marca range como builtin\n";
+        ok = false;
+    } else {
+        std::cout << "[OK] SymbolTable: range registrado como builtin\n";
+    }
     if (!table.lookupVariable("PI") || !table.lookupFunction("print", 1)) {
         std::cerr << "[FAIL] lookupVariable/lookupFunction no resuelven builtins\n";
         ok = false;
@@ -93,5 +99,6 @@ int main() {
     ok &= expect_error("A4 let PI", "let PI = 1 in print(PI);");
     ok &= expect_error("A4 redeclare sin", "function sin(x) => x;\nprint(sin(1));");
     ok &= expect_ok("A4 use builtins via lookup", "print(PI);\nprint(sin(1));");
+    ok &= expect_ok("A4 range builtin", "for (i in range(0, 2)) print(i);");
     return ok ? 0 : 1;
 }

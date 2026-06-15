@@ -77,11 +77,12 @@ int main() {
     ok &= expect_error("R3 same arity overload",
                        "function suma(a, b) => a + b;\nfunction suma(x, y) => x + y;\nprint(suma(1, 2));",
                        ErrorType::REDEFINED_FUNCTION);
-    ok &= expect_error("R4 forward reference",
-                       "let r = f(1) in print(r);\nfunction f(n) => n;",
-                       ErrorType::UNDEFINED_FUNCTION);
-    ok &= expect_error("R4 call before decl", "print(f(1));\nfunction f(x) => x;",
-                       ErrorType::UNDEFINED_FUNCTION);
+    ok &= expect_ok("R4 forward reference in let",
+                    "let r = f(1) in print(r);\nfunction f(n) => n;");
+    ok &= expect_ok("R4 mutual forward ( collectFunctions)",
+                    "function a() => b();\nfunction b() => 1;\nprint(a());");
+    ok &= expect_ok("R4 call before textual decl",
+                    "print(h(1));\nfunction h(x) => x;");
 
     ok &= expect_ok("R3 distinct arity overload",
                     "function suma(a, b) => a + b;\nfunction suma(a, b, c) => a + b + c;\n"

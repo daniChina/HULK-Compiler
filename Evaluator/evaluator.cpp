@@ -139,7 +139,7 @@ void Evaluator::visit(parser::BoolExpr* expr) {
 
 void Evaluator::visit(parser::NullExpr* expr) {
     (void)expr;
-    current_ = value::Value(0.0);
+    current_ = value::Value::null();
 }
 
 void Evaluator::visit(parser::IdentifierExpr* expr) {
@@ -420,7 +420,42 @@ void Evaluator::visit(parser::BlockExpr* expr) {
 }
 
 void Evaluator::visit(parser::GetAttrExpr* expr) { (void)expr; setError("atributo no implementado"); }
-void Evaluator::visit(parser::WhileExpr* expr) { (void)expr; setError("while no implementado"); }
+void Evaluator::visit(parser::WhileExpr* expr) {
+    value::Value result(0.0);
+    bool ran_body = false;
+
+    while (!had_error_) {
+        visitExpr(expr->condition.get());
+        if (had_error_) {
+            return;
+        }
+        if (!current_.isBool()) {
+            setError("La condición de 'while' debe ser booleana");
+            return;
+        }
+        if (!current_.asBool()) {
+            break;
+        }
+
+        visitExpr(expr->body.get());
+        if (had_error_) {
+            return;
+        }
+        result = current_;
+        ran_body = true;
+    }
+
+    if (expr->else_branch) {
+        visitExpr(expr->else_branch.get());
+        return;
+    }
+
+    if (ran_body) {
+        current_ = result;
+    } else {
+        current_ = value::Value(0.0);
+    }
+}
 void Evaluator::visit(parser::ForExpr* expr) {
     visitExpr(expr->iterable.get());
     if (had_error_) {
@@ -449,7 +484,29 @@ void Evaluator::visit(parser::ForExpr* expr) {
         }
     }
 }
-void Evaluator::visit(parser::WithExpr* expr) { (void)expr; setError("with no implementado"); }
+void Evaluator::visit(parser::WithExpr* expr) {
+    visitExpr(expr->value.get());
+    if (had_error_) {
+        return;
+    }
+
+    if (current_.isNull()) {
+        if (expr->else_branch) {
+            visitExpr(expr->else_branch.get());
+        } else {
+            current_ = value::Value::null();
+        }
+        return;
+    }
+
+    const value::Value bound = current_;
+    auto frame = std::make_shared<EnvFrame>(global_);
+    frame->define(expr->alias.lexeme, bound);
+    const auto saved = global_;
+    global_ = frame;
+    visitExpr(expr->body.get());
+    global_ = saved;
+}
 void Evaluator::visit(parser::CaseExpr* expr) { (void)expr; setError("case no implementado"); }
 void Evaluator::visit(parser::IsExpr* expr) { (void)expr; setError("is no implementado"); }
 void Evaluator::visit(parser::AsExpr* expr) { (void)expr; setError("as no implementado"); }
@@ -476,8 +533,75 @@ void Evaluator::visit(parser::NewExpr* expr) { (void)expr; setError("new no impl
 void Evaluator::visit(parser::BaseCallExpr* expr) { (void)expr; setError("base no implementado"); }
 void Evaluator::visit(parser::SetAttrExpr* expr) { (void)expr; setError("set attr no implementado"); }
 void Evaluator::visit(parser::MethodCallExpr* expr) { (void)expr; setError("método no implementado"); }
-void Evaluator::visit(parser::UnlessExpr* expr) { (void)expr; setError("unless no implementado"); }
-void Evaluator::visit(parser::RepeatExpr* expr) { (void)expr; setError("repeat no implementado"); }
-void Evaluator::visit(parser::LoopWhileExpr* expr) { (void)expr; setError("loop no implementado"); }
+void Evaluator::visit(parser::UnlessExpr* expr) {
+    visitExpr(expr->condition.get());
+    if (had_error_) {
+        return;
+    }
+    if (!current_.isBool()) {
+        setError("La condición de 'unless' debe ser booleana");
+        return;
+    }
+
+    if (!current_.asBool()) {
+        visitExpr(expr->then_branch.get());
+    } else if (expr->else_branch) {
+        visitExpr(expr->else_branch.get());
+    } else {
+        current_ = value::Value(0.0);
+    }
+}
+
+void Evaluator::visit(parser::RepeatExpr* expr) {
+    visitExpr(expr->count.get());
+    if (had_error_) {
+        return;
+    }
+    if (!current_.isNumber()) {
+        setError("La cantidad de 'repeat' debe ser un número");
+        return;
+    }
+
+    const int times = static_cast<int>(current_.asNumber());
+    value::Value result(0.0);
+    for (int i = 0; i < times && !had_error_; ++i) {
+        visitExpr(expr->body.get());
+        if (had_error_) {
+            return;
+        }
+        result = current_;
+    }
+    current_ = result;
+}
+
+void Evaluator::visit(parser::LoopWhileExpr* expr) {
+    visitExpr(expr->body.get());
+    if (had_error_) {
+        return;
+    }
+    value::Value result = current_;
+
+    while (!had_error_) {
+        visitExpr(expr->condition.get());
+        if (had_error_) {
+            return;
+        }
+        if (!current_.isBool()) {
+            setError("La condición de 'loop-while' debe ser booleana");
+            return;
+        }
+        if (!current_.asBool()) {
+            break;
+        }
+
+        visitExpr(expr->body.get());
+        if (had_error_) {
+            return;
+        }
+        result = current_;
+    }
+
+    current_ = result;
+}
 
 }  // namespace eval

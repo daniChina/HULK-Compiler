@@ -1,0 +1,1 @@
+print(with (1 as a) a);

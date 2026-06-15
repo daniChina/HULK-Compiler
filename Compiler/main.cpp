@@ -14,6 +14,7 @@
 #include "../Parser/generator/ll1_table.hpp"
 #include "../Parser/syntax/ll1_parser.hpp"
 #include "../SemanticCheck/phase2_checker.hpp"
+#include "../Evaluator/evaluator.hpp"
 
 namespace {
 
@@ -23,12 +24,14 @@ struct Options {
     bool print_ast = false;
     bool print_symbols = false;
     bool run_semantic = false;
+    bool run_interpret = false;
     std::string input_path;
 };
 
 void print_usage(const char* program_name) {
     std::cerr
-        << "Uso: " << program_name << " [--tokens] [--cst] [--ast] [--symbols] [--semantic] [archivo.hulk]\n"
+        << "Uso: " << program_name
+        << " [--tokens] [--cst] [--ast] [--symbols] [--semantic] [--interpret] [archivo.hulk]\n"
         << "  Si no se pasa archivo, lee desde stdin.\n";
 }
 
@@ -57,6 +60,10 @@ Options parse_options(int argc, char* argv[]) {
         }
         if (arg == "--semantic") {
             options.run_semantic = true;
+            continue;
+        }
+        if (arg == "--interpret") {
+            options.run_interpret = true;
             continue;
         }
         if (arg == "--help" || arg == "-h") {
@@ -116,7 +123,11 @@ int main(int argc, char* argv[]) {
         parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
         auto parse_result = parser.parse();
 
-        std::cout << "Parse OK\n";
+        const bool quiet_pipeline = options.run_interpret;
+
+        if (!quiet_pipeline) {
+            std::cout << "Parse OK\n";
+        }
 
         if (options.print_cst && parse_result.cst_root) {
             std::cout << "== CST ==\n";
@@ -150,7 +161,18 @@ int main(int argc, char* argv[]) {
                     analyzer.printErrors();
                     return 1;
                 }
-                std::cout << "Semantic OK\n";
+                if (!quiet_pipeline) {
+                    std::cout << "Semantic OK\n";
+                }
+            }
+
+            if (options.run_interpret) {
+                eval::Evaluator evaluator;
+                evaluator.evaluate(ast.get());
+                if (evaluator.hadError()) {
+                    std::cerr << evaluator.lastError() << "\n";
+                    return 1;
+                }
             }
         }
 

@@ -59,7 +59,7 @@ int main() {
         "B8: forward reference via dual pass");
 
     ok &= runProgram(
-        "function fact(n) => if n <= 1 then 1 else n * fact(n - 1); print(fact(5));",
+        "function fact(n) => if (n <= 1) 1 else n * fact(n - 1); print(fact(5));",
         "120\n",
         "B9: recursion");
 

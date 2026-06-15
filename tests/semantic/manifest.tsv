@@ -13,9 +13,6 @@ invalid/12_r3_method_duplicate_params.hulk	semantic	ya est
 invalid/13_r3_overload_same_arity.hulk	semantic	ya est
 invalid/14_r4_undefined_call.hulk	semantic	no est
 invalid/15_r4_typo_undefined_function.hulk	semantic	prnt
-invalid/16_r4_forward_reference_in_program.hulk	semantic	no est
-invalid/17_r4_mutual_forward.hulk	semantic	no est
-invalid/18_r4_call_before_any_function_decl.hulk	semantic	no est
 invalid/19_block_multi_let_without_in.hulk	parse	BindingTail
 invalid/20_block_stmt_alone.hulk	parse	no puede ser una sentencia
 invalid/21_a4_redefine_e.hulk	semantic	ya est

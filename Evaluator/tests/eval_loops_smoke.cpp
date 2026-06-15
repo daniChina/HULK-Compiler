@@ -49,13 +49,12 @@ bool runProgram(const std::string& source, const std::string& expected_stdout, c
 int main() {
     bool ok = true;
 
-    ok &= runProgram("print(7 % 3);", "1\n", "B4: modulo");
-    ok &= runProgram("print(2 ^ 3);", "8\n", "B4: power");
-    ok &= runProgram("print(true and false);", "false\n", "B4: logical and");
-    ok &= runProgram("print(true or false);", "true\n", "B4: logical or");
-    ok &= runProgram("print(let x = 0 in { x := 3; x; });", "3\n", "B11: assign in let");
-    ok &= runProgram("print(sin(0));", "0\n", "B10: sin builtin");
-    ok &= runProgram("for (i in range(0, 3)) print(i);", "0\n1\n2\n", "A3/B10: range + for");
+    ok &= runProgram("print(if (true) 1 else 2);", "1\n", "B6: if true");
+    ok &= runProgram("print(let i = 0 in while (i < 3) { i := i + 1; });", "3\n", "B6: while counter");
+    ok &= runProgram("print(while (false) 1 else 2);", "2\n", "B6: while-else skipped body");
+    ok &= runProgram("print(unless (false) 1 else 2);", "1\n", "B6: unless false");
+    ok &= runProgram("print(let n = 0 in { repeat (3) n := n + 1; n; });", "3\n", "B6: repeat");
+    ok &= runProgram("print(loop 7 while (false));", "7\n", "B6: loop-while once");
 
     return ok ? 0 : 1;
 }

@@ -75,6 +75,7 @@ private:
     void resolveFunctionCall(const parser::Token& name_token, size_t arity, const std::string& context);
 
     void collectClassDeclarations(parser::Program* program);
+    void collectFunctionDeclarations(parser::Program* program);
     void registerClassDecl(parser::ClassDecl* stmt);
     bool isBuiltinNominalType(const std::string& name) const;
     bool validateTypeExists(const std::optional<parser::Token>& token);

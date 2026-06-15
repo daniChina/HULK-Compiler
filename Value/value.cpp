@@ -5,6 +5,9 @@
 namespace value {
 
 std::string Value::toString() const {
+    if (isNull()) {
+        return "Null";
+    }
     if (isString()) {
         return asString();
     }
@@ -31,6 +34,9 @@ std::string Value::toString() const {
 }
 
 std::string Value::getTypeName() const {
+    if (isNull()) {
+        return "Null";
+    }
     if (isString()) {
         return "String";
     }
@@ -50,7 +56,9 @@ std::string Value::getTypeName() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const Value& v) {
-    if (v.isNumber()) {
+    if (v.isNull()) {
+        os << "Null";
+    } else if (v.isNumber()) {
         os << v.asNumber();
     } else if (v.isBool()) {
         os << (v.asBool() ? "true" : "false");
