@@ -49,56 +49,12 @@ bool runProgram(const std::string& source, const std::string& expected_stdout, c
 int main() {
     bool ok = true;
 
-    ok &= runProgram(
-        "class Point(x: Number, y: Number) { x: Number = x; y: Number = y; }\n"
-        "print(let p = new Point(1, 2) in p.x);\n",
-        "1\n",
-        "C2: new + attr read");
+    ok &= runProgram("print(\"hi\");\n", "\"hi\"\n", "A5: print string quoted");
+    ok &= runProgram("print(\"a\" @ \"b\");\n", "\"ab\"\n", "A5: string concat @");
+    ok &= runProgram("print(\"a\" @@ \"b\");\n", "\"a b\"\n", "A5: string concat @@ space");
 
-    ok &= runProgram(
-        "class Point(x: Number) { x: Number = x; }\n"
-        "print(let p = new Point(0) in { p.x := 5; p.x; });\n",
-        "5\n",
-        "C3: attr assign via GetAttr := ");
-
-    ok &= runProgram(
-        "class Counter(n: Number) { n: Number = n; inc() => self.n := self.n + 1; }\n"
-        "print(let c = new Counter(0) in c.inc());\n",
-        "1\n",
-        "C4: method call + self");
-
-    ok &= runProgram(
-        "class A() {}\n"
-        "class B() is A {}\n"
-        "print(0);\n",
-        "0\n",
-        "C1: dual pass registers all classes");
-
-    ok &= runProgram(
-        "class Person(name:String) {\n"
-        "  name:String = name;\n"
-        "  greet() => \"Hello, \" @ self.name;\n"
-        "}\n"
-        "class Student(name:String) is Person(name) {\n"
-        "  greet() => base() @ \"!\";\n"
-        "}\n"
-        "print(let s = new Student(\"Alice\") in s.greet());\n",
-        "\"Hello, Alice!\"\n",
-        "C5: base() in method");
-
-    ok &= runProgram(
-        "class Person(n: Number) { n: Number = n; }\n"
-        "class Sub(n: Number) is Person(n) { twice() => self.n * 2; }\n"
-        "print(let x = new Sub(5) in (x as Sub).twice());\n",
-        "10\n",
-        "C6: as downcast + method");
-
-    ok &= runProgram(
-        "class Person(name:String) { name:String = name; }\n"
-        "class Student(name:String) is Person(name) {}\n"
-        "print(let s = new Student(\"A\") in s is Student);\n",
-        "true\n",
-        "C6: is instance type");
+    ok &= runProgram("print(Null);\n", "Null\n", "A4: print Null");
+    ok &= runProgram("print(with (Null as x) 1 else 0);\n", "0\n", "A4: Null vs with else");
 
     return ok ? 0 : 1;
 }

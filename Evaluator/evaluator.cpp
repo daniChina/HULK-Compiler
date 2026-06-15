@@ -75,6 +75,7 @@ value::Value Evaluator::evaluate(parser::Program* program) {
     functions_.clear();
     types_.clear();
     current_self_.reset();
+    current_method_name_.clear();
     current_ = value::Value(0.0);
     if (!program) {
         return current_;
@@ -207,6 +208,103 @@ value::Value Evaluator::constructInstance(parser::ClassDecl* type_def,
     return value::Value(instance);
 }
 
+std::shared_ptr<value::Instance> Evaluator::resolveInstance(parser::Expr* object_expr) {
+    if (auto* self_expr = dynamic_cast<parser::SelfExpr*>(object_expr)) {
+        (void)self_expr;
+        if (!current_self_) {
+            setError("Cannot use self outside of class methods");
+            return nullptr;
+        }
+        return current_self_;
+    }
+
+    visitExpr(object_expr);
+    if (had_error_) {
+        return nullptr;
+    }
+    if (!current_.isInstance()) {
+        setError("Cannot access attributes on non-class instance");
+        return nullptr;
+    }
+    return current_.asInstance();
+}
+
+const parser::MethodDef* Evaluator::findMethod(parser::ClassDecl* type_def,
+                                               const std::string& method_name) const {
+    if (!type_def) {
+        return nullptr;
+    }
+    for (const auto& method : type_def->methods) {
+        if (method.name.lexeme == method_name) {
+            return &method;
+        }
+    }
+    if (type_def->parent_name) {
+        auto it = types_.find(type_def->parent_name->lexeme);
+        if (it != types_.end()) {
+            return findMethod(it->second, method_name);
+        }
+    }
+    return nullptr;
+}
+
+void Evaluator::invokeMethod(const std::shared_ptr<value::Instance>& instance,
+                             const parser::MethodDef& method,
+                             const std::vector<value::Value>& args) {
+    const auto saved_global = global_;
+    const auto saved_self = current_self_;
+    const std::string saved_method = current_method_name_;
+
+    global_ = std::make_shared<EnvFrame>(instance->attrs);
+    current_self_ = instance;
+    current_method_name_ = method.name.lexeme;
+    global_->define("self", value::Value(instance));
+
+    for (std::size_t i = 0; i < method.params.size(); ++i) {
+        if (i < args.size()) {
+            global_->define(method.params[i].first.lexeme, args[i]);
+        }
+    }
+
+    visitExpr(method.body.get());
+
+    global_ = saved_global;
+    current_self_ = saved_self;
+    current_method_name_ = saved_method;
+}
+
+bool Evaluator::assignInstanceAttr(const std::shared_ptr<value::Instance>& instance,
+                                   const std::string& attr_name,
+                                   const value::Value& value) {
+    if (value::Value* slot = instance->attrs->lookup(attr_name)) {
+        *slot = value;
+        return true;
+    }
+    setError("Undefined attribute: " + attr_name);
+    return false;
+}
+
+bool Evaluator::instanceConformsTo(parser::ClassDecl* dynamic_type,
+                                   const std::string& static_type_name) const {
+    if (!dynamic_type) {
+        return false;
+    }
+    if (dynamic_type->name.lexeme == static_type_name) {
+        return true;
+    }
+    if (dynamic_type->parent_name) {
+        const std::string& parent = dynamic_type->parent_name->lexeme;
+        if (parent == "Object") {
+            return static_type_name == "Object";
+        }
+        auto it = types_.find(parent);
+        if (it != types_.end()) {
+            return instanceConformsTo(it->second, static_type_name);
+        }
+    }
+    return false;
+}
+
 void Evaluator::visit(parser::Program* stmt) {
     for (const auto& s : stmt->stmts) {
         if (auto* fn = dynamic_cast<parser::FunctionDecl*>(s.get())) {
@@ -262,7 +360,14 @@ void Evaluator::visit(parser::IdentifierExpr* expr) {
     setError("Variable '" + expr->token.lexeme + "' no está definida");
 }
 
-void Evaluator::visit(parser::SelfExpr* expr) { (void)expr; setError("self no implementado en Fase 3"); }
+void Evaluator::visit(parser::SelfExpr* expr) {
+    (void)expr;
+    if (!current_self_) {
+        setError("Cannot use self outside of class methods");
+        return;
+    }
+    current_ = value::Value(current_self_);
+}
 
 void Evaluator::visit(parser::GroupedExpr* expr) { visitExpr(expr->expression.get()); }
 
@@ -355,9 +460,9 @@ void Evaluator::visit(parser::BinaryExpr* expr) {
     } else if (op == "^" && left.isNumber() && right.isNumber()) {
         current_ = value::Value(std::pow(left.asNumber(), right.asNumber()));
     } else if (op == "@" && left.isString() && right.isString()) {
-        current_ = value::Value(left.asString() + right.asString());
+        current_ = value::Value(left.toString() + right.toString());
     } else if (op == "@@" && left.isString() && right.isString()) {
-        current_ = value::Value(left.asString() + right.asString());
+        current_ = value::Value(left.toString() + " " + right.toString());
     } else if (left.isNumber() && right.isNumber() &&
                (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "==" || op == "!=")) {
         current_ = value::Value(compareNumbers(left.asNumber(), right.asNumber(), op));
@@ -408,7 +513,7 @@ bool Evaluator::callBuiltin(const std::string& name, const std::vector<parser::E
         }
         visitExpr(args[0].get());
         if (!had_error_) {
-            out_ << current_.toString() << '\n';
+            out_ << current_ << '\n';
             current_ = value::Value(0.0);
         }
         return true;
@@ -493,6 +598,37 @@ void Evaluator::visit(parser::CallExpr* expr) {
         return;
     }
 
+    if (auto* get_attr = dynamic_cast<parser::GetAttrExpr*>(expr->callee.get())) {
+        const auto instance = resolveInstance(get_attr->object.get());
+        if (!instance || had_error_) {
+            return;
+        }
+
+        const parser::MethodDef* method = findMethod(instance->type_def, get_attr->name.lexeme);
+        if (!method) {
+            setError("Undefined method: " + get_attr->name.lexeme);
+            return;
+        }
+        if (method->params.size() != expr->args.size()) {
+            setError("El método '" + get_attr->name.lexeme + "' espera " +
+                     std::to_string(method->params.size()) + " argumento(s)");
+            return;
+        }
+
+        std::vector<value::Value> args;
+        args.reserve(expr->args.size());
+        for (const auto& arg : expr->args) {
+            visitExpr(arg.get());
+            if (had_error_) {
+                return;
+            }
+            args.push_back(current_);
+        }
+
+        invokeMethod(instance, *method, args);
+        return;
+    }
+
     setError("Llamada no implementada en Fase 3");
 }
 
@@ -532,31 +668,10 @@ void Evaluator::visit(parser::BlockExpr* expr) {
 }
 
 void Evaluator::visit(parser::GetAttrExpr* expr) {
-    visitExpr(expr->object.get());
-    if (had_error_) {
+    const auto instance = resolveInstance(expr->object.get());
+    if (!instance || had_error_) {
         return;
     }
-
-    if (auto* self_expr = dynamic_cast<parser::SelfExpr*>(expr->object.get())) {
-        (void)self_expr;
-        if (!current_self_) {
-            setError("Cannot use self outside of class methods");
-            return;
-        }
-        if (value::Value* slot = current_self_->attrs->lookup(expr->name.lexeme)) {
-            current_ = *slot;
-            return;
-        }
-        setError("Undefined attribute: " + expr->name.lexeme);
-        return;
-    }
-
-    if (!current_.isInstance()) {
-        setError("Cannot access attributes on non-class instance");
-        return;
-    }
-
-    auto instance = current_.asInstance();
     if (value::Value* slot = instance->attrs->lookup(expr->name.lexeme)) {
         current_ = *slot;
         return;
@@ -651,8 +766,74 @@ void Evaluator::visit(parser::WithExpr* expr) {
     global_ = saved;
 }
 void Evaluator::visit(parser::CaseExpr* expr) { (void)expr; setError("case no implementado"); }
-void Evaluator::visit(parser::IsExpr* expr) { (void)expr; setError("is no implementado"); }
-void Evaluator::visit(parser::AsExpr* expr) { (void)expr; setError("as no implementado"); }
+void Evaluator::visit(parser::IsExpr* expr) {
+    visitExpr(expr->object.get());
+    if (had_error_) {
+        return;
+    }
+    const value::Value left = current_;
+    const std::string& target = expr->type_name.lexeme;
+
+    if (!left.isInstance()) {
+        if (target == "Null" && left.isNull()) {
+            current_ = value::Value(true);
+        } else if (target == "Number" && left.isNumber()) {
+            current_ = value::Value(true);
+        } else if (target == "String" && left.isString()) {
+            current_ = value::Value(true);
+        } else if (target == "Boolean" && left.isBool()) {
+            current_ = value::Value(true);
+        } else {
+            current_ = value::Value(false);
+        }
+        return;
+    }
+
+    const auto instance = left.asInstance();
+    if (!instance || !instance->type_def) {
+        current_ = value::Value(false);
+        return;
+    }
+
+    current_ = value::Value(instanceConformsTo(instance->type_def, target));
+}
+
+void Evaluator::visit(parser::AsExpr* expr) {
+    visitExpr(expr->object.get());
+    if (had_error_) {
+        return;
+    }
+    const value::Value left = current_;
+    const std::string& target = expr->type_name.lexeme;
+
+    if (!left.isInstance()) {
+        if (target == "Null" && left.isNull()) {
+            current_ = left;
+        } else if (target == "Number" && left.isNumber()) {
+            current_ = left;
+        } else if (target == "String" && left.isString()) {
+            current_ = left;
+        } else if (target == "Boolean" && left.isBool()) {
+            current_ = left;
+        } else {
+            setError("No se puede convertir de " + left.getTypeName() + " a " + target);
+        }
+        return;
+    }
+
+    const auto instance = left.asInstance();
+    if (!instance || !instance->type_def) {
+        setError("No se puede convertir instancia nula a " + target);
+        return;
+    }
+
+    if (!instanceConformsTo(instance->type_def, target)) {
+        setError("No se puede convertir de " + instance->type_def->name.lexeme + " a " + target);
+        return;
+    }
+
+    current_ = left;
+}
 void Evaluator::visit(parser::AssignExpr* expr) {
     visitExpr(expr->rhs.get());
     if (had_error_) {
@@ -670,6 +851,17 @@ void Evaluator::visit(parser::AssignExpr* expr) {
         return;
     }
 
+    if (auto* get_attr = dynamic_cast<parser::GetAttrExpr*>(expr->lhs.get())) {
+        const auto instance = resolveInstance(get_attr->object.get());
+        if (!instance || had_error_) {
+            return;
+        }
+        if (assignInstanceAttr(instance, get_attr->name.lexeme, rhs)) {
+            current_ = rhs;
+        }
+        return;
+    }
+
     setError("Asignación no soportada para este destino");
 }
 void Evaluator::visit(parser::NewExpr* expr) {
@@ -682,9 +874,106 @@ void Evaluator::visit(parser::NewExpr* expr) {
 
     current_ = constructInstance(it->second, expr->args);
 }
-void Evaluator::visit(parser::BaseCallExpr* expr) { (void)expr; setError("base no implementado"); }
-void Evaluator::visit(parser::SetAttrExpr* expr) { (void)expr; setError("set attr no implementado"); }
-void Evaluator::visit(parser::MethodCallExpr* expr) { (void)expr; setError("método no implementado"); }
+void Evaluator::visit(parser::BaseCallExpr* expr) {
+    if (!current_self_) {
+        setError("base() fuera de contexto de método");
+        return;
+    }
+    if (current_method_name_.empty()) {
+        setError("base() fuera de contexto de método");
+        return;
+    }
+
+    parser::ClassDecl* type_def = current_self_->type_def;
+    if (!type_def || !type_def->parent_name) {
+        setError("base(): método base no encontrado");
+        return;
+    }
+
+    const std::string& parent_name = type_def->parent_name->lexeme;
+    if (parent_name == "Object") {
+        setError("base(): método base no encontrado");
+        return;
+    }
+
+    auto parent_it = types_.find(parent_name);
+    if (parent_it == types_.end()) {
+        setError("base(): método base no encontrado");
+        return;
+    }
+
+    const parser::MethodDef* method = findMethod(parent_it->second, current_method_name_);
+    if (!method) {
+        setError("base(): método base no encontrado");
+        return;
+    }
+
+    const auto saved_global = global_;
+    const auto saved_self = current_self_;
+
+    global_ = std::make_shared<EnvFrame>(current_self_->attrs);
+    global_->define("self", value::Value(current_self_));
+
+    for (const auto& param : method->params) {
+        const std::string& param_name = param.first.lexeme;
+        if (global_->bindings.find(param_name) != global_->bindings.end()) {
+            continue;
+        }
+        if (value::Value* slot = saved_global->lookup(param_name)) {
+            global_->define(param_name, *slot);
+        }
+    }
+
+    visitExpr(method->body.get());
+
+    global_ = saved_global;
+    current_self_ = saved_self;
+}
+void Evaluator::visit(parser::SetAttrExpr* expr) {
+    const auto instance = resolveInstance(expr->object.get());
+    if (!instance || had_error_) {
+        return;
+    }
+
+    visitExpr(expr->value.get());
+    if (had_error_) {
+        return;
+    }
+
+    if (assignInstanceAttr(instance, expr->attr_name.lexeme, current_)) {
+        // current_ already holds assigned value
+    }
+}
+
+void Evaluator::visit(parser::MethodCallExpr* expr) {
+    const auto instance = resolveInstance(expr->object.get());
+    if (!instance || had_error_) {
+        return;
+    }
+
+    const parser::MethodDef* method = findMethod(instance->type_def, expr->method_name.lexeme);
+    if (!method) {
+        setError("Undefined method: " + expr->method_name.lexeme);
+        return;
+    }
+    if (method->params.size() != expr->args.size()) {
+        setError("El método '" + expr->method_name.lexeme + "' espera " +
+                 std::to_string(method->params.size()) + " argumento(s)");
+        return;
+    }
+
+    std::vector<value::Value> args;
+    args.reserve(expr->args.size());
+    for (const auto& arg : expr->args) {
+        visitExpr(arg.get());
+        if (had_error_) {
+            return;
+        }
+        args.push_back(current_);
+    }
+
+    invokeMethod(instance, *method, args);
+}
 void Evaluator::visit(parser::UnlessExpr* expr) {
     visitExpr(expr->condition.get());
     if (had_error_) {

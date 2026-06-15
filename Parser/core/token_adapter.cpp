@@ -77,9 +77,13 @@ TokenType from_lexer_token(::TokenType lexer_type) {
 }
 
 Token make_token(const HulkLexer& lexer, ::TokenType lexer_type) {
+    std::string lexeme = lexer.lexeme();
+    if (lexer_type == ::TokenType::STRING_LITERAL) {
+        lexeme = lexer.sem.str_val;
+    }
     return Token{
         from_lexer_token(lexer_type),
-        lexer.lexeme(),
+        std::move(lexeme),
         lexer.token_line(),
         lexer.token_col()
     };

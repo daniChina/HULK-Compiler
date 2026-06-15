@@ -1,0 +1,3 @@
+print(Null);
+print(0);
+print(with (Null as x) 1 else 0);

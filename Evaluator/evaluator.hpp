@@ -64,6 +64,7 @@ private:
     std::map<std::string, FunctionOverloadMap> functions_;
     std::map<std::string, parser::ClassDecl*> types_;
     std::shared_ptr<value::Instance> current_self_;
+    std::string current_method_name_;
     value::Value current_{0.0};
     bool had_error_ = false;
     std::string last_error_;
@@ -78,6 +79,13 @@ private:
     value::Value constructInstance(parser::ClassDecl* type_def, const std::vector<parser::ExprPtr>& args);
     void initializeParentAttributes(value::Instance& instance, parser::ClassDecl* type_def);
     void initializeAttributes(value::Instance& instance, parser::ClassDecl* type_def);
+    std::shared_ptr<value::Instance> resolveInstance(parser::Expr* object_expr);
+    const parser::MethodDef* findMethod(parser::ClassDecl* type_def, const std::string& method_name) const;
+    void invokeMethod(const std::shared_ptr<value::Instance>& instance, const parser::MethodDef& method,
+                      const std::vector<value::Value>& args);
+    bool assignInstanceAttr(const std::shared_ptr<value::Instance>& instance, const std::string& attr_name,
+                            const value::Value& value);
+    bool instanceConformsTo(parser::ClassDecl* dynamic_type, const std::string& static_type_name) const;
     void invokeUserFunction(const UserFunction& fn, const std::vector<parser::ExprPtr>& args);
     bool callBuiltin(const std::string& name, const std::vector<parser::ExprPtr>& args);
 };
