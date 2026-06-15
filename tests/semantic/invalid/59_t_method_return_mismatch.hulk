@@ -1,0 +1,7 @@
+class Parent() {
+    greet() => "hello";
+}
+class Child() is Parent() {
+    greet() => 1;
+}
+print(0);

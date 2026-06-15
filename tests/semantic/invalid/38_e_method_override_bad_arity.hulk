@@ -1,0 +1,7 @@
+class Parent() {
+    greet() => "hello";
+}
+class Child() is Parent() {
+    greet(name:String) => "hello " @ name;
+}
+print(0);

@@ -1,0 +1,3 @@
+class Person(name:String) {}
+class Student(name:Number) is Person(name) {}
+print(0);

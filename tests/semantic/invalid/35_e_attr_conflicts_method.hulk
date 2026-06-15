@@ -1,0 +1,5 @@
+class Point(x:Number) {
+    x:Number = x;
+    x() => 1;
+}
+print(0);

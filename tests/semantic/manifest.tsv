@@ -21,7 +21,7 @@ invalid/20_block_stmt_alone.hulk	parse	no puede ser una sentencia
 invalid/21_a4_redefine_e.hulk	semantic	ya est
 invalid/22_a4_redefine_builtin_sin.hulk	semantic	ya est
 invalid/23_r2_assign_without_let.hulk	semantic	no est
-invalid/24_r4_print_wrong_arity.hulk	semantic	no acepta
+invalid/24_r4_print_wrong_arity.hulk	semantic	acepta
 invalid/30_e_child_before_parent.hulk	semantic	no est
 invalid/31_e_undefined_type_new.hulk	semantic	no est
 invalid/32_e_redefined_class.hulk	semantic	ya est
@@ -31,3 +31,26 @@ invalid/42_e_inherit_primitive.hulk	semantic	heredar
 invalid/43_e_base_ghost.hulk	semantic	no est
 invalid/44_e_base_args_arity.hulk	semantic	espera
 invalid/34_e_attr_init_type_error.hulk	semantic	conforma
+invalid/35_e_attr_conflicts_method.hulk	semantic	redefinido
+invalid/36_e_undefined_attribute.hulk	semantic	no definido
+invalid/37_e_undefined_method.hulk	semantic	no definido
+invalid/38_e_method_override_bad_arity.hulk	semantic	redefinido
+invalid/39_e_self_outside_method.hulk	semantic	miembro
+invalid/40_e_self_assign.hulk	semantic	self
+invalid/41_e_base_outside_method.hulk	semantic	Llamada
+invalid/45_e_base_args_type.hulk	semantic	Error de tipos
+invalid/47_e_as_undefined_type.hulk	semantic	no definido
+invalid/48_e_as_type_error.hulk	semantic	Error de tipos
+invalid/50_t_add_number_string.hulk	semantic	Error de tipos
+invalid/51_t_concat_bad_operand.hulk	semantic	Error de tipos
+invalid/52_t_if_non_boolean.hulk	semantic	Error de tipos
+invalid/53_t_while_non_boolean.hulk	semantic	Error de tipos
+invalid/54_t_unless_non_boolean.hulk	semantic	Error de tipos
+invalid/55_t_let_init_mismatch.hulk	semantic	Error de tipos
+invalid/56_t_let_undefined_type.hulk	semantic	no definido
+invalid/57_t_function_body_mismatch.hulk	semantic	Error de tipos
+invalid/58_t_call_arg_type.hulk	semantic	Error de tipos
+invalid/59_t_method_return_mismatch.hulk	semantic	Error de tipos
+invalid/60_t_new_arg_type.hulk	semantic	Error de tipos
+invalid/61_g_repeat_non_string.hulk	semantic	Error de tipos
+

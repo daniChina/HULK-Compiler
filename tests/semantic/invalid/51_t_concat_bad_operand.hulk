@@ -1,0 +1,4 @@
+class A() {}
+let a = new A() in {
+    let s = "hello" @ a in print(s);
+};

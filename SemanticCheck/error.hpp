@@ -56,7 +56,7 @@ struct SemanticError
             result += " (" + source + ")";
         }
 
-        result += ": " + message;
+        result += ": " + getTypeString() + ": " + message;
 
         if (!context.empty())
         {

@@ -1,0 +1,5 @@
+class Point(x:Number) {
+    x:Number = x;
+    bad() => self := new Point(1.0);
+}
+print(0);

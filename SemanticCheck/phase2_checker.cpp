@@ -80,12 +80,15 @@ void Phase2Analyzer::registerFunctionDecl(parser::FunctionDecl* stmt) {
 
     std::vector<TypeInfo> param_types;
     param_types.reserve(stmt->params.size());
-    for (size_t i = 0; i < stmt->params.size(); ++i) {
-        param_types.push_back(TypeInfo(TypeInfo::Kind::Unknown));
+    for (const auto& p : stmt->params) {
+        validateTypeExists(p.second);
+        param_types.push_back(resolveType(p.second));
     }
+    validateTypeExists(stmt->return_type);
+    TypeInfo ret_type = resolveType(stmt->return_type);
 
     if (!symbol_table_.declareFunction(stmt->name.lexeme, param_types,
-                                       TypeInfo(TypeInfo::Kind::Unknown), stmt->name.line)) {
+                                       ret_type, stmt->name.line)) {
         report(ErrorType::REDEFINED_FUNCTION,
                "Función '" + stmt->name.lexeme + "' ya está definida", stmt->name.line,
                stmt->name.col, "declaración de función");
@@ -107,15 +110,44 @@ void Phase2Analyzer::visit(parser::FunctionDecl* stmt) {
 
     symbol_table_.enterScope();
     for (const auto& param : stmt->params) {
-        symbol_table_.declareVariable(param.first.lexeme, TypeInfo(TypeInfo::Kind::Unknown));
+        validateTypeExists(param.second);
+        symbol_table_.declareVariable(param.first.lexeme, resolveType(param.second));
     }
     visitExpr(stmt->body.get());
+    TypeInfo body_type = current_type_;
     symbol_table_.exitScope();
+
+    if (stmt->return_type.has_value()) {
+        validateTypeExists(stmt->return_type);
+        TypeInfo ret_type = resolveType(stmt->return_type);
+        if (!body_type.conformsTo(ret_type)) {
+            report(ErrorType::TYPE_ERROR,
+                   "El tipo de retorno de la función '" + body_type.toString() +
+                       "' no conforma al tipo de retorno declarado '" + ret_type.toString() + "'",
+                   stmt->name.line, stmt->name.col, "declaración de función");
+        }
+    } else {
+        auto func = symbol_table_.lookupFunction(stmt->name.lexeme, stmt->params.size());
+        if (func && func->return_type.getKind() == TypeInfo::Kind::Unknown) {
+            func->return_type = body_type;
+        }
+    }
 }
 
 bool Phase2Analyzer::isBuiltinNominalType(const std::string& name) const {
     return name == "Object" || name == "Number" || name == "String" || name == "Boolean" ||
            name == "Null" || name == "Void" || name == "Unknown";
+}
+
+bool Phase2Analyzer::validateTypeExists(const std::optional<parser::Token>& token) {
+    if (!token.has_value()) return true;
+    const std::string& name = token->lexeme;
+    if (isBuiltinNominalType(name)) return true;
+    if (!symbol_table_.isTypeDeclared(name)) {
+        report(ErrorType::UNDEFINED_TYPE, "Tipo '" + name + "' no está definido", token->line, token->col, "anotación de tipo");
+        return false;
+    }
+    return true;
 }
 
 void Phase2Analyzer::collectClassDeclarations(parser::Program* program) {
@@ -152,13 +184,18 @@ void Phase2Analyzer::registerClassDecl(parser::ClassDecl* stmt) {
     symbol_table_.storeTypeDeclaration(name, stmt);
 
     // Register methods and attributes in type symbol
+    for (const auto& param : stmt->params) {
+        validateTypeExists(param.second);
+    }
     for (const auto& attr : stmt->attributes) {
+        validateTypeExists(attr.declared_type);
         TypeInfo attr_type = resolveType(attr.declared_type);
         symbol_table_.addTypeAttribute(name, attr.name.lexeme, attr_type, attr.name.line);
     }
     for (const auto& method : stmt->methods) {
         std::vector<TypeInfo> method_params;
         for (const auto& p : method.params) {
+            validateTypeExists(p.second);
             method_params.push_back(resolveType(p.second));
         }
         symbol_table_.addTypeMethod(name, method.name.lexeme, method_params, TypeInfo(TypeInfo::Kind::Unknown), method.name.line);
@@ -194,9 +231,30 @@ TypeInfo Phase2Analyzer::resolveType(const std::optional<parser::Token>& token) 
 }
 
 void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
+    std::string base = stmt->parent_name ? stmt->parent_name->lexeme : "Object";
     for (const auto& method : stmt->methods) {
         checkUniqueParamNames(method.params, method.name.line, method.name.col,
                                "declaración de método");
+        if (base != "Object") {
+            auto base_method = symbol_table_.lookupMethod(base, method.name.lexeme);
+            if (base_method) {
+                bool match = (method.params.size() == base_method->parameter_types.size());
+                if (match) {
+                    for (size_t i = 0; i < method.params.size(); ++i) {
+                        TypeInfo param_type = resolveType(method.params[i].second);
+                        if (!param_type.conformsTo(base_method->parameter_types[i])) {
+                            match = false;
+                            break;
+                        }
+                    }
+                }
+                if (!match) {
+                    report(ErrorType::REDEFINED_METHOD,
+                           "El método '" + method.name.lexeme + "' ya existe en el tipo base '" + base + "' con una firma diferente",
+                           method.name.line, method.name.col, "declaración de método");
+                }
+            }
+        }
     }
 
     const std::string& class_name = stmt->name.lexeme;
@@ -224,6 +282,14 @@ void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
                     }
                     for (size_t i = 0; i < base_args_count; ++i) {
                         visitExpr(stmt->parent_args[i].get());
+                        TypeInfo arg_type = current_type_;
+                        TypeInfo expected_param_type = resolveType(base_class_decl->params[i].second);
+                        if (!arg_type.conformsTo(expected_param_type)) {
+                            report(ErrorType::TYPE_ERROR,
+                                   "El argumento " + std::to_string(i + 1) + " del constructor base tiene tipo '" + arg_type.toString() +
+                                       "' pero se esperaba '" + expected_param_type.toString() + "'",
+                                   stmt->parent_name->line, stmt->parent_name->col, "declaración de clase");
+                        }
                     }
                     symbol_table_.exitScope();
                 }
@@ -274,6 +340,50 @@ void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
     }
 
     symbol_table_.exitScope();
+
+    // Analyze method bodies
+    for (const auto& method : stmt->methods) {
+        symbol_table_.enterScope();
+        
+        // Declare self
+        symbol_table_.declareVariable("self", TypeInfo(TypeInfo::Kind::Object, class_name), false);
+        
+        // Declare method parameters
+        for (const auto& param : method.params) {
+            validateTypeExists(param.second);
+            TypeInfo p_type = resolveType(param.second);
+            symbol_table_.declareVariable(param.first.lexeme, p_type);
+        }
+        
+        // Analyze method body
+        visitExpr(method.body.get());
+        TypeInfo body_type = current_type_;
+        
+        symbol_table_.exitScope();
+        
+        // Update method return type in symbol table if it was previously Unknown
+        auto type_sym = symbol_table_.lookupType(class_name);
+        if (type_sym) {
+            auto method_sym = type_sym->methods[method.name.lexeme];
+            if (method_sym && method_sym->return_type.getKind() == TypeInfo::Kind::Unknown) {
+                method_sym->return_type = body_type;
+            }
+        }
+        
+        // Validate override conformance
+        if (base != "Object") {
+            auto base_method = symbol_table_.lookupMethod(base, method.name.lexeme);
+            if (base_method) {
+                if (!body_type.conformsTo(base_method->return_type)) {
+                    report(ErrorType::TYPE_ERROR,
+                           "El tipo de retorno del método '" + method.name.lexeme + "' ('" + body_type.toString() +
+                               "') no conforma al tipo de retorno del método base '" + base + "': '" + base_method->return_type.toString() + "'",
+                           method.name.line, method.name.col, "declaración de método");
+                }
+            }
+        }
+    }
+
     current_class_ = old_class;
 }
 
@@ -319,7 +429,18 @@ void Phase2Analyzer::visit(parser::GroupedExpr* expr) {
 
 void Phase2Analyzer::visit(parser::UnaryExpr* expr) {
     visitExpr(expr->right.get());
-    current_type_ = TypeInfo::inferUnaryOp(expr->op.lexeme, current_type_);
+    TypeInfo operand_type = current_type_;
+    const std::string& op = expr->op.lexeme;
+    if (op == "-") {
+        if (!operand_type.isNumeric() && !operand_type.isUnknown()) {
+            report(ErrorType::TYPE_ERROR, "Operación unaria '-' inválida para el tipo '" + operand_type.toString() + "'", expr->op.line, expr->op.col, "expresión unaria");
+        }
+    } else if (op == "!" || op == "not") {
+        if (!operand_type.isBoolean() && !operand_type.isUnknown()) {
+            report(ErrorType::TYPE_ERROR, "Operación unaria '!' inválida para el tipo '" + operand_type.toString() + "'", expr->op.line, expr->op.col, "expresión unaria");
+        }
+    }
+    current_type_ = TypeInfo::inferUnaryOp(op, operand_type);
 }
 
 void Phase2Analyzer::visit(parser::BinaryExpr* expr) {
@@ -327,24 +448,95 @@ void Phase2Analyzer::visit(parser::BinaryExpr* expr) {
     TypeInfo left_type = current_type_;
     visitExpr(expr->right.get());
     TypeInfo right_type = current_type_;
-    current_type_ = TypeInfo::inferBinaryOp(expr->op.lexeme, left_type, right_type);
+
+    const std::string& op = expr->op.lexeme;
+    if (op == "+" || op == "-" || op == "*" || op == "/" || op == "%" || op == "^") {
+        if (!(left_type.isNumeric() || left_type.isUnknown()) || !(right_type.isNumeric() || right_type.isUnknown())) {
+            report(ErrorType::TYPE_ERROR, "Operación aritmética inválida entre '" + left_type.toString() + "' y '" + right_type.toString() + "'", expr->op.line, expr->op.col, "expresión binaria");
+        }
+    } else if (op == "&&" || op == "||" || op == "and" || op == "or" || op == "&" || op == "|") {
+        if (!(left_type.isBoolean() || left_type.isUnknown()) || !(right_type.isBoolean() || right_type.isUnknown())) {
+            report(ErrorType::TYPE_ERROR, "Operación lógica inválida entre '" + left_type.toString() + "' y '" + right_type.toString() + "'", expr->op.line, expr->op.col, "expresión binaria");
+        }
+    } else if (op == "<" || op == "<=" || op == ">" || op == ">=") {
+        if (!(left_type.isNumeric() || left_type.isUnknown()) || !(right_type.isNumeric() || right_type.isUnknown())) {
+            report(ErrorType::TYPE_ERROR, "Comparación inválida entre '" + left_type.toString() + "' y '" + right_type.toString() + "'", expr->op.line, expr->op.col, "expresión binaria");
+        }
+    } else if (op == "==" || op == "!=") {
+        if (left_type.getKind() != TypeInfo::Kind::Unknown && right_type.getKind() != TypeInfo::Kind::Unknown) {
+            if (left_type.getKind() != right_type.getKind()) {
+                report(ErrorType::TYPE_ERROR, "Comparación de igualdad inválida entre '" + left_type.toString() + "' y '" + right_type.toString() + "'", expr->op.line, expr->op.col, "expresión binaria");
+            }
+        }
+    } else if (op == "@" || op == "@@") {
+        if (left_type.isObject() || right_type.isObject()) {
+            report(ErrorType::TYPE_ERROR, "Concatenación inválida entre '" + left_type.toString() + "' y '" + right_type.toString() + "'", expr->op.line, expr->op.col, "expresión binaria");
+        }
+    }
+
+    current_type_ = TypeInfo::inferBinaryOp(op, left_type, right_type);
 }
 
 void Phase2Analyzer::visit(parser::CallExpr* expr) {
     TypeInfo ret_type = TypeInfo(TypeInfo::Kind::Unknown);
+    std::vector<TypeInfo> arg_types;
+    for (const auto& arg : expr->args) {
+        visitExpr(arg.get());
+        arg_types.push_back(current_type_);
+    }
+
     if (auto* callee_id = dynamic_cast<parser::IdentifierExpr*>(expr->callee.get())) {
         resolveFunctionCall(callee_id->token, expr->args.size(), "llamada a función");
         auto func = symbol_table_.lookupFunction(callee_id->token.lexeme, expr->args.size());
         if (func) {
             ret_type = func->return_type;
+            // Validate arguments conformance
+            for (size_t i = 0; i < expr->args.size(); ++i) {
+                if (i < func->parameter_types.size()) {
+                    if (!arg_types[i].conformsTo(func->parameter_types[i])) {
+                        report(ErrorType::TYPE_ERROR,
+                               "El argumento " + std::to_string(i + 1) + " de la función '" + callee_id->token.lexeme +
+                                   "' tiene tipo '" + arg_types[i].toString() + "' pero se esperaba '" +
+                                   func->parameter_types[i].toString() + "'",
+                               callee_id->token.line, callee_id->token.col, "llamada a función");
+                    }
+                }
+            }
+        }
+    } else if (auto* get_attr = dynamic_cast<parser::GetAttrExpr*>(expr->callee.get())) {
+        visitExpr(get_attr->object.get());
+        TypeInfo obj_type = current_type_;
+        if (!obj_type.isObject() && !obj_type.isUnknown()) {
+            report(ErrorType::TYPE_ERROR, "No se puede llamar a un método en un tipo no objeto '" + obj_type.toString() + "'", get_attr->name.line, get_attr->name.col, "llamada a método");
+            ret_type = TypeInfo(TypeInfo::Kind::Unknown);
+        } else {
+            auto method = symbol_table_.lookupMethod(obj_type.getTypeName(), get_attr->name.lexeme);
+            if (!method && !obj_type.isUnknown()) {
+                report(ErrorType::UNDEFINED_METHOD, "El tipo '" + obj_type.getTypeName() + "' no tiene un método '" + get_attr->name.lexeme + "'", get_attr->name.line, get_attr->name.col, "llamada a método");
+                ret_type = TypeInfo(TypeInfo::Kind::Unknown);
+            } else if (method) {
+                if (expr->args.size() != method->parameter_types.size()) {
+                    report(ErrorType::ARGUMENT_COUNT_MISMATCH, "El método '" + get_attr->name.lexeme + "' espera " + std::to_string(method->parameter_types.size()) + " argumento(s) pero se recibieron " + std::to_string(expr->args.size()), get_attr->name.line, get_attr->name.col, "llamada a método");
+                } else {
+                    for (size_t i = 0; i < expr->args.size(); ++i) {
+                        if (!arg_types[i].conformsTo(method->parameter_types[i])) {
+                            report(ErrorType::TYPE_ERROR,
+                                   "El argumento " + std::to_string(i + 1) + " del método '" + get_attr->name.lexeme +
+                                       "' tiene tipo '" + arg_types[i].toString() + "' pero se esperaba '" +
+                                       method->parameter_types[i].toString() + "'",
+                                   get_attr->name.line, get_attr->name.col, "llamada a método");
+                        }
+                    }
+                }
+                ret_type = method->return_type;
+            } else {
+                ret_type = TypeInfo(TypeInfo::Kind::Unknown);
+            }
         }
     } else {
         visitExpr(expr->callee.get());
     }
 
-    for (const auto& arg : expr->args) {
-        visitExpr(arg.get());
-    }
     current_type_ = ret_type;
 }
 
@@ -435,30 +627,55 @@ void Phase2Analyzer::visit(parser::CaseExpr* expr) {
 
 void Phase2Analyzer::visit(parser::IsExpr* expr) {
     visitExpr(expr->object.get());
-    const std::string& type_name = expr->type_name.lexeme;
-    if (!symbol_table_.isTypeDeclared(type_name)) {
-        report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
-               expr->type_name.line, expr->type_name.col, "expresión is");
-    }
+    validateTypeExists(expr->type_name);
     current_type_ = TypeInfo(TypeInfo::Kind::Boolean);
 }
 
 void Phase2Analyzer::visit(parser::AsExpr* expr) {
     visitExpr(expr->object.get());
-    const std::string& type_name = expr->type_name.lexeme;
-    if (!symbol_table_.isTypeDeclared(type_name)) {
-        report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
-               expr->type_name.line, expr->type_name.col, "expresión as");
+    TypeInfo obj_type = current_type_;
+    if (!validateTypeExists(expr->type_name)) {
         current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
     } else {
-        current_type_ = TypeInfo(TypeInfo::Kind::Object, type_name);
+        TypeInfo target_type = resolveType(expr->type_name);
+        if (obj_type.getKind() != TypeInfo::Kind::Object &&
+            obj_type.getKind() != TypeInfo::Kind::Unknown &&
+            obj_type.getKind() != TypeInfo::Kind::Null) {
+            
+            bool match = false;
+            if (obj_type.getKind() == TypeInfo::Kind::Number && target_type.getKind() == TypeInfo::Kind::Number) match = true;
+            if (obj_type.getKind() == TypeInfo::Kind::String && target_type.getKind() == TypeInfo::Kind::String) match = true;
+            if (obj_type.getKind() == TypeInfo::Kind::Boolean && target_type.getKind() == TypeInfo::Kind::Boolean) match = true;
+            
+            if (!match) {
+                report(ErrorType::TYPE_ERROR, "Casteo inválido: no se puede convertir de '" + obj_type.toString() + "' a '" + target_type.toString() + "'", expr->type_name.line, expr->type_name.col, "expresión as");
+            }
+        }
+        current_type_ = target_type;
     }
 }
 
 void Phase2Analyzer::visit(parser::AssignExpr* expr) {
     visitExpr(expr->rhs.get());
     TypeInfo rhs_type = current_type_;
-    if (auto* lhs_id = dynamic_cast<parser::IdentifierExpr*>(expr->lhs.get())) {
+    
+    bool is_self = false;
+    int line = 0, col = 0;
+    if (auto* self_expr = dynamic_cast<parser::SelfExpr*>(expr->lhs.get())) {
+        is_self = true;
+        line = self_expr->token.line;
+        col = self_expr->token.col;
+    } else if (auto* id_expr = dynamic_cast<parser::IdentifierExpr*>(expr->lhs.get())) {
+        if (id_expr->token.lexeme == "self") {
+            is_self = true;
+            line = id_expr->token.line;
+            col = id_expr->token.col;
+        }
+    }
+    
+    if (is_self) {
+        report(ErrorType::INVALID_SELF_ASSIGNMENT, "No se puede asignar a 'self' - no es un destino de asignación válido", line, col, "asignación destructiva");
+    } else if (auto* lhs_id = dynamic_cast<parser::IdentifierExpr*>(expr->lhs.get())) {
         resolveVariableUse(lhs_id->token, "asignación");
         auto* sym = symbol_table_.lookupVariable(lhs_id->token.lexeme);
         if (sym) {
@@ -474,27 +691,53 @@ void Phase2Analyzer::visit(parser::AssignExpr* expr) {
 
 void Phase2Analyzer::visit(parser::NewExpr* expr) {
     const std::string& type_name = expr->type_name.lexeme;
+    std::vector<TypeInfo> arg_types;
+    for (const auto& arg : expr->args) {
+        visitExpr(arg.get());
+        arg_types.push_back(current_type_);
+    }
+
     if (!symbol_table_.isTypeDeclared(type_name)) {
         report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
                expr->type_name.line, expr->type_name.col, "instanciación de objeto");
         current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
     } else {
         auto* class_decl = symbol_table_.getTypeDeclaration(type_name);
-        if (class_decl && expr->args.size() != class_decl->params.size()) {
-            report(ErrorType::ARGUMENT_COUNT_MISMATCH,
-                   "El constructor de '" + type_name + "' espera " +
-                       std::to_string(class_decl->params.size()) + " parámetro(s) pero se recibieron " +
-                       std::to_string(expr->args.size()),
-                   expr->type_name.line, expr->type_name.col, "instanciación de objeto");
+        if (class_decl) {
+            if (expr->args.size() != class_decl->params.size()) {
+                report(ErrorType::ARGUMENT_COUNT_MISMATCH,
+                       "El constructor de '" + type_name + "' espera " +
+                           std::to_string(class_decl->params.size()) + " parámetro(s) pero se recibieron " +
+                           std::to_string(expr->args.size()),
+                       expr->type_name.line, expr->type_name.col, "instanciación de objeto");
+            } else {
+                for (size_t i = 0; i < expr->args.size(); ++i) {
+                    TypeInfo expected_type = resolveType(class_decl->params[i].second);
+                    if (!arg_types[i].conformsTo(expected_type)) {
+                        report(ErrorType::TYPE_ERROR,
+                               "El argumento " + std::to_string(i + 1) + " del constructor de '" + type_name +
+                                   "' tiene tipo '" + arg_types[i].toString() + "' pero se esperaba '" +
+                                   expected_type.toString() + "'",
+                               expr->type_name.line, expr->type_name.col, "instanciación de objeto");
+                    }
+                }
+            }
         }
         current_type_ = TypeInfo(TypeInfo::Kind::Object, type_name);
-    }
-    for (const auto& arg : expr->args) {
-        visitExpr(arg.get());
     }
 }
 
 void Phase2Analyzer::visit(parser::BaseCallExpr* expr) {
+    bool has_base = false;
+    if (!current_class_.empty()) {
+        auto type_sym = symbol_table_.lookupType(current_class_);
+        if (type_sym && type_sym->base_type != "Object" && !type_sym->base_type.empty()) {
+            has_base = true;
+        }
+    }
+    if (!has_base) {
+        report(ErrorType::INVALID_BASE, "No se puede usar 'base' fuera de una definición de clase con herencia", 0, 0, "llamada base");
+    }
     for (const auto& arg : expr->args) {
         visitExpr(arg.get());
     }
@@ -523,8 +766,10 @@ void Phase2Analyzer::visit(parser::SetAttrExpr* expr) {
 void Phase2Analyzer::visit(parser::MethodCallExpr* expr) {
     visitExpr(expr->object.get());
     TypeInfo obj_type = current_type_;
+    std::vector<TypeInfo> arg_types;
     for (const auto& arg : expr->args) {
         visitExpr(arg.get());
+        arg_types.push_back(current_type_);
     }
     if (!obj_type.isObject() && !obj_type.isUnknown()) {
         report(ErrorType::TYPE_ERROR, "No se puede llamar a un método en un tipo no objeto '" + obj_type.toString() + "'", expr->method_name.line, expr->method_name.col, "llamada a método");
@@ -537,6 +782,16 @@ void Phase2Analyzer::visit(parser::MethodCallExpr* expr) {
         } else if (method) {
             if (expr->args.size() != method->parameter_types.size()) {
                 report(ErrorType::ARGUMENT_COUNT_MISMATCH, "El método '" + expr->method_name.lexeme + "' espera " + std::to_string(method->parameter_types.size()) + " argumento(s) pero se recibieron " + std::to_string(expr->args.size()), expr->method_name.line, expr->method_name.col, "llamada a método");
+            } else {
+                for (size_t i = 0; i < expr->args.size(); ++i) {
+                    if (!arg_types[i].conformsTo(method->parameter_types[i])) {
+                        report(ErrorType::TYPE_ERROR,
+                               "El argumento " + std::to_string(i + 1) + " del método '" + expr->method_name.lexeme +
+                                   "' tiene tipo '" + arg_types[i].toString() + "' pero se esperaba '" +
+                                   method->parameter_types[i].toString() + "'",
+                               expr->method_name.line, expr->method_name.col, "llamada a método");
+                    }
+                }
             }
             current_type_ = method->return_type;
         } else {
@@ -587,6 +842,7 @@ void Phase2Analyzer::visit(parser::BlockExpr* expr) {
 void Phase2Analyzer::visit(parser::LetExpr* expr) {
     visitExpr(expr->initializer.get());
     TypeInfo init_type = current_type_;
+    validateTypeExists(expr->declared_type);
     TypeInfo declared_type = resolveType(expr->declared_type);
 
     if (expr->declared_type.has_value() && !init_type.conformsTo(declared_type)) {

@@ -226,7 +226,7 @@ public:
         }
 
         // Logical operations
-        if (op == "||" || op == "&&")
+        if (op == "||" || op == "&&" || op == "or" || op == "and" || op == "|" || op == "&")
         {
             if (left.isBoolean() && right.isBoolean())
             {

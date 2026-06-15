@@ -77,6 +77,7 @@ private:
     void collectClassDeclarations(parser::Program* program);
     void registerClassDecl(parser::ClassDecl* stmt);
     bool isBuiltinNominalType(const std::string& name) const;
+    bool validateTypeExists(const std::optional<parser::Token>& token);
 
     TypeInfo current_type_;
     std::string current_class_;

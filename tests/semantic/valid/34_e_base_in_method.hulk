@@ -1,0 +1,8 @@
+class Person(name:String) {
+    name:String = name;
+    greet() => "Hello, " @ self.name;
+}
+class Student(name:String) is Person(name) {
+    greet() => base() @ "!";
+}
+let s = new Student("Alice") in print(s.greet());

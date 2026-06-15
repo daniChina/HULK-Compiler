@@ -1,0 +1,5 @@
+class A() {
+    createB() => new B();
+}
+class B() {}
+print(0);

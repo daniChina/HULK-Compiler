@@ -1,0 +1,1 @@
+let x:UnknownType = 1 in print(x);
