@@ -12,3 +12,4 @@ valid/60_v6_sin.hulk	0\n
 valid/62_v6_range_print.hulk	0\n1\n2\n
 valid/80_v8_with.hulk	1\n
 valid/81_v8_with_null_else.hulk	42\n
+valid/90_v10_new_attr.hulk	1\n

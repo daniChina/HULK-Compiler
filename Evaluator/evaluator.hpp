@@ -62,6 +62,8 @@ private:
     std::ostream& out_;
     std::shared_ptr<EnvFrame> global_;
     std::map<std::string, FunctionOverloadMap> functions_;
+    std::map<std::string, parser::ClassDecl*> types_;
+    std::shared_ptr<value::Instance> current_self_;
     value::Value current_{0.0};
     bool had_error_ = false;
     std::string last_error_;
@@ -72,6 +74,10 @@ private:
 
     static bool isBuiltinFunctionName(const std::string& name);
     void registerFunction(parser::FunctionDecl* decl);
+    void registerClass(parser::ClassDecl* decl);
+    value::Value constructInstance(parser::ClassDecl* type_def, const std::vector<parser::ExprPtr>& args);
+    void initializeParentAttributes(value::Instance& instance, parser::ClassDecl* type_def);
+    void initializeAttributes(value::Instance& instance, parser::ClassDecl* type_def);
     void invokeUserFunction(const UserFunction& fn, const std::vector<parser::ExprPtr>& args);
     bool callBuiltin(const std::string& name, const std::vector<parser::ExprPtr>& args);
 };

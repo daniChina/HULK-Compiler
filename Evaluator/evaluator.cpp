@@ -73,6 +73,8 @@ value::Value Evaluator::evaluate(parser::Program* program) {
     had_error_ = false;
     last_error_.clear();
     functions_.clear();
+    types_.clear();
+    current_self_.reset();
     current_ = value::Value(0.0);
     if (!program) {
         return current_;
@@ -98,18 +100,128 @@ void Evaluator::registerFunction(parser::FunctionDecl* decl) {
     overloads[arity] = UserFunction{decl, global_};
 }
 
+void Evaluator::registerClass(parser::ClassDecl* decl) {
+    const std::string& name = decl->name.lexeme;
+    if (types_.find(name) != types_.end()) {
+        setError("Tipo redefinido: " + name);
+        return;
+    }
+    types_[name] = decl;
+}
+
+void Evaluator::initializeAttributes(value::Instance& instance, parser::ClassDecl* type_def) {
+    auto saved = global_;
+    global_ = instance.attrs;
+    for (const auto& attr : type_def->attributes) {
+        visitExpr(attr.value.get());
+        if (had_error_) {
+            global_ = saved;
+            return;
+        }
+        instance.attrs->define(attr.name.lexeme, current_);
+    }
+    global_ = saved;
+}
+
+void Evaluator::initializeParentAttributes(value::Instance& instance, parser::ClassDecl* type_def) {
+    if (!type_def->parent_name) {
+        return;
+    }
+
+    const std::string& base_name = type_def->parent_name->lexeme;
+    auto base_it = types_.find(base_name);
+    if (base_it == types_.end()) {
+        setError("Tipo base no registrado: " + base_name);
+        return;
+    }
+
+    parser::ClassDecl* base = base_it->second;
+    if (base->params.size() != type_def->parent_args.size()) {
+        setError("Número incorrecto de argumentos en llamada a base: " + base_name);
+        return;
+    }
+
+    auto base_env = std::make_shared<EnvFrame>(instance.attrs);
+    auto saved = global_;
+    global_ = base_env;
+    for (std::size_t i = 0; i < base->params.size(); ++i) {
+        visitExpr(type_def->parent_args[i].get());
+        if (had_error_) {
+            global_ = saved;
+            return;
+        }
+        base_env->define(base->params[i].first.lexeme, current_);
+    }
+
+    for (const auto& attr : base->attributes) {
+        visitExpr(attr.value.get());
+        if (had_error_) {
+            global_ = saved;
+            return;
+        }
+        instance.attrs->define(attr.name.lexeme, current_);
+    }
+    global_ = saved;
+}
+
+value::Value Evaluator::constructInstance(parser::ClassDecl* type_def,
+                                          const std::vector<parser::ExprPtr>& args) {
+    if (type_def->params.size() != args.size()) {
+        setError("Número de argumentos inválido para " + type_def->name.lexeme);
+        return value::Value(0.0);
+    }
+
+    auto saved = global_;
+    std::vector<value::Value> ctor_args;
+    ctor_args.reserve(args.size());
+    for (const auto& arg : args) {
+        visitExpr(arg.get());
+        if (had_error_) {
+            return value::Value(0.0);
+        }
+        ctor_args.push_back(current_);
+    }
+
+    auto instance = std::make_shared<value::Instance>();
+    instance->attrs = std::make_shared<EnvFrame>(saved);
+    instance->type_def = type_def;
+    instance->type_name = type_def->name.lexeme;
+    instance->self = instance;
+
+    for (std::size_t i = 0; i < type_def->params.size(); ++i) {
+        instance->attrs->define(type_def->params[i].first.lexeme, ctor_args[i]);
+    }
+
+    initializeParentAttributes(*instance, type_def);
+    if (had_error_) {
+        global_ = saved;
+        return value::Value(0.0);
+    }
+
+    initializeAttributes(*instance, type_def);
+    global_ = saved;
+    if (had_error_) {
+        return value::Value(0.0);
+    }
+
+    return value::Value(instance);
+}
+
 void Evaluator::visit(parser::Program* stmt) {
     for (const auto& s : stmt->stmts) {
         if (auto* fn = dynamic_cast<parser::FunctionDecl*>(s.get())) {
             registerFunction(fn);
-            if (had_error_) {
-                return;
-            }
+        } else if (auto* cls = dynamic_cast<parser::ClassDecl*>(s.get())) {
+            registerClass(cls);
+        }
+        if (had_error_) {
+            return;
         }
     }
 
     for (const auto& s : stmt->stmts) {
-        if (dynamic_cast<parser::FunctionDecl*>(s.get())) {
+        if (dynamic_cast<parser::FunctionDecl*>(s.get()) ||
+            dynamic_cast<parser::ClassDecl*>(s.get())) {
             continue;
         }
         visitStmt(s.get());
@@ -123,7 +235,7 @@ void Evaluator::visit(parser::ExprStmt* stmt) { visitExpr(stmt->expr.get()); }
 
 void Evaluator::visit(parser::FunctionDecl* stmt) { (void)stmt; }
 
-void Evaluator::visit(parser::ClassDecl* stmt) { (void)stmt; }
+void Evaluator::visit(parser::ClassDecl* stmt) { registerClass(stmt); }
 void Evaluator::visit(parser::MethodDecl* stmt) { (void)stmt; }
 void Evaluator::visit(parser::AttributeDecl* stmt) { (void)stmt; }
 
@@ -419,7 +531,38 @@ void Evaluator::visit(parser::BlockExpr* expr) {
     }
 }
 
-void Evaluator::visit(parser::GetAttrExpr* expr) { (void)expr; setError("atributo no implementado"); }
+void Evaluator::visit(parser::GetAttrExpr* expr) {
+    visitExpr(expr->object.get());
+    if (had_error_) {
+        return;
+    }
+
+    if (auto* self_expr = dynamic_cast<parser::SelfExpr*>(expr->object.get())) {
+        (void)self_expr;
+        if (!current_self_) {
+            setError("Cannot use self outside of class methods");
+            return;
+        }
+        if (value::Value* slot = current_self_->attrs->lookup(expr->name.lexeme)) {
+            current_ = *slot;
+            return;
+        }
+        setError("Undefined attribute: " + expr->name.lexeme);
+        return;
+    }
+
+    if (!current_.isInstance()) {
+        setError("Cannot access attributes on non-class instance");
+        return;
+    }
+
+    auto instance = current_.asInstance();
+    if (value::Value* slot = instance->attrs->lookup(expr->name.lexeme)) {
+        current_ = *slot;
+        return;
+    }
+    setError("Undefined attribute: " + expr->name.lexeme);
+}
 void Evaluator::visit(parser::WhileExpr* expr) {
     value::Value result(0.0);
     bool ran_body = false;
@@ -529,7 +672,16 @@ void Evaluator::visit(parser::AssignExpr* expr) {
 
     setError("Asignación no soportada para este destino");
 }
-void Evaluator::visit(parser::NewExpr* expr) { (void)expr; setError("new no implementado"); }
+void Evaluator::visit(parser::NewExpr* expr) {
+    const std::string& type_name = expr->type_name.lexeme;
+    auto it = types_.find(type_name);
+    if (it == types_.end()) {
+        setError("Tipo no registrado: " + type_name);
+        return;
+    }
+
+    current_ = constructInstance(it->second, expr->args);
+}
 void Evaluator::visit(parser::BaseCallExpr* expr) { (void)expr; setError("base no implementado"); }
 void Evaluator::visit(parser::SetAttrExpr* expr) { (void)expr; setError("set attr no implementado"); }
 void Evaluator::visit(parser::MethodCallExpr* expr) { (void)expr; setError("método no implementado"); }

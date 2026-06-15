@@ -42,6 +42,7 @@ EVAL_FUNCTIONS_TEST_TARGET = eval_functions_smoke
 EVAL_OPS_TEST_TARGET = eval_ops_smoke
 EVAL_LOOPS_TEST_TARGET = eval_loops_smoke
 EVAL_WITH_TEST_TARGET = eval_with_smoke
+EVAL_OO_TEST_TARGET = eval_oo_smoke
 
 TARGET = hulk_c.exe
 TYPE_TEST_TARGET = type_info_smoke
@@ -105,6 +106,8 @@ test_eval:
 	./$(EVAL_LOOPS_TEST_TARGET)
 	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_with_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_WITH_TEST_TARGET)
 	./$(EVAL_WITH_TEST_TARGET)
+	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_oo_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_OO_TEST_TARGET)
+	./$(EVAL_OO_TEST_TARGET)
 
 ifeq ($(OS),Windows_NT)
 test_semantic_fixtures: compile
@@ -119,4 +122,4 @@ test_eval_fixtures: compile
 endif
 
 clean:
-	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) $(EVAL_OO_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o

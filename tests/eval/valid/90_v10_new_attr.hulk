@@ -1,0 +1,5 @@
+class Point(x: Number, y: Number) {
+    x: Number = x;
+    y: Number = y;
+}
+print(let p = new Point(1, 2) in p.x);
