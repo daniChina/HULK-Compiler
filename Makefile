@@ -1,4 +1,4 @@
-.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_eval
+.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_eval test_eval_fixtures
 
 # Compilador y flags
 CXX = g++
@@ -109,9 +109,13 @@ test_eval:
 ifeq ($(OS),Windows_NT)
 test_semantic_fixtures: compile
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_semantic.ps1
+test_eval_fixtures: compile
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_eval.ps1
 else
 test_semantic_fixtures: compile
 	bash scripts/run_semantic.sh
+test_eval_fixtures: compile
+	bash scripts/run_eval.sh
 endif
 
 clean:
