@@ -4,7 +4,7 @@
 CXX = g++
 # FlexLexer.h: MSYS2/ghcup o WinFlexBison (winget install WinFlexBison.win_flex_bison)
 FLEX_WIN = $(LOCALAPPDATA)/Microsoft/WinGet/Packages/WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe
-CXXFLAGS = -std=c++17 -Wall -I. -ILexer -IParser/core -IParser/ast -IParser/generator -IParser/syntax \
+CXXFLAGS = -std=c++17 -Wall -fuse-ld=bfd -I. -ILexer -IParser/core -IParser/ast -IParser/generator -IParser/syntax \
            -ISemanticCheck -ISymbolTable -ITypes -IValue -IEvaluator \
            -I/usr/include -IC:/ghcup/msys64/usr/include -I$(FLEX_WIN)
 
@@ -37,7 +37,7 @@ R3_R4_SEMANTIC_TEST_TARGET = r3_r4_semantic_smoke
 A4_BUILTINS_TEST_TARGET = a4_builtins_smoke
 EVAL_TEST_TARGET = eval_smoke
 
-TARGET = hulk.exe
+TARGET = hulk_c.exe
 TYPE_TEST_TARGET = type_info_smoke
 SYMBOL_SMOKE_TARGET = symbol_table_smoke
 SYMBOL_SCOPE_TEST_TARGET = symbol_table_scope_tests

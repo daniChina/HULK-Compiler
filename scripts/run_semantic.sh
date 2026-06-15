@@ -4,7 +4,7 @@
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HULK="${HULK:-$ROOT/hulk.exe}"
+HULK="${HULK:-$ROOT/hulk_c.exe}"
 VALID_DIR="$ROOT/tests/semantic/valid"
 INVALID_DIR="$ROOT/tests/semantic/invalid"
 MANIFEST="$ROOT/tests/semantic/manifest.tsv"

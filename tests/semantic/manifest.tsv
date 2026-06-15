@@ -27,3 +27,7 @@ invalid/31_e_undefined_type_new.hulk	semantic	no est
 invalid/32_e_redefined_class.hulk	semantic	ya est
 invalid/33_e_new_wrong_arity.hulk	semantic	espera
 invalid/46_e_is_undefined_type.hulk	semantic	no est
+invalid/42_e_inherit_primitive.hulk	semantic	heredar
+invalid/43_e_base_ghost.hulk	semantic	no est
+invalid/44_e_base_args_arity.hulk	semantic	espera
+invalid/34_e_attr_init_type_error.hulk	semantic	conforma

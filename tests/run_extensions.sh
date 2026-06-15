@@ -15,7 +15,7 @@ FAILED=0
 
 for test_file in tests/extensions/valid/*.hulk; do
     echo -n "Probando [VALID] $(basename "$test_file")... "
-    if ./hulk.exe --ast "$test_file" > /dev/null 2>&1; then
+    if ./hulk_c.exe --ast "$test_file" > /dev/null 2>&1; then
         echo "OK"
     else
         echo "FALLO"

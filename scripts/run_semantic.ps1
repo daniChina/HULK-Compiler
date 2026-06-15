@@ -1,6 +1,6 @@
 # Recorre tests/semantic/{valid,invalid}/ con hulk.exe --semantic (Windows / PowerShell).
 param(
-    [string]$Hulk = (Join-Path $PSScriptRoot "..\hulk.exe")
+    [string]$Hulk = (Join-Path $PSScriptRoot "..\hulk_c.exe")
 )
 
 $ErrorActionPreference = "Continue"

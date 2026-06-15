@@ -1,0 +1,3 @@
+class Person(x: Number) {
+    x_attr: String = x;
+}

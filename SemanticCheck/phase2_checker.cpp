@@ -151,6 +151,19 @@ void Phase2Analyzer::registerClassDecl(parser::ClassDecl* stmt) {
     }
     symbol_table_.storeTypeDeclaration(name, stmt);
 
+    // Register methods and attributes in type symbol
+    for (const auto& attr : stmt->attributes) {
+        TypeInfo attr_type = resolveType(attr.declared_type);
+        symbol_table_.addTypeAttribute(name, attr.name.lexeme, attr_type, attr.name.line);
+    }
+    for (const auto& method : stmt->methods) {
+        std::vector<TypeInfo> method_params;
+        for (const auto& p : method.params) {
+            method_params.push_back(resolveType(p.second));
+        }
+        symbol_table_.addTypeMethod(name, method.name.lexeme, method_params, TypeInfo(TypeInfo::Kind::Unknown), method.name.line);
+    }
+
     for (const auto& method : stmt->methods) {
         checkUniqueParamNames(method.params, method.name.line, method.name.col,
                               "declaración de método");
@@ -167,12 +180,101 @@ void Phase2Analyzer::registerClassDecl(parser::ClassDecl* stmt) {
     }
 }
 
+TypeInfo Phase2Analyzer::resolveType(const std::optional<parser::Token>& token) {
+    if (!token.has_value()) {
+        return TypeInfo(TypeInfo::Kind::Unknown);
+    }
+    const std::string& name = token->lexeme;
+    if (name == "Number") return TypeInfo(TypeInfo::Kind::Number);
+    if (name == "String") return TypeInfo(TypeInfo::Kind::String);
+    if (name == "Boolean") return TypeInfo(TypeInfo::Kind::Boolean);
+    if (name == "Object") return TypeInfo(TypeInfo::Kind::Object);
+    if (name == "Void") return TypeInfo(TypeInfo::Kind::Void);
+    return TypeInfo(TypeInfo::Kind::Object, name);
+}
+
 void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
     for (const auto& method : stmt->methods) {
         checkUniqueParamNames(method.params, method.name.line, method.name.col,
-                              "declaración de método");
+                               "declaración de método");
     }
-    (void)stmt;
+
+    const std::string& class_name = stmt->name.lexeme;
+    std::string old_class = current_class_;
+    current_class_ = class_name;
+
+    if (stmt->parent_name) {
+        const std::string& parent_name = stmt->parent_name->lexeme;
+        auto* base_class_decl = symbol_table_.getTypeDeclaration(parent_name);
+        if (base_class_decl) {
+            size_t base_param_count = base_class_decl->params.size();
+            size_t base_args_count = stmt->parent_args.size();
+
+            if (base_args_count > 0) {
+                if (base_args_count != base_param_count) {
+                    report(ErrorType::ARGUMENT_COUNT_MISMATCH,
+                           "El constructor del padre '" + parent_name + "' espera " +
+                               std::to_string(base_param_count) + " parámetro(s) pero se recibieron " +
+                               std::to_string(base_args_count),
+                           stmt->parent_name->line, stmt->parent_name->col, "declaración de clase");
+                } else {
+                    symbol_table_.enterScope();
+                    for (const auto& param : stmt->params) {
+                        symbol_table_.declareVariable(param.first.lexeme, resolveType(param.second));
+                    }
+                    for (size_t i = 0; i < base_args_count; ++i) {
+                        visitExpr(stmt->parent_args[i].get());
+                    }
+                    symbol_table_.exitScope();
+                }
+            } else if (base_param_count > 0) {
+                if (stmt->params.size() != base_param_count) {
+                    report(ErrorType::ARGUMENT_COUNT_MISMATCH,
+                           "La clase '" + stmt->name.lexeme + "' debe declarar el mismo número de parámetros que su base '" +
+                               parent_name + "' (" + std::to_string(base_param_count) + ") cuando no se pasan argumentos de base",
+                           stmt->name.line, stmt->name.col, "declaración de clase");
+                }
+            }
+        }
+    }
+
+    // --- E2: Attribute initialization type check ---
+    symbol_table_.enterScope();
+    
+    // Declare 'self'
+    symbol_table_.declareVariable("self", TypeInfo(TypeInfo::Kind::Object, class_name), false);
+
+    // Declare class constructor parameters
+    for (const auto& param : stmt->params) {
+        symbol_table_.declareVariable(param.first.lexeme, resolveType(param.second));
+    }
+
+    // Check each attribute initializer
+    for (const auto& attr : stmt->attributes) {
+        if (attr.value) {
+            visitExpr(attr.value.get());
+            TypeInfo init_type = current_type_;
+            TypeInfo declared_type = resolveType(attr.declared_type);
+
+            if (attr.declared_type.has_value() && !init_type.conformsTo(declared_type)) {
+                report(ErrorType::TYPE_ERROR,
+                       "El tipo de la expresión de inicialización '" + init_type.toString() +
+                           "' no conforma al tipo declarado del atributo '" + attr.name.lexeme +
+                           "': '" + declared_type.toString() + "'",
+                       attr.name.line, attr.name.col, "declaración de atributo");
+            } else {
+                if (!attr.declared_type.has_value()) {
+                    auto type_sym = symbol_table_.lookupType(class_name);
+                    if (type_sym) {
+                        type_sym->attributes[attr.name.lexeme].type = init_type;
+                    }
+                }
+            }
+        }
+    }
+
+    symbol_table_.exitScope();
+    current_class_ = old_class;
 }
 
 void Phase2Analyzer::visit(parser::MethodDecl* stmt) {
@@ -182,21 +284,60 @@ void Phase2Analyzer::visit(parser::MethodDecl* stmt) {
 
 void Phase2Analyzer::visit(parser::AttributeDecl* stmt) { (void)stmt; }
 
-void Phase2Analyzer::visit(parser::NumberExpr* expr) { (void)expr; }
-void Phase2Analyzer::visit(parser::StringExpr* expr) { (void)expr; }
-void Phase2Analyzer::visit(parser::NullExpr* expr) { (void)expr; }
-void Phase2Analyzer::visit(parser::BoolExpr* expr) { (void)expr; }
-void Phase2Analyzer::visit(parser::SelfExpr* expr) { (void)expr; }
-void Phase2Analyzer::visit(parser::GroupedExpr* expr) { visitExpr(expr->expression.get()); }
-void Phase2Analyzer::visit(parser::UnaryExpr* expr) { visitExpr(expr->right.get()); }
+void Phase2Analyzer::visit(parser::NumberExpr* expr) {
+    (void)expr;
+    current_type_ = TypeInfo(TypeInfo::Kind::Number);
+}
+
+void Phase2Analyzer::visit(parser::StringExpr* expr) {
+    (void)expr;
+    current_type_ = TypeInfo(TypeInfo::Kind::String);
+}
+
+void Phase2Analyzer::visit(parser::NullExpr* expr) {
+    (void)expr;
+    current_type_ = TypeInfo(TypeInfo::Kind::Null);
+}
+
+void Phase2Analyzer::visit(parser::BoolExpr* expr) {
+    (void)expr;
+    current_type_ = TypeInfo(TypeInfo::Kind::Boolean);
+}
+
+void Phase2Analyzer::visit(parser::SelfExpr* expr) {
+    if (current_class_.empty()) {
+        report(ErrorType::INVALID_SELF, "No se puede usar 'self' fuera del cuerpo de una clase", expr->token.line, expr->token.col, "expresión self");
+        current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+    } else {
+        current_type_ = TypeInfo(TypeInfo::Kind::Object, current_class_);
+    }
+}
+
+void Phase2Analyzer::visit(parser::GroupedExpr* expr) {
+    visitExpr(expr->expression.get());
+}
+
+void Phase2Analyzer::visit(parser::UnaryExpr* expr) {
+    visitExpr(expr->right.get());
+    current_type_ = TypeInfo::inferUnaryOp(expr->op.lexeme, current_type_);
+}
+
 void Phase2Analyzer::visit(parser::BinaryExpr* expr) {
     visitExpr(expr->left.get());
+    TypeInfo left_type = current_type_;
     visitExpr(expr->right.get());
+    TypeInfo right_type = current_type_;
+    current_type_ = TypeInfo::inferBinaryOp(expr->op.lexeme, left_type, right_type);
 }
 
 void Phase2Analyzer::visit(parser::CallExpr* expr) {
+    TypeInfo ret_type = TypeInfo(TypeInfo::Kind::Unknown);
     if (auto* callee_id = dynamic_cast<parser::IdentifierExpr*>(expr->callee.get())) {
         resolveFunctionCall(callee_id->token, expr->args.size(), "llamada a función");
+        auto func = symbol_table_.lookupFunction(callee_id->token.lexeme, expr->args.size());
+        if (func) {
+            ret_type = func->return_type;
+        }
     } else {
         visitExpr(expr->callee.get());
     }
@@ -204,50 +345,94 @@ void Phase2Analyzer::visit(parser::CallExpr* expr) {
     for (const auto& arg : expr->args) {
         visitExpr(arg.get());
     }
+    current_type_ = ret_type;
 }
 
-void Phase2Analyzer::visit(parser::GetAttrExpr* expr) { visitExpr(expr->object.get()); }
+void Phase2Analyzer::visit(parser::GetAttrExpr* expr) {
+    visitExpr(expr->object.get());
+    TypeInfo obj_type = current_type_;
+    if (!obj_type.isObject() && !obj_type.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "No se puede acceder a un atributo en un tipo no objeto '" + obj_type.toString() + "'", expr->dot.line, expr->dot.col, "acceso a atributo");
+        current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+    } else {
+        auto* attr = symbol_table_.lookupAttribute(obj_type.getTypeName(), expr->name.lexeme);
+        if (!attr && !obj_type.isUnknown()) {
+            report(ErrorType::UNDEFINED_ATTRIBUTE, "El tipo '" + obj_type.getTypeName() + "' no tiene un atributo '" + expr->name.lexeme + "'", expr->name.line, expr->name.col, "acceso a atributo");
+            current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+        } else if (attr) {
+            current_type_ = attr->type;
+        } else {
+            current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+        }
+    }
+}
+
 void Phase2Analyzer::visit(parser::IfExpr* expr) {
     visitExpr(expr->condition.get());
-    visitExpr(expr->then_branch.get());
-    if (expr->else_branch) {
-        visitExpr(expr->else_branch.get());
+    if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "La condición de 'if' debe ser de tipo Boolean, se obtuvo '" + current_type_.toString() + "'", 0, 0, "expresión if");
     }
+    visitExpr(expr->then_branch.get());
+    TypeInfo then_type = current_type_;
+    visitExpr(expr->else_branch.get());
+    TypeInfo else_type = current_type_;
+    current_type_ = TypeInfo::getLowestCommonAncestor({then_type, else_type});
 }
+
 void Phase2Analyzer::visit(parser::WhileExpr* expr) {
     visitExpr(expr->condition.get());
+    if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "La condición de 'while' debe ser de tipo Boolean, se obtuvo '" + current_type_.toString() + "'", 0, 0, "expresión while");
+    }
     visitExpr(expr->body.get());
     if (expr->else_branch) {
         visitExpr(expr->else_branch.get());
     }
+    current_type_ = TypeInfo(TypeInfo::Kind::Void);
 }
+
 void Phase2Analyzer::visit(parser::ForExpr* expr) {
     visitExpr(expr->iterable.get());
-
+    TypeInfo item_type = TypeInfo(TypeInfo::Kind::Unknown);
+    if (auto* call = dynamic_cast<parser::CallExpr*>(expr->iterable.get())) {
+        if (auto* id = dynamic_cast<parser::IdentifierExpr*>(call->callee.get())) {
+            if (id->token.lexeme == "range") {
+                item_type = TypeInfo(TypeInfo::Kind::Number);
+            }
+        }
+    }
     symbol_table_.enterScope();
-    symbol_table_.declareVariable(expr->variable.lexeme, TypeInfo(TypeInfo::Kind::Unknown));
+    symbol_table_.declareVariable(expr->variable.lexeme, item_type);
     visitExpr(expr->body.get());
     symbol_table_.exitScope();
+    current_type_ = TypeInfo(TypeInfo::Kind::Void);
 }
 
 void Phase2Analyzer::visit(parser::WithExpr* expr) {
     visitExpr(expr->value.get());
-
+    TypeInfo val_type = current_type_;
     symbol_table_.enterScope();
-    symbol_table_.declareVariable(expr->alias.lexeme, TypeInfo(TypeInfo::Kind::Unknown));
+    symbol_table_.declareVariable(expr->alias.lexeme, val_type);
     visitExpr(expr->body.get());
     symbol_table_.exitScope();
-
     if (expr->else_branch) {
         visitExpr(expr->else_branch.get());
     }
 }
+
 void Phase2Analyzer::visit(parser::CaseExpr* expr) {
     visitExpr(expr->value.get());
+    std::vector<TypeInfo> branch_types;
     for (const auto& branch : expr->branches) {
+        symbol_table_.enterScope();
+        symbol_table_.declareVariable(branch.name.lexeme, TypeInfo(TypeInfo::Kind::Object, branch.type_name.lexeme));
         visitExpr(branch.body.get());
+        branch_types.push_back(current_type_);
+        symbol_table_.exitScope();
     }
+    current_type_ = TypeInfo::getLowestCommonAncestor(branch_types);
 }
+
 void Phase2Analyzer::visit(parser::IsExpr* expr) {
     visitExpr(expr->object.get());
     const std::string& type_name = expr->type_name.lexeme;
@@ -255,6 +440,7 @@ void Phase2Analyzer::visit(parser::IsExpr* expr) {
         report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
                expr->type_name.line, expr->type_name.col, "expresión is");
     }
+    current_type_ = TypeInfo(TypeInfo::Kind::Boolean);
 }
 
 void Phase2Analyzer::visit(parser::AsExpr* expr) {
@@ -263,22 +449,35 @@ void Phase2Analyzer::visit(parser::AsExpr* expr) {
     if (!symbol_table_.isTypeDeclared(type_name)) {
         report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
                expr->type_name.line, expr->type_name.col, "expresión as");
+        current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+    } else {
+        current_type_ = TypeInfo(TypeInfo::Kind::Object, type_name);
     }
 }
+
 void Phase2Analyzer::visit(parser::AssignExpr* expr) {
     visitExpr(expr->rhs.get());
-
+    TypeInfo rhs_type = current_type_;
     if (auto* lhs_id = dynamic_cast<parser::IdentifierExpr*>(expr->lhs.get())) {
         resolveVariableUse(lhs_id->token, "asignación");
+        auto* sym = symbol_table_.lookupVariable(lhs_id->token.lexeme);
+        if (sym) {
+            if (!rhs_type.conformsTo(sym->type)) {
+                report(ErrorType::TYPE_ERROR, "No se puede asignar un valor de tipo '" + rhs_type.toString() + "' a una variable de tipo '" + sym->type.toString() + "'", lhs_id->token.line, lhs_id->token.col, "asignación");
+            }
+        }
     } else {
         visitExpr(expr->lhs.get());
     }
+    current_type_ = rhs_type;
 }
+
 void Phase2Analyzer::visit(parser::NewExpr* expr) {
     const std::string& type_name = expr->type_name.lexeme;
     if (!symbol_table_.isTypeDeclared(type_name)) {
         report(ErrorType::UNDEFINED_TYPE, "Tipo '" + type_name + "' no está definido",
                expr->type_name.line, expr->type_name.col, "instanciación de objeto");
+        current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
     } else {
         auto* class_decl = symbol_table_.getTypeDeclaration(type_name);
         if (class_decl && expr->args.size() != class_decl->params.size()) {
@@ -288,50 +487,111 @@ void Phase2Analyzer::visit(parser::NewExpr* expr) {
                        std::to_string(expr->args.size()),
                    expr->type_name.line, expr->type_name.col, "instanciación de objeto");
         }
+        current_type_ = TypeInfo(TypeInfo::Kind::Object, type_name);
     }
     for (const auto& arg : expr->args) {
         visitExpr(arg.get());
     }
 }
+
 void Phase2Analyzer::visit(parser::BaseCallExpr* expr) {
     for (const auto& arg : expr->args) {
         visitExpr(arg.get());
     }
+    current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
 }
+
 void Phase2Analyzer::visit(parser::SetAttrExpr* expr) {
     visitExpr(expr->object.get());
+    TypeInfo obj_type = current_type_;
     visitExpr(expr->value.get());
+    TypeInfo val_type = current_type_;
+    if (!obj_type.isObject() && !obj_type.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "No se puede asignar un atributo en un tipo no objeto '" + obj_type.toString() + "'", expr->attr_name.line, expr->attr_name.col, "asignación de atributo");
+    } else {
+        auto* attr = symbol_table_.lookupAttribute(obj_type.getTypeName(), expr->attr_name.lexeme);
+        if (!attr && !obj_type.isUnknown()) {
+            report(ErrorType::UNDEFINED_ATTRIBUTE, "El tipo '" + obj_type.getTypeName() + "' no tiene un atributo '" + expr->attr_name.lexeme + "'", expr->attr_name.line, expr->attr_name.col, "asignación de atributo");
+        } else if (attr) {
+            if (!val_type.conformsTo(attr->type)) {
+                report(ErrorType::TYPE_ERROR, "No se puede asignar un valor de tipo '" + val_type.toString() + "' al atributo '" + expr->attr_name.lexeme + "' de tipo '" + attr->type.toString() + "'", expr->attr_name.line, expr->attr_name.col, "asignación de atributo");
+            }
+        }
+    }
 }
+
 void Phase2Analyzer::visit(parser::MethodCallExpr* expr) {
     visitExpr(expr->object.get());
+    TypeInfo obj_type = current_type_;
     for (const auto& arg : expr->args) {
         visitExpr(arg.get());
     }
-}
-void Phase2Analyzer::visit(parser::UnlessExpr* expr) {
-    visitExpr(expr->condition.get());
-    visitExpr(expr->then_branch.get());
-    if (expr->else_branch) {
-        visitExpr(expr->else_branch.get());
+    if (!obj_type.isObject() && !obj_type.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "No se puede llamar a un método en un tipo no objeto '" + obj_type.toString() + "'", expr->method_name.line, expr->method_name.col, "llamada a método");
+        current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+    } else {
+        auto method = symbol_table_.lookupMethod(obj_type.getTypeName(), expr->method_name.lexeme);
+        if (!method && !obj_type.isUnknown()) {
+            report(ErrorType::UNDEFINED_METHOD, "El tipo '" + obj_type.getTypeName() + "' no tiene un método '" + expr->method_name.lexeme + "'", expr->method_name.line, expr->method_name.col, "llamada a método");
+            current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+        } else if (method) {
+            if (expr->args.size() != method->parameter_types.size()) {
+                report(ErrorType::ARGUMENT_COUNT_MISMATCH, "El método '" + expr->method_name.lexeme + "' espera " + std::to_string(method->parameter_types.size()) + " argumento(s) pero se recibieron " + std::to_string(expr->args.size()), expr->method_name.line, expr->method_name.col, "llamada a método");
+            }
+            current_type_ = method->return_type;
+        } else {
+            current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+        }
     }
 }
+
+void Phase2Analyzer::visit(parser::UnlessExpr* expr) {
+    visitExpr(expr->condition.get());
+    if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "La condición de 'unless' debe ser de tipo Boolean", 0, 0, "unless");
+    }
+    visitExpr(expr->then_branch.get());
+    TypeInfo then_type = current_type_;
+    visitExpr(expr->else_branch.get());
+    TypeInfo else_type = current_type_;
+    current_type_ = TypeInfo::getLowestCommonAncestor({then_type, else_type});
+}
+
 void Phase2Analyzer::visit(parser::RepeatExpr* expr) {
     visitExpr(expr->count.get());
+    if (!current_type_.isNumeric() && !current_type_.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "La cantidad de repeticiones debe ser de tipo Number", 0, 0, "repeat");
+    }
     visitExpr(expr->body.get());
+    current_type_ = TypeInfo(TypeInfo::Kind::Void);
 }
+
 void Phase2Analyzer::visit(parser::LoopWhileExpr* expr) {
     visitExpr(expr->body.get());
     visitExpr(expr->condition.get());
+    if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
+        report(ErrorType::TYPE_ERROR, "La condición de 'loop-while' debe ser de tipo Boolean", 0, 0, "loop-while");
+    }
+    current_type_ = TypeInfo(TypeInfo::Kind::Void);
 }
 
 void Phase2Analyzer::visit(parser::BlockExpr* expr) {
+    TypeInfo block_type = TypeInfo(TypeInfo::Kind::Void);
     for (const auto& sub : expr->exprs) {
         visitExpr(sub.get());
+        block_type = current_type_;
     }
+    current_type_ = block_type;
 }
 
 void Phase2Analyzer::visit(parser::LetExpr* expr) {
     visitExpr(expr->initializer.get());
+    TypeInfo init_type = current_type_;
+    TypeInfo declared_type = resolveType(expr->declared_type);
+
+    if (expr->declared_type.has_value() && !init_type.conformsTo(declared_type)) {
+        report(ErrorType::TYPE_ERROR, "El tipo de la expresión no conforma al tipo declarado: esperado '" + declared_type.toString() + "', obtenido '" + init_type.toString() + "'", expr->name.line, expr->name.col, "expresión let");
+    }
 
     symbol_table_.enterScope();
 
@@ -339,12 +599,15 @@ void Phase2Analyzer::visit(parser::LetExpr* expr) {
         report(ErrorType::REDEFINED_VARIABLE,
                "Variable '" + expr->name.lexeme + "' ya está definida en este ámbito",
                expr->name.line, expr->name.col, "expresión let");
-    } else if (!symbol_table_.declareVariable(expr->name.lexeme, TypeInfo(TypeInfo::Kind::Unknown))) {
-        report(ErrorType::REDEFINED_VARIABLE,
-               "Variable '" + expr->name.lexeme + "' ya está definida en este ámbito",
-               expr->name.line,
-               expr->name.col,
-               "expresión let");
+    } else {
+        TypeInfo var_type = expr->declared_type.has_value() ? declared_type : init_type;
+        if (!symbol_table_.declareVariable(expr->name.lexeme, var_type)) {
+            report(ErrorType::REDEFINED_VARIABLE,
+                   "Variable '" + expr->name.lexeme + "' ya está definida en este ámbito",
+                   expr->name.line,
+                   expr->name.col,
+                   "expresión let");
+        }
     }
 
     visitExpr(expr->body.get());
@@ -353,6 +616,12 @@ void Phase2Analyzer::visit(parser::LetExpr* expr) {
 
 void Phase2Analyzer::visit(parser::IdentifierExpr* expr) {
     resolveVariableUse(expr->token, "identificador");
+    auto* sym = symbol_table_.lookupVariable(expr->token.lexeme);
+    if (sym) {
+        current_type_ = sym->type;
+    } else {
+        current_type_ = TypeInfo(TypeInfo::Kind::Unknown);
+    }
 }
 
 }  // namespace semantic

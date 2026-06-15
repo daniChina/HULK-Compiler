@@ -1,0 +1,2 @@
+class Person(first: String, last: String) {}
+class K(f: String) is Person(f) {}

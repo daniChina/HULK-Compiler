@@ -15,6 +15,8 @@ namespace semantic {
 // Analizador Fase 2 sobre el AST local (`parser::`). Analizador semántico activo (R1–R4).
 class Phase2Analyzer : public parser::ExprVisitor, public parser::StmtVisitor {
 public:
+    Phase2Analyzer() : current_type_(TypeInfo::Kind::Unknown), current_class_("") {}
+
     void analyze(parser::Program* program);
 
     bool hasErrors() const { return error_manager_.hasErrors(); }
@@ -75,6 +77,10 @@ private:
     void collectClassDeclarations(parser::Program* program);
     void registerClassDecl(parser::ClassDecl* stmt);
     bool isBuiltinNominalType(const std::string& name) const;
+
+    TypeInfo current_type_;
+    std::string current_class_;
+    TypeInfo resolveType(const std::optional<parser::Token>& token);
 };
 
 }  // namespace semantic
