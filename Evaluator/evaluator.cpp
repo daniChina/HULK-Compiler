@@ -507,6 +507,11 @@ void Evaluator::invokeUserFunction(const UserFunction& fn,
 
 bool Evaluator::callBuiltin(const std::string& name, const std::vector<parser::ExprPtr>& args) {
     if (name == "print") {
+        if (args.empty()) {
+            out_ << '\n';
+            current_ = value::Value(0.0);
+            return true;
+        }
         if (args.size() != 1) {
             setError("print espera 1 argumento");
             return true;
@@ -766,38 +771,6 @@ void Evaluator::visit(parser::WithExpr* expr) {
     global_ = saved;
 }
 void Evaluator::visit(parser::CaseExpr* expr) { (void)expr; setError("case no implementado"); }
-void Evaluator::visit(parser::IsExpr* expr) {
-    visitExpr(expr->object.get());
-    if (had_error_) {
-        return;
-    }
-    const value::Value left = current_;
-    const std::string& target = expr->type_name.lexeme;
-
-    if (!left.isInstance()) {
-        if (target == "Null" && left.isNull()) {
-            current_ = value::Value(true);
-        } else if (target == "Number" && left.isNumber()) {
-            current_ = value::Value(true);
-        } else if (target == "String" && left.isString()) {
-            current_ = value::Value(true);
-        } else if (target == "Boolean" && left.isBool()) {
-            current_ = value::Value(true);
-        } else {
-            current_ = value::Value(false);
-        }
-        return;
-    }
-
-    const auto instance = left.asInstance();
-    if (!instance || !instance->type_def) {
-        current_ = value::Value(false);
-        return;
-    }
-
-    current_ = value::Value(instanceConformsTo(instance->type_def, target));
-}
-
 void Evaluator::visit(parser::AsExpr* expr) {
     visitExpr(expr->object.get());
     if (had_error_) {

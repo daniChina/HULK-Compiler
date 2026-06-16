@@ -1,0 +1,3 @@
+function tag(s) => "x" @ s;
+
+print(tag("a"));

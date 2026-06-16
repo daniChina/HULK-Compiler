@@ -1,4 +1,4 @@
-.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_eval test_eval_fixtures
+.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_eval test_eval_fixtures test_is_as_smoke
 
 # Compilador y flags
 CXX = g++
@@ -44,6 +44,7 @@ EVAL_LOOPS_TEST_TARGET = eval_loops_smoke
 EVAL_WITH_TEST_TARGET = eval_with_smoke
 EVAL_OO_TEST_TARGET = eval_oo_smoke
 EVAL_LITERALS_TEST_TARGET = eval_literals_smoke
+IS_AS_SMOKE_TARGET = is_as_smoke
 
 TARGET = hulk_c.exe
 TYPE_TEST_TARGET = type_info_smoke
@@ -96,6 +97,10 @@ test_a4_builtins:
 
 test_semantic: test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins
 
+test_is_as_smoke:
+	$(CXX) $(CXXFLAGS) Parser/tests/is_as_expr_pipeline_smoke.cpp $(PARSER_TEST_COMMON) -o $(IS_AS_SMOKE_TARGET)
+	./$(IS_AS_SMOKE_TARGET)
+
 test_eval:
 	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_TEST_TARGET)
 	./$(EVAL_TEST_TARGET)
@@ -125,4 +130,4 @@ test_eval_fixtures: compile
 endif
 
 clean:
-	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_LITERALS_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) $(EVAL_OO_TEST_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_LITERALS_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) $(EVAL_OO_TEST_TARGET) $(IS_AS_SMOKE_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o

@@ -23,7 +23,7 @@ invalid/30_e_child_before_parent.hulk	semantic	no est
 invalid/31_e_undefined_type_new.hulk	semantic	no est
 invalid/32_e_redefined_class.hulk	semantic	ya est
 invalid/33_e_new_wrong_arity.hulk	semantic	espera
-invalid/46_e_is_undefined_type.hulk	semantic	no est
+invalid/46_e_is_undefined_type.hulk	parse	IS
 invalid/42_e_inherit_primitive.hulk	semantic	heredar
 invalid/43_e_base_ghost.hulk	semantic	no est
 invalid/44_e_base_args_arity.hulk	semantic	espera
@@ -37,6 +37,7 @@ invalid/40_e_self_assign.hulk	semantic	self
 invalid/41_e_base_outside_method.hulk	semantic	Llamada
 invalid/45_e_base_args_type.hulk	semantic	Error de tipos
 invalid/47_e_as_undefined_type.hulk	semantic	no definido
+invalid/47_i1_inheritance_cycle.hulk	semantic	ciclic
 invalid/48_e_as_type_error.hulk	semantic	Error de tipos
 invalid/50_t_add_number_string.hulk	semantic	Error de tipos
 invalid/51_t_concat_bad_operand.hulk	semantic	Error de tipos
@@ -50,4 +51,6 @@ invalid/58_t_call_arg_type.hulk	semantic	Error de tipos
 invalid/59_t_method_return_mismatch.hulk	semantic	Error de tipos
 invalid/60_t_new_arg_type.hulk	semantic	Error de tipos
 invalid/61_g_repeat_non_string.hulk	semantic	Error de tipos
+invalid/62_i1_self_inheritance.hulk	semantic	ciclic
+invalid/63_i1_three_way_cycle.hulk	semantic	ciclic
 

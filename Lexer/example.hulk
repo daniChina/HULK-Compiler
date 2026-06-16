@@ -72,13 +72,9 @@ class Knight(firstname:String, lastname:String) is Person(firstname, lastname) {
     name() -> "Sir" @@ self.firstname;
 }
 
-// 9. Type Checking (is) and Downcasting (as)
+// 9. Downcasting (as)
 let x : Object = new Knight("Phil", "Collins") in {
-    if (x is Knight) {
-        let k = x as Knight in print(k.name());
-    } else {
-        print("Not a knight");
-    };
+    let k = x as Knight in print(k.name());
 }
 
 // 10. Protocols (Structural Typing)

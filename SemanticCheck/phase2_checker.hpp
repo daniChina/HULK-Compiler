@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -13,6 +14,7 @@
 namespace semantic {
 
 // Analizador Fase 2 sobre el AST local (`parser::`). Analizador semántico activo (R1–R4).
+// Pasadas: (1) collect clases/funciones; (2) clases; (3) fixed-point ≤10 sobre funciones + stmts restantes (I2/I3/I5).
 class Phase2Analyzer : public parser::ExprVisitor, public parser::StmtVisitor {
 public:
     Phase2Analyzer() : current_type_(TypeInfo::Kind::Unknown), current_class_("") {}
@@ -41,7 +43,6 @@ public:
     void visit(parser::ForExpr* expr) override;
     void visit(parser::WithExpr* expr) override;
     void visit(parser::CaseExpr* expr) override;
-    void visit(parser::IsExpr* expr) override;
     void visit(parser::AsExpr* expr) override;
     void visit(parser::AssignExpr* expr) override;
     void visit(parser::NewExpr* expr) override;
@@ -77,9 +78,21 @@ private:
     void collectClassDeclarations(parser::Program* program);
     void collectFunctionDeclarations(parser::Program* program);
     void registerClassDecl(parser::ClassDecl* stmt);
+    bool validateInheritanceChain(const std::string& class_name, const std::string& base_name,
+                                  int line, int col);
     bool isBuiltinNominalType(const std::string& name) const;
     bool validateTypeExists(const std::optional<parser::Token>& token);
+    void propagateTypeToExpr(parser::Expr* expr, const TypeInfo& type);
+    void propagateNumericPair(parser::Expr* left, parser::Expr* right, TypeInfo& left_type,
+                              TypeInfo& right_type);
+    void propagateStringPair(parser::Expr* left, parser::Expr* right, TypeInfo& left_type,
+                             TypeInfo& right_type);
+    void propagateBooleanPair(parser::Expr* left, parser::Expr* right, TypeInfo& left_type,
+                              TypeInfo& right_type);
+    bool analyzeFunctionDecl(parser::FunctionDecl* stmt);
+    void runInferencePasses(parser::Program* program);
 
+    std::map<std::string, std::string> pending_class_parents_;
     TypeInfo current_type_;
     std::string current_class_;
     TypeInfo resolveType(const std::optional<parser::Token>& token);

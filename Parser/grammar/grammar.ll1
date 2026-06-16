@@ -116,7 +116,6 @@ WithSourceCmpExprTail -> LESS WithSourceConcatExpr WithSourceCmpExprTail
                       | GREATER_EQUAL WithSourceConcatExpr WithSourceCmpExprTail
                       | EQUAL_EQUAL WithSourceConcatExpr WithSourceCmpExprTail
                       | BANG_EQUAL WithSourceConcatExpr WithSourceCmpExprTail
-                      | IS IDENTIFIER WithSourceCmpExprTail
                       | ε
 
 WithSourceConcatExpr     -> WithSourceAddExpr WithSourceConcatExprTail
@@ -189,7 +188,6 @@ CmpExprTail     -> LESS ConcatExpr CmpExprTail
                 | GREATER_EQUAL ConcatExpr CmpExprTail
                 | EQUAL_EQUAL ConcatExpr CmpExprTail
                 | BANG_EQUAL ConcatExpr CmpExprTail
-                | IS IDENTIFIER CmpExprTail
                 | ε
 
 ConcatExpr      -> AddExpr ConcatExprTail

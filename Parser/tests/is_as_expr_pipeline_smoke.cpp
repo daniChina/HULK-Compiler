@@ -1,3 +1,5 @@
+// Smoke: operador `as` y herencia con `is` en declaraciones de clase.
+// Compilar: mingw32-make test_is_as_smoke  o  scripts/run_is_as_smoke.ps1
 #include <exception>
 #include <initializer_list>
 #include <iostream>
@@ -89,6 +91,24 @@ bool expect_program_ast(
     }
 }
 
+bool expect_parse_failure(
+    const std::string& name,
+    const parser::generator::Grammar& grammar,
+    const parser::generator::Ll1TableResult& ll1_table,
+    const std::string& source) {
+    try {
+        auto tokens = tokenize_source(source);
+        parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
+        const auto parse_result = parser.parse();
+        parser::cst_to_ast(*parse_result.cst_root);
+        std::cerr << "[FAIL] " << name << ": se esperaba error de parseo\n";
+        return false;
+    } catch (const std::exception&) {
+        std::cout << "[OK] " << name << " -> parse error esperado\n";
+        return true;
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -98,24 +118,6 @@ int main() {
         const auto ll1_table = parser::generator::build_ll1_table(grammar, first_follow);
 
         bool ok = true;
-
-        {
-            const auto tokens = tokenize_source("x is Person;");
-            ok &= expect_token_types(
-                "lexer recognizes is type check",
-                tokens,
-                {parser::TokenType::IDENTIFIER, parser::TokenType::IS, parser::TokenType::IDENTIFIER,
-                 parser::TokenType::SEMICOLON, parser::TokenType::EOF_TOKEN});
-
-            ok &= expect_program_ast(
-                "pipeline builds AST for is expression",
-                grammar,
-                ll1_table,
-                "x is Person;",
-                "Program(\n"
-                "  ExprStmt(Is(Identifier(x), Person))\n"
-                ")");
-        }
 
         {
             const auto tokens = tokenize_source("x as Number;");
@@ -136,15 +138,6 @@ int main() {
         }
 
         ok &= expect_program_ast(
-            "pipeline chains is checks left-associatively",
-            grammar,
-            ll1_table,
-            "x is Person is Animal;",
-            "Program(\n"
-            "  ExprStmt(Is(Is(Identifier(x), Person), Animal))\n"
-            ")");
-
-        ok &= expect_program_ast(
             "pipeline chains as casts left-associatively",
             grammar,
             ll1_table,
@@ -154,31 +147,29 @@ int main() {
             ")");
 
         ok &= expect_program_ast(
-            "pipeline binds postfix before as and is at comparison level",
+            "pipeline binds postfix before as at comparison level",
             grammar,
             ll1_table,
-            "x.m as Number is Person;",
+            "x.m as Number;",
             "Program(\n"
-            "  ExprStmt(Is(As(GetAttr(Identifier(x), m), Number), Person))\n"
+            "  ExprStmt(As(GetAttr(Identifier(x), m), Number))\n"
             ")");
 
         ok &= expect_program_ast(
-            "pipeline parses is before equality at comparison level",
+            "pipeline parses class inheritance with is keyword",
             grammar,
             ll1_table,
-            "x is Person == true;",
+            "class Child() is Parent() {}",
             "Program(\n"
-            "  ExprStmt(Binary(Is(Identifier(x), Person), ==, Bool(true)))\n"
+            "  ClassDecl(Child is Parent {\n"
+            "})\n"
             ")");
 
-        ok &= expect_program_ast(
-            "pipeline parses is inside with source expression",
+        ok &= expect_parse_failure(
+            "pipeline rejects is as expression operator",
             grammar,
             ll1_table,
-            "with (v is Person as alias) alias.name;",
-            "Program(\n"
-            "  ExprStmt(With(Is(Identifier(v), Person) as alias, GetAttr(Identifier(alias), name)))\n"
-            ")");
+            "x is Person;");
 
         return ok ? 0 : 1;
     } catch (const std::exception& error) {

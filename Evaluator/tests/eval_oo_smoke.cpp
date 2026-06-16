@@ -93,12 +93,5 @@ int main() {
         "10\n",
         "C6: as downcast + method");
 
-    ok &= runProgram(
-        "class Person(name:String) { name:String = name; }\n"
-        "class Student(name:String) is Person(name) {}\n"
-        "print(let s = new Student(\"A\") in s is Student);\n",
-        "true\n",
-        "C6: is instance type");
-
     return ok ? 0 : 1;
 }

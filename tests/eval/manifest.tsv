@@ -1,4 +1,5 @@
 # valid/<archivo>	expected_stdout (literal, incluye \n final)
+valid/01_v0_print_empty.hulk	\n
 valid/02_v0_print_string.hulk	"hi"\n
 valid/12_v1_string_concat.hulk	"ab"\n
 valid/13_v1_null.hulk	Null\n0\n0\n
@@ -19,4 +20,4 @@ valid/90_v10_new_attr.hulk	1\n
 valid/91_v11_set_attr.hulk	5\n
 valid/92_v11_method.hulk	1\n
 valid/93_v12_base.hulk	"King Arthur Pendragon"\n
-valid/94_v13_is.hulk	true\nfalse\n
+valid/94_v13_is.hulk	"A"\n

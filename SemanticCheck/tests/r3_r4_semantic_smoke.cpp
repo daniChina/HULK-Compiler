@@ -90,6 +90,12 @@ int main() {
     ok &= expect_ok("R4 declare b then a",
                     "function b() => 1;\nfunction a() => b();\nprint(a());");
     ok &= expect_ok("R4 builtin print", "print(\"ok\");");
+    ok &= expect_ok("I4 print no args", "print();");
+    ok &= expect_ok("I2 infer param from body", "function f(x) => x + 1;\nprint(f(2));");
+    ok &= expect_ok("I2 mutual infer params",
+                    "function a(x) => b(x);\nfunction b(x) => x + 1;\nprint(a(1));");
+    ok &= expect_ok("I3 propagate from call",
+                    "function g(x:Number) => x;\nfunction h(y) => g(y);\nprint(h(1));");
 
     return ok ? 0 : 1;
 }

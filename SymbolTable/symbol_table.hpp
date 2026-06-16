@@ -526,6 +526,7 @@ private:
                                 {TypeInfo(TypeInfo::Kind::Number), TypeInfo(TypeInfo::Kind::Number)},
                                 TypeInfo(TypeInfo::Kind::Number));
         registerBuiltinFunction("rand", {}, TypeInfo(TypeInfo::Kind::Number));
+        registerBuiltinFunction("print", {}, TypeInfo(TypeInfo::Kind::Void));
         registerBuiltinFunction("print", {TypeInfo(TypeInfo::Kind::Unknown)},
                                 TypeInfo(TypeInfo::Kind::Void));
         registerBuiltinFunction("range",

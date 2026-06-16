@@ -29,7 +29,6 @@ enum class ExprKind {
     FOR,
     WITH,
     CASE_EXPR,
-    IS_EXPR,
     AS_EXPR,
     ASSIGN_EXPR,
     NEW_OBJ,
@@ -297,15 +296,6 @@ struct CaseExpr final : Expr {
 
     ExprPtr value;
     std::vector<CaseBranchDef> branches;
-};
-
-struct IsExpr final : Expr {
-    IsExpr(ExprPtr object, Token is_keyword, Token type_name);
-    void accept(ExprVisitor* visitor) override;
-
-    ExprPtr object;
-    Token is_keyword;
-    Token type_name;
 };
 
 struct AsExpr final : Expr {

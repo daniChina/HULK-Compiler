@@ -49,11 +49,12 @@ bool expect_table_builtins() {
     } else {
         std::cout << "[OK] SymbolTable: range registrado como builtin\n";
     }
-    if (!table.lookupVariable("PI") || !table.lookupFunction("print", 1)) {
+    if (!table.lookupVariable("PI") || !table.lookupFunction("print", 0) ||
+        !table.lookupFunction("print", 1)) {
         std::cerr << "[FAIL] lookupVariable/lookupFunction no resuelven builtins\n";
         ok = false;
     } else {
-        std::cout << "[OK] resolución #11: lookupVariable(PI), lookupFunction(print,1)\n";
+        std::cout << "[OK] resolución #11: lookupVariable(PI), lookupFunction(print,0/1)\n";
     }
     return ok;
 }

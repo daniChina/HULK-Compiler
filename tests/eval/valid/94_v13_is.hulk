@@ -2,5 +2,4 @@ class Person(name:String) {
     name:String = name;
 }
 class Student(name:String) is Person(name) {}
-print(let s = new Student("A") in s is Person);
-print(let p = new Person("A") in p is Student);
+print(let s = new Student("A") in s.name);

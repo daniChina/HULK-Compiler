@@ -31,7 +31,6 @@ using parser::GetAttrExpr;
 using parser::SetAttrExpr;
 using parser::MethodCallExpr;
 using parser::BaseCallExpr;
-using parser::IsExpr;
 using parser::AsExpr;
 using parser::UnlessExpr;
 using parser::RepeatExpr;

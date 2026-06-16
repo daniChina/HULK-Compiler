@@ -21,7 +21,6 @@ struct WhileExpr;
 struct ForExpr;
 struct WithExpr;
 struct CaseExpr;
-struct IsExpr;
 struct AsExpr;
 struct AssignExpr;
 struct NewExpr;
@@ -62,7 +61,6 @@ struct ExprVisitor {
     virtual void visit(ForExpr* expr) = 0;
     virtual void visit(WithExpr* expr) = 0;
     virtual void visit(CaseExpr* expr) = 0;
-    virtual void visit(IsExpr* expr) = 0;
     virtual void visit(AsExpr* expr) = 0;
     virtual void visit(AssignExpr* expr) = 0;
     virtual void visit(NewExpr* expr) = 0;

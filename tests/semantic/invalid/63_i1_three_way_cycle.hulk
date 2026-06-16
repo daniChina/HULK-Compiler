@@ -1,0 +1,5 @@
+class A is C {}
+
+class B is A {}
+
+class C is B {}

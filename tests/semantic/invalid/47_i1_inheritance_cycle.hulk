@@ -1,0 +1,3 @@
+class A is B {}
+
+class B is A {}
