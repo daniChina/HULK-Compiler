@@ -55,4 +55,5 @@ invalid/62_i1_self_inheritance.hulk	semantic	ciclic
 invalid/63_i1_three_way_cycle.hulk	semantic	ciclic
 invalid/64_i7_for_type_mismatch.hulk	semantic	conforma
 invalid/65_i8_attr_infer_mismatch.hulk	semantic	conforma
+invalid/66_i10_grandchild_override_mismatch.hulk	semantic	Error de tipos
 

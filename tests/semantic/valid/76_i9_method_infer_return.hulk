@@ -1,0 +1,4 @@
+class C {
+    double(x) => x + x;
+}
+let c = new C() in print(c.double(1));

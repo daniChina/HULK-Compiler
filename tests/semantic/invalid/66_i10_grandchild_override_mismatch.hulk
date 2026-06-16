@@ -1,0 +1,8 @@
+class GrandParent() {
+    greet() => "hello";
+}
+class Parent() is GrandParent() {}
+class Child() is Parent() {
+    greet() => 1;
+}
+print(0);

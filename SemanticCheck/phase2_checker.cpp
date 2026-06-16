@@ -2,6 +2,8 @@
 
 #include "../Types/type_info.hpp"
 #include <memory>
+#include <optional>
+#include <utility>
 #include <vector>
 
 namespace semantic {
@@ -40,6 +42,7 @@ void Phase2Analyzer::report(ErrorType type, const std::string& message, int line
 void Phase2Analyzer::visitExpr(parser::Expr* expr) {
     if (expr) {
         expr->accept(this);
+        type_map_.set(expr, current_type_);
     }
 }
 
@@ -54,6 +57,7 @@ void Phase2Analyzer::analyze(parser::Program* program) {
         return;
     }
     TypeInfo::setSymbolTable(&symbol_table_);
+    type_map_.clear();
     drainPendingLetBindingErrors(error_manager_);
     collectClassDeclarations(program);
     collectFunctionDeclarations(program);
@@ -65,6 +69,7 @@ void Phase2Analyzer::analyze(parser::Program* program) {
     }
 
     runInferencePasses(program);
+    validateMethodOverrideReturns(program);
 }
 
 void Phase2Analyzer::runInferencePasses(parser::Program* program) {
@@ -76,7 +81,13 @@ void Phase2Analyzer::runInferencePasses(parser::Program* program) {
                 if (analyzeFunctionDecl(fn)) {
                     changed = true;
                 }
-            } else if (!dynamic_cast<parser::ClassDecl*>(stmt.get())) {
+            } else if (auto* class_decl = dynamic_cast<parser::ClassDecl*>(stmt.get())) {
+                for (const auto& method : class_decl->methods) {
+                    if (analyzeClassMethod(class_decl, method)) {
+                        changed = true;
+                    }
+                }
+            } else {
                 visitStmt(stmt.get());
             }
         }
@@ -107,6 +118,140 @@ bool Phase2Analyzer::analyzeFunctionDecl(parser::FunctionDecl* stmt) {
         }
     }
     return false;
+}
+
+bool Phase2Analyzer::analyzeClassMethod(parser::ClassDecl* class_decl,
+                                          const parser::MethodDef& method) {
+    const std::string& class_name = class_decl->name.lexeme;
+
+    auto type_sym = symbol_table_.lookupType(class_name);
+    if (!type_sym) {
+        return false;
+    }
+    auto method_sym = type_sym->methods[method.name.lexeme];
+    if (!method_sym) {
+        return false;
+    }
+
+    const TypeInfo old_ret = method_sym->return_type;
+    const std::vector<TypeInfo> old_params = method_sym->parameter_types;
+
+    symbol_table_.enterScope();
+    symbol_table_.declareVariable("self", TypeInfo(TypeInfo::Kind::Object, class_name), false);
+
+    std::vector<TypeInfo> param_types;
+    param_types.reserve(method.params.size());
+    for (const auto& param : method.params) {
+        validateTypeExists(param.second);
+        TypeInfo p_type = param.second.has_value() ? resolveType(param.second)
+                                                   : TypeInfo(TypeInfo::Kind::Unknown);
+        symbol_table_.declareVariable(param.first.lexeme, p_type);
+        param_types.push_back(p_type);
+    }
+
+    std::string old_class = current_class_;
+    current_class_ = class_name;
+
+    visitExpr(method.body.get());
+    TypeInfo body_type = current_type_;
+
+    for (size_t i = 0; i < method.params.size(); ++i) {
+        if (!method.params[i].second.has_value()) {
+            auto* sym = symbol_table_.lookupVariable(method.params[i].first.lexeme);
+            if (sym && sym->type.getKind() != TypeInfo::Kind::Unknown) {
+                param_types[i] = sym->type;
+            }
+        } else {
+            param_types[i] = resolveType(method.params[i].second);
+        }
+    }
+
+    current_class_ = old_class;
+    symbol_table_.exitScope();
+
+    symbol_table_.updateMethodSignature(class_name, method.name.lexeme, param_types, body_type);
+
+    method_sym = symbol_table_.lookupType(class_name)->methods[method.name.lexeme];
+    if (!method_sym) {
+        return false;
+    }
+
+    if (typesDiffer(old_ret, method_sym->return_type)) {
+        return true;
+    }
+    for (size_t i = 0; i < old_params.size(); ++i) {
+        if (typesDiffer(old_params[i], method_sym->parameter_types[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<std::pair<std::shared_ptr<FunctionSymbol>, std::string>>
+Phase2Analyzer::lookupInheritedMethod(const std::string& class_name,
+                                      const std::string& method_name) {
+    auto type_sym = symbol_table_.lookupType(class_name);
+    if (!type_sym || type_sym->base_type == "Object") {
+        return std::nullopt;
+    }
+    auto [method, owner] =
+        symbol_table_.lookupMethodWithOwner(type_sym->base_type, method_name);
+    if (!method) {
+        return std::nullopt;
+    }
+    return std::make_pair(method, owner);
+}
+
+bool Phase2Analyzer::methodSignatureMatchesOverride(const parser::MethodDef& method,
+                                                    const FunctionSymbol& inherited) {
+    if (method.params.size() != inherited.parameter_types.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < method.params.size(); ++i) {
+        TypeInfo param_type = method.params[i].second.has_value()
+                                  ? resolveType(method.params[i].second)
+                                  : TypeInfo(TypeInfo::Kind::Unknown);
+        if (!param_type.conformsTo(inherited.parameter_types[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void Phase2Analyzer::validateMethodOverrideReturns(parser::Program* program) {
+    for (const auto& stmt : program->stmts) {
+        auto* class_decl = dynamic_cast<parser::ClassDecl*>(stmt.get());
+        if (!class_decl) {
+            continue;
+        }
+        const std::string& class_name = class_decl->name.lexeme;
+        auto type_sym = symbol_table_.lookupType(class_name);
+        if (!type_sym) {
+            continue;
+        }
+        for (const auto& method : class_decl->methods) {
+            auto inherited = lookupInheritedMethod(class_name, method.name.lexeme);
+            if (!inherited) {
+                continue;
+            }
+            auto method_sym = type_sym->methods[method.name.lexeme];
+            if (!method_sym) {
+                continue;
+            }
+            const TypeInfo& ret = method_sym->return_type;
+            const TypeInfo& base_ret = inherited->first->return_type;
+            if (ret.isUnknown() || base_ret.isUnknown()) {
+                continue;
+            }
+            if (!ret.conformsTo(base_ret)) {
+                report(ErrorType::TYPE_ERROR,
+                       "El tipo de retorno del método '" + method.name.lexeme + "' ('" +
+                           ret.toString() + "') no conforma al tipo de retorno del método base '" +
+                           inherited->second + "': '" + base_ret.toString() + "'",
+                       method.name.line, method.name.col, "declaración de método");
+            }
+        }
+    }
 }
 
 void Phase2Analyzer::propagateTypeToExpr(parser::Expr* expr, const TypeInfo& type) {
@@ -386,12 +531,12 @@ void Phase2Analyzer::registerClassDecl(parser::ClassDecl* stmt) {
         symbol_table_.addTypeAttribute(name, attr.name.lexeme, attr_type, attr.name.line);
     }
     for (const auto& method : stmt->methods) {
-        std::vector<TypeInfo> method_params;
         for (const auto& p : method.params) {
             validateTypeExists(p.second);
-            method_params.push_back(resolveType(p.second));
         }
-        symbol_table_.addTypeMethod(name, method.name.lexeme, method_params, TypeInfo(TypeInfo::Kind::Unknown), method.name.line);
+        std::vector<TypeInfo> method_params(method.params.size(), TypeInfo(TypeInfo::Kind::Unknown));
+        symbol_table_.addTypeMethod(name, method.name.lexeme, method_params,
+                                    TypeInfo(TypeInfo::Kind::Unknown), method.name.line);
     }
 
     for (const auto& method : stmt->methods) {
@@ -468,33 +613,22 @@ TypeInfo Phase2Analyzer::resolveType(const std::optional<parser::Token>& token) 
 }
 
 void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
-    std::string base = stmt->parent_name ? stmt->parent_name->lexeme : "Object";
+    const std::string& class_name = stmt->name.lexeme;
     for (const auto& method : stmt->methods) {
         checkUniqueParamNames(method.params, method.name.line, method.name.col,
                                "declaración de método");
-        if (base != "Object") {
-            auto base_method = symbol_table_.lookupMethod(base, method.name.lexeme);
-            if (base_method) {
-                bool match = (method.params.size() == base_method->parameter_types.size());
-                if (match) {
-                    for (size_t i = 0; i < method.params.size(); ++i) {
-                        TypeInfo param_type = resolveType(method.params[i].second);
-                        if (!param_type.conformsTo(base_method->parameter_types[i])) {
-                            match = false;
-                            break;
-                        }
-                    }
-                }
-                if (!match) {
-                    report(ErrorType::REDEFINED_METHOD,
-                           "El método '" + method.name.lexeme + "' ya existe en el tipo base '" + base + "' con una firma diferente",
-                           method.name.line, method.name.col, "declaración de método");
-                }
+        auto inherited = lookupInheritedMethod(class_name, method.name.lexeme);
+        if (inherited) {
+            if (!methodSignatureMatchesOverride(method, *inherited->first)) {
+                report(ErrorType::REDEFINED_METHOD,
+                       "El método '" + method.name.lexeme + "' ya existe en el tipo base '" +
+                           inherited->second + "' con una firma diferente",
+                       method.name.line, method.name.col, "declaración de método");
             }
         }
     }
 
-    const std::string& class_name = stmt->name.lexeme;
+    std::string base = stmt->parent_name ? stmt->parent_name->lexeme : "Object";
     std::string old_class = current_class_;
     current_class_ = class_name;
 
@@ -583,49 +717,6 @@ void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
     }
 
     symbol_table_.exitScope();
-
-    // Analyze method bodies
-    for (const auto& method : stmt->methods) {
-        symbol_table_.enterScope();
-        
-        // Declare self
-        symbol_table_.declareVariable("self", TypeInfo(TypeInfo::Kind::Object, class_name), false);
-        
-        // Declare method parameters
-        for (const auto& param : method.params) {
-            validateTypeExists(param.second);
-            TypeInfo p_type = resolveType(param.second);
-            symbol_table_.declareVariable(param.first.lexeme, p_type);
-        }
-        
-        // Analyze method body
-        visitExpr(method.body.get());
-        TypeInfo body_type = current_type_;
-        
-        symbol_table_.exitScope();
-        
-        // Update method return type in symbol table if it was previously Unknown
-        auto type_sym = symbol_table_.lookupType(class_name);
-        if (type_sym) {
-            auto method_sym = type_sym->methods[method.name.lexeme];
-            if (method_sym && method_sym->return_type.getKind() == TypeInfo::Kind::Unknown) {
-                method_sym->return_type = body_type;
-            }
-        }
-        
-        // Validate override conformance
-        if (base != "Object") {
-            auto base_method = symbol_table_.lookupMethod(base, method.name.lexeme);
-            if (base_method) {
-                if (!body_type.conformsTo(base_method->return_type)) {
-                    report(ErrorType::TYPE_ERROR,
-                           "El tipo de retorno del método '" + method.name.lexeme + "' ('" + body_type.toString() +
-                               "') no conforma al tipo de retorno del método base '" + base + "': '" + base_method->return_type.toString() + "'",
-                           method.name.line, method.name.col, "declaración de método");
-                }
-            }
-        }
-    }
 
     current_class_ = old_class;
 }
@@ -776,6 +867,16 @@ void Phase2Analyzer::visit(parser::CallExpr* expr) {
                     report(ErrorType::ARGUMENT_COUNT_MISMATCH, "El método '" + get_attr->name.lexeme + "' espera " + std::to_string(method->parameter_types.size()) + " argumento(s) pero se recibieron " + std::to_string(expr->args.size()), get_attr->name.line, get_attr->name.col, "llamada a método");
                 } else {
                     for (size_t i = 0; i < expr->args.size(); ++i) {
+                        if (method->parameter_types[i].getKind() != TypeInfo::Kind::Unknown) {
+                            propagateTypeToExpr(expr->args[i].get(), method->parameter_types[i]);
+                            if (auto* id = dynamic_cast<parser::IdentifierExpr*>(expr->args[i].get())) {
+                                if (auto* sym = symbol_table_.lookupVariable(id->token.lexeme)) {
+                                    arg_types[i] = sym->type;
+                                }
+                            }
+                        }
+                    }
+                    for (size_t i = 0; i < expr->args.size(); ++i) {
                         if (!arg_types[i].conformsTo(method->parameter_types[i])) {
                             report(ErrorType::TYPE_ERROR,
                                    "El argumento " + std::to_string(i + 1) + " del método '" + get_attr->name.lexeme +
@@ -792,6 +893,10 @@ void Phase2Analyzer::visit(parser::CallExpr* expr) {
         }
     } else {
         visitExpr(expr->callee.get());
+    }
+
+    if (expr->callee && !type_map_.has(expr->callee.get())) {
+        type_map_.set(expr->callee.get(), TypeInfo(TypeInfo::Kind::Unknown));
     }
 
     current_type_ = ret_type;
@@ -1051,6 +1156,16 @@ void Phase2Analyzer::visit(parser::MethodCallExpr* expr) {
             if (expr->args.size() != method->parameter_types.size()) {
                 report(ErrorType::ARGUMENT_COUNT_MISMATCH, "El método '" + expr->method_name.lexeme + "' espera " + std::to_string(method->parameter_types.size()) + " argumento(s) pero se recibieron " + std::to_string(expr->args.size()), expr->method_name.line, expr->method_name.col, "llamada a método");
             } else {
+                for (size_t i = 0; i < expr->args.size(); ++i) {
+                    if (method->parameter_types[i].getKind() != TypeInfo::Kind::Unknown) {
+                        propagateTypeToExpr(expr->args[i].get(), method->parameter_types[i]);
+                        if (auto* id = dynamic_cast<parser::IdentifierExpr*>(expr->args[i].get())) {
+                            if (auto* sym = symbol_table_.lookupVariable(id->token.lexeme)) {
+                                arg_types[i] = sym->type;
+                            }
+                        }
+                    }
+                }
                 for (size_t i = 0; i < expr->args.size(); ++i) {
                     if (!arg_types[i].conformsTo(method->parameter_types[i])) {
                         report(ErrorType::TYPE_ERROR,

@@ -429,6 +429,29 @@ public:
     }
 
     /**
+     * @brief Update method signature with new parameter and return types
+     */
+    bool updateMethodSignature(const std::string &type_name, const std::string &method_name,
+                               const std::vector<TypeInfo> &params, const TypeInfo &return_type)
+    {
+        auto type_symbol = lookupType(type_name);
+        if (!type_symbol)
+        {
+            return false;
+        }
+
+        auto found = type_symbol->methods.find(method_name);
+        if (found == type_symbol->methods.end())
+        {
+            return false;
+        }
+
+        found->second->parameter_types = params;
+        found->second->return_type = return_type;
+        return true;
+    }
+
+    /**
      * @brief Look up an attribute in a type (recursively in base types)
      */
     Symbol *lookupAttribute(const std::string &type_name, const std::string &attr_name)
@@ -466,6 +489,32 @@ public:
             return lookupMethod(type_symbol->base_type, method_name);
 
         return nullptr;
+    }
+
+    /**
+     * @brief Look up a method and the type that declares it (walks base types)
+     */
+    std::pair<std::shared_ptr<FunctionSymbol>, std::string> lookupMethodWithOwner(
+        const std::string &type_name, const std::string &method_name)
+    {
+        auto type_symbol = lookupType(type_name);
+        if (!type_symbol)
+        {
+            return {nullptr, ""};
+        }
+
+        auto found = type_symbol->methods.find(method_name);
+        if (found != type_symbol->methods.end())
+        {
+            return {found->second, type_name};
+        }
+
+        if (type_symbol->base_type != "Object")
+        {
+            return lookupMethodWithOwner(type_symbol->base_type, method_name);
+        }
+
+        return {nullptr, ""};
     }
 
 private:

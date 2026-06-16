@@ -1,0 +1,6 @@
+// Ejemplo mínimo: edita este archivo o crea otro .hulk en playground/
+function greet(name: String): String {
+    "Hola, " @ name @ "!";
+}
+
+print(greet("HULK"));

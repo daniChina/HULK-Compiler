@@ -1,0 +1,5 @@
+class C {
+    a(x) => self.b(x);
+    b(x) => x + 1;
+}
+let c = new C() in print(c.a(1));

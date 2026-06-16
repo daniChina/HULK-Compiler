@@ -1,0 +1,5 @@
+class C {
+    helper(x: Number) => x;
+    outer(y) => self.helper(y);
+}
+let c = new C() in print(c.outer(1));

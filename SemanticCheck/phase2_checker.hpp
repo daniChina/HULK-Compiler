@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -10,16 +11,19 @@
 #include "../SymbolTable/symbol_table.hpp"
 #include "binding_list.hpp"
 #include "error.hpp"
+#include "type_map.hpp"
 
 namespace semantic {
 
 // Analizador Fase 2 sobre el AST local (`parser::`). Analizador semántico activo (R1–R4).
-// Pasadas: (1) collect clases/funciones; (2) clases; (3) fixed-point ≤10 sobre funciones + stmts restantes (I2/I3/I5).
+// Pasadas: (1) collect; (2) clases; (3) fixed-point; (4) override retorno; TypeMap en cada visitExpr (I11).
 class Phase2Analyzer : public parser::ExprVisitor, public parser::StmtVisitor {
 public:
     Phase2Analyzer() : current_type_(TypeInfo::Kind::Unknown), current_class_("") {}
 
     void analyze(parser::Program* program);
+
+    const TypeMap& getTypeMap() const { return type_map_; }
 
     bool hasErrors() const { return error_manager_.hasErrors(); }
     void printErrors(std::ostream& out = std::cerr) const { error_manager_.printErrors(out); }
@@ -90,9 +94,16 @@ private:
     void propagateBooleanPair(parser::Expr* left, parser::Expr* right, TypeInfo& left_type,
                               TypeInfo& right_type);
     bool analyzeFunctionDecl(parser::FunctionDecl* stmt);
+    bool analyzeClassMethod(parser::ClassDecl* class_decl, const parser::MethodDef& method);
     void runInferencePasses(parser::Program* program);
+    void validateMethodOverrideReturns(parser::Program* program);
+    std::optional<std::pair<std::shared_ptr<FunctionSymbol>, std::string>>
+    lookupInheritedMethod(const std::string& class_name, const std::string& method_name);
+    bool methodSignatureMatchesOverride(const parser::MethodDef& method,
+                                        const FunctionSymbol& inherited);
 
     std::map<std::string, std::string> pending_class_parents_;
+    TypeMap type_map_;
     TypeInfo current_type_;
     std::string current_class_;
     TypeInfo resolveType(const std::optional<parser::Token>& token);

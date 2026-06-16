@@ -1,4 +1,4 @@
-.PHONY: all compile lexer clean execute test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_eval test_eval_fixtures test_is_as_smoke
+.PHONY: all compile lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke
 
 # Compilador y flags
 CXX = g++
@@ -37,6 +37,7 @@ R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
 R3_R4_SEMANTIC_TEST_TARGET = r3_r4_semantic_smoke
 A4_BUILTINS_TEST_TARGET = a4_builtins_smoke
+TYPE_MAP_TEST_TARGET = type_map_smoke
 EVAL_TEST_TARGET = eval_smoke
 EVAL_FUNCTIONS_TEST_TARGET = eval_functions_smoke
 EVAL_OPS_TEST_TARGET = eval_ops_smoke
@@ -95,7 +96,11 @@ test_a4_builtins:
 	$(CXX) $(CXXFLAGS) SemanticCheck/tests/a4_builtins_smoke.cpp $(PARSER_TEST_COMMON) SemanticCheck/phase2_checker.cpp -o $(A4_BUILTINS_TEST_TARGET)
 	./$(A4_BUILTINS_TEST_TARGET)
 
-test_semantic: test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins
+test_type_map:
+	$(CXX) $(CXXFLAGS) SemanticCheck/tests/type_map_smoke.cpp $(PARSER_TEST_COMMON) SemanticCheck/phase2_checker.cpp -o $(TYPE_MAP_TEST_TARGET)
+	./$(TYPE_MAP_TEST_TARGET)
+
+test_semantic: test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map
 
 test_is_as_smoke:
 	$(CXX) $(CXXFLAGS) Parser/tests/is_as_expr_pipeline_smoke.cpp $(PARSER_TEST_COMMON) -o $(IS_AS_SMOKE_TARGET)
@@ -117,12 +122,34 @@ test_eval:
 	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_oo_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_OO_TEST_TARGET)
 	./$(EVAL_OO_TEST_TARGET)
 
+RUN_FILE ?= playground/hello.hulk
+
 ifeq ($(OS),Windows_NT)
+run: compile
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_hulk.ps1 $(RUN_FILE)
+run-pipeline: compile
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_hulk.ps1 -Pipeline $(RUN_FILE)
+run-lexer: compile
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_hulk.ps1 -Lexer $(RUN_FILE)
+run-parse: compile
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_hulk.ps1 -Parse $(RUN_FILE)
+run-semantic: compile
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_hulk.ps1 -SemanticOnly $(RUN_FILE)
 test_semantic_fixtures: compile
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_semantic.ps1
 test_eval_fixtures: compile
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_eval.ps1
 else
+run: compile
+	bash scripts/run_hulk.sh $(RUN_FILE)
+run-pipeline: compile
+	bash scripts/run_hulk.sh --pipeline $(RUN_FILE)
+run-lexer: compile
+	bash scripts/run_hulk.sh --lexer $(RUN_FILE)
+run-parse: compile
+	bash scripts/run_hulk.sh --parse $(RUN_FILE)
+run-semantic: compile
+	bash scripts/run_hulk.sh --semantic-only $(RUN_FILE)
 test_semantic_fixtures: compile
 	bash scripts/run_semantic.sh
 test_eval_fixtures: compile

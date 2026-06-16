@@ -1,0 +1,23 @@
+class Vehicle(spd: Number) {
+ speed: Number = spd;
+ move() => "moving";
+ max_speed() => self.speed;
+}
+
+class Car(spd: Number, d: Number) is Vehicle(spd) {
+ doors: Number = d;
+ move() => "driving";
+}
+
+class Bike(spd: Number) is Vehicle(spd) {
+ move() => "cycling";
+}
+
+let v: Vehicle = new Car(120, 4) in {
+ if (v.move() == "driving") print("ok") else print("fail");
+ if (v.max_speed() == 120) print("ok") else print("fail");
+};
+let b: Vehicle = new Bike(25) in {
+ if (b.move() == "cycling") print("ok") else print("fail");
+ if (b.max_speed() == 25) print("ok") else print("fail");
+};

@@ -1,0 +1,8 @@
+class GrandParent() {
+    greet() => "gp";
+}
+class Parent() is GrandParent() {}
+class Child() is Parent() {
+    greet() => "child";
+}
+let c = new Child() in print(c.greet());
