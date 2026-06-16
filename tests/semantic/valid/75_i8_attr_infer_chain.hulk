@@ -1,0 +1,6 @@
+class C {
+    a = 1;
+    b = a + 1;
+}
+
+let c = new C() in print(c.b);

@@ -1,0 +1,3 @@
+class C {
+    n: String = 0;
+}

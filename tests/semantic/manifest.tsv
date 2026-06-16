@@ -53,4 +53,6 @@ invalid/60_t_new_arg_type.hulk	semantic	Error de tipos
 invalid/61_g_repeat_non_string.hulk	semantic	Error de tipos
 invalid/62_i1_self_inheritance.hulk	semantic	ciclic
 invalid/63_i1_three_way_cycle.hulk	semantic	ciclic
+invalid/64_i7_for_type_mismatch.hulk	semantic	conforma
+invalid/65_i8_attr_infer_mismatch.hulk	semantic	conforma
 

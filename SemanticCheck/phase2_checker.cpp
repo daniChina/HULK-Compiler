@@ -1,6 +1,7 @@
 #include "phase2_checker.hpp"
 
 #include "../Types/type_info.hpp"
+#include <memory>
 #include <vector>
 
 namespace semantic {
@@ -9,6 +10,24 @@ namespace {
 
 bool typesDiffer(const TypeInfo& a, const TypeInfo& b) {
     return a.getKind() != b.getKind() || a.getTypeName() != b.getTypeName();
+}
+
+TypeInfo inferForElementType(SymbolTable& table, parser::Expr* iterable,
+                             const TypeInfo& iterable_type) {
+    if (auto* call = dynamic_cast<parser::CallExpr*>(iterable)) {
+        if (auto* id = dynamic_cast<parser::IdentifierExpr*>(call->callee.get())) {
+            if (id->token.lexeme == "range") {
+                return TypeInfo(TypeInfo::Kind::Number);
+            }
+        }
+    }
+    if (iterable_type.getKind() == TypeInfo::Kind::Object &&
+        !iterable_type.getTypeName().empty()) {
+        if (auto method = table.lookupMethod(iterable_type.getTypeName(), "current")) {
+            return method->return_type;
+        }
+    }
+    return TypeInfo(TypeInfo::Kind::Unknown);
 }
 
 }  // namespace
@@ -339,6 +358,17 @@ void Phase2Analyzer::registerClassDecl(parser::ClassDecl* stmt) {
         }
     }
 
+    // I6: herencia implícita de params y parent_args cuando la subclase no declara ninguno.
+    if (stmt->parent_name && base != "Object" && stmt->params.empty() && stmt->parent_args.empty()) {
+        if (auto* base_class_decl = symbol_table_.getTypeDeclaration(base)) {
+            stmt->params = base_class_decl->params;
+            for (const auto& param : base_class_decl->params) {
+                stmt->parent_args.push_back(
+                    std::make_unique<parser::IdentifierExpr>(param.first));
+            }
+        }
+    }
+
     if (!symbol_table_.declareType(name, base, stmt->name.line)) {
         report(ErrorType::REDEFINED_TYPE, "Tipo '" + name + "' ya está definido", stmt->name.line,
                stmt->name.col, "declaración de clase");
@@ -522,28 +552,34 @@ void Phase2Analyzer::visit(parser::ClassDecl* stmt) {
         symbol_table_.declareVariable(param.first.lexeme, resolveType(param.second));
     }
 
-    // Check each attribute initializer
+    // Check each attribute initializer (I8: inferir tipo si no hay anotación)
     for (const auto& attr : stmt->attributes) {
-        if (attr.value) {
-            visitExpr(attr.value.get());
-            TypeInfo init_type = current_type_;
-            TypeInfo declared_type = resolveType(attr.declared_type);
+        if (!attr.value) {
+            continue;
+        }
+        visitExpr(attr.value.get());
+        TypeInfo init_type = current_type_;
+        TypeInfo attr_type;
 
-            if (attr.declared_type.has_value() && !init_type.conformsTo(declared_type)) {
+        if (attr.declared_type.has_value()) {
+            validateTypeExists(attr.declared_type);
+            attr_type = resolveType(attr.declared_type);
+            if (!init_type.conformsTo(attr_type)) {
                 report(ErrorType::TYPE_ERROR,
                        "El tipo de la expresión de inicialización '" + init_type.toString() +
                            "' no conforma al tipo declarado del atributo '" + attr.name.lexeme +
-                           "': '" + declared_type.toString() + "'",
+                           "': '" + attr_type.toString() + "'",
                        attr.name.line, attr.name.col, "declaración de atributo");
-            } else {
-                if (!attr.declared_type.has_value()) {
-                    auto type_sym = symbol_table_.lookupType(class_name);
-                    if (type_sym) {
-                        type_sym->attributes[attr.name.lexeme].type = init_type;
-                    }
-                }
+            }
+        } else {
+            attr_type = init_type;
+            auto type_sym = symbol_table_.lookupType(class_name);
+            if (type_sym && !init_type.isUnknown()) {
+                type_sym->attributes[attr.name.lexeme].type = init_type;
             }
         }
+
+        symbol_table_.declareVariable(attr.name.lexeme, attr_type, false);
     }
 
     symbol_table_.exitScope();
@@ -806,16 +842,24 @@ void Phase2Analyzer::visit(parser::WhileExpr* expr) {
 
 void Phase2Analyzer::visit(parser::ForExpr* expr) {
     visitExpr(expr->iterable.get());
-    TypeInfo item_type = TypeInfo(TypeInfo::Kind::Unknown);
-    if (auto* call = dynamic_cast<parser::CallExpr*>(expr->iterable.get())) {
-        if (auto* id = dynamic_cast<parser::IdentifierExpr*>(call->callee.get())) {
-            if (id->token.lexeme == "range") {
-                item_type = TypeInfo(TypeInfo::Kind::Number);
-            }
+    const TypeInfo iterable_type = current_type_;
+    TypeInfo item_type = inferForElementType(symbol_table_, expr->iterable.get(), iterable_type);
+
+    TypeInfo loop_var_type = item_type;
+    if (expr->declared_type.has_value()) {
+        validateTypeExists(expr->declared_type);
+        const TypeInfo declared = resolveType(expr->declared_type);
+        if (!item_type.isUnknown() && !item_type.conformsTo(declared)) {
+            report(ErrorType::TYPE_ERROR,
+                   "El tipo del elemento iterable '" + item_type.toString() +
+                       "' no conforma al tipo declarado del iterador '" + declared.toString() + "'",
+                   expr->variable.line, expr->variable.col, "expresión for");
         }
+        loop_var_type = declared;
     }
+
     symbol_table_.enterScope();
-    symbol_table_.declareVariable(expr->variable.lexeme, item_type);
+    symbol_table_.declareVariable(expr->variable.lexeme, loop_var_type);
     visitExpr(expr->body.get());
     symbol_table_.exitScope();
     current_type_ = TypeInfo(TypeInfo::Kind::Void);

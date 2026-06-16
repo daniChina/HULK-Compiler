@@ -1010,12 +1010,16 @@ Token build_type_annotation(const CstNode& node) {
 AttributeDef build_class_attr_from_head(const CstNode& head_node, Token name) {
     expect_symbol(head_node, "ClassAttrListHead");
     const auto& first_child = child(head_node, 0);
-    if (first_child.symbol != "TypeAnnotation") {
-        throw std::runtime_error("Se esperaba atributo con anotacion de tipo en ClassAttrListHead");
+    if (first_child.symbol == "TypeAnnotation") {
+        auto declared_type = build_type_annotation(first_child);
+        ExprPtr value = build_expr(child(head_node, 2));
+        return {std::move(name), std::move(declared_type), std::move(value)};
     }
-    auto declared_type = build_type_annotation(first_child);
-    ExprPtr value = build_expr(child(head_node, 2));
-    return {std::move(name), std::move(declared_type), std::move(value)};
+    if (first_child.token.type == TokenType::EQUAL) {
+        ExprPtr value = build_expr(child(head_node, 1));
+        return {std::move(name), std::nullopt, std::move(value)};
+    }
+    throw std::runtime_error("Se esperaba atributo con '=' en ClassAttrListHead");
 }
 
 MethodDef build_class_method_from_head(const CstNode& head_node, Token name) {
@@ -1034,7 +1038,8 @@ void extract_class_attr_list_head(
     Token name,
     std::vector<AttributeDef>& attributes,
     std::vector<MethodDef>& methods) {
-    if (child(head_node, 0).symbol == "TypeAnnotation") {
+    if (child(head_node, 0).symbol == "TypeAnnotation" ||
+        child(head_node, 0).token.type == TokenType::EQUAL) {
         attributes.push_back(build_class_attr_from_head(head_node, std::move(name)));
         return;
     }

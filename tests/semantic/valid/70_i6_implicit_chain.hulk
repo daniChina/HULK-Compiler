@@ -1,0 +1,7 @@
+class A(x: Number, y: Number) {}
+
+class B is A {}
+
+class C is B {}
+
+let o = new C(1, 2) in print(o);

@@ -1,0 +1,1 @@
+for (x: String in range(0, 2)) print(x);

@@ -1,0 +1,5 @@
+class C {
+    n = 0;
+}
+
+print(let c = new C() in c.n + 1);

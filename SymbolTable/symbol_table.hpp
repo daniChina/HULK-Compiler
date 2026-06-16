@@ -499,6 +499,8 @@ private:
         declareType("Null", "Object");
         declareType("Void", "Object");
         declareType("Unknown", "Object");
+        declareType("Iterable", "Object");
+        addTypeMethod("Iterable", "current", {}, TypeInfo(TypeInfo::Kind::Number), 0);
     }
 
     /**

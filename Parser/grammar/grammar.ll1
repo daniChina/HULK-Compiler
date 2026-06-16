@@ -49,6 +49,7 @@ ClassAttrList   -> IDENTIFIER ClassAttrListHead ClassAttrList
                 | ε
 
 ClassAttrListHead -> TypeAnnotation EQUAL Expr SEMICOLON
+                  | EQUAL Expr SEMICOLON
                   | LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON ClassMethodList
 
 ClassMethodList -> ClassMethod ClassMethodList

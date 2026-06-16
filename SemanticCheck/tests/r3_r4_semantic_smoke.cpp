@@ -96,6 +96,13 @@ int main() {
                     "function a(x) => b(x);\nfunction b(x) => x + 1;\nprint(a(1));");
     ok &= expect_ok("I3 propagate from call",
                     "function g(x:Number) => x;\nfunction h(y) => g(y);\nprint(h(1));");
+    ok &= expect_ok("I6 implicit inherit params",
+                    "class Parent(x: Number) {}\nclass Child is Parent {}\n"
+                    "let c = new Child(1) in print(c);");
+    ok &= expect_ok("I7 for range element Number", "for (i in range(0, 2)) print(i + 1);");
+    ok &= expect_ok("I7 for typed iterator", "for (x: Number in range(0, 2)) print(x);");
+    ok &= expect_ok("I8 attr infer no annotation",
+                    "class C { n = 0; }\nlet c = new C() in print(c.n + 1);");
 
     return ok ? 0 : 1;
 }

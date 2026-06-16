@@ -21,3 +21,5 @@ valid/91_v11_set_attr.hulk	5\n
 valid/92_v11_method.hulk	1\n
 valid/93_v12_base.hulk	"King Arthur Pendragon"\n
 valid/94_v13_is.hulk	"A"\n
+valid/95_v14_implicit_inherit.hulk	42\n
+valid/96_v14_attr_infer.hulk	1\n

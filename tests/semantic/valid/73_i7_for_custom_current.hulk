@@ -1,0 +1,5 @@
+class MyIter() {
+    current() => 1;
+}
+
+for (x in new MyIter()) print(x + 1);
