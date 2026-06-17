@@ -15,3 +15,7 @@ valid/12_l1_bool.hulk      llvm_ok    i1 true
 # I2 — let / ámbitos (oracle IR en Codegen/tests/i2_let_smoke.cpp; aritmética en I3)
 valid/20_l2_let.hulk        llvm_ok    %x = alloca
 valid/21_l2_nested_let.hulk llvm_ok    store double 2.000000e+00
+
+# I3 — aritmética binaria (oracle IR en Codegen/tests/i3_binary_smoke.cpp; stdout en I4)
+valid/30_l3_add.hulk         llvm_ok    fadd double
+valid/31_l3_precedence.hulk  llvm_ok    fmul double

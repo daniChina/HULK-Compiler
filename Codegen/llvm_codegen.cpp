@@ -16,6 +16,14 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kE = 2.71828182845904523536;
 
+bool isLogicalAndOp(const std::string& op) {
+    return op == "&&" || op == "and" || op == "&";
+}
+
+bool isLogicalOrOp(const std::string& op) {
+    return op == "||" || op == "or" || op == "|";
+}
+
 #define HULK_VISIT_STUB(Node) \
     void LLVMCodeGenerator::visit(parser::Node* /*node*/) { \
         fail("codegen no implementado para " #Node " (iteracion posterior a I2)"); \
@@ -249,6 +257,92 @@ void LLVMCodeGenerator::visit(parser::StringExpr* expr) {
     current_value_ = createBoxedFromString(str_ptr);
 }
 
+llvm::Function* LLVMCodeGenerator::getLibmFunction(const char* name, llvm::FunctionType* fn_type) {
+    llvm::Function* fn = module_->getFunction(name);
+    if (fn != nullptr) {
+        return fn;
+    }
+    return llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage, name, module_.get());
+}
+
+llvm::Value* LLVMCodeGenerator::expectBoolValue(llvm::Value* value, const std::string& op) {
+    if (value == nullptr || !value->getType()->isIntegerTy(1)) {
+        fail("Operador '" + op + "' requiere operandos booleanos");
+        return nullptr;
+    }
+    return value;
+}
+
+llvm::Value* LLVMCodeGenerator::expectDoubleValue(llvm::Value* value, const std::string& op) {
+    if (value == nullptr || !value->getType()->isDoubleTy()) {
+        fail("Operador '" + op + "' requiere operandos numericos");
+        return nullptr;
+    }
+    return value;
+}
+
+void LLVMCodeGenerator::emitLogicalAndShortCircuit(parser::Expr* right_expr) {
+    llvm::Value* left_val = current_value_;
+    if (expectBoolValue(left_val, "&&") == nullptr) {
+        return;
+    }
+
+    llvm::Function* fn = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* lhs_bb = builder_->GetInsertBlock();
+    llvm::BasicBlock* rhs_bb = llvm::BasicBlock::Create(*context_, "land.rhs", fn);
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "land.end", fn);
+
+    builder_->CreateCondBr(left_val, rhs_bb, merge_bb);
+
+    builder_->SetInsertPoint(rhs_bb);
+    right_expr->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* right_val = expectBoolValue(current_value_, "&&");
+    if (right_val == nullptr) {
+        return;
+    }
+    builder_->CreateBr(merge_bb);
+
+    builder_->SetInsertPoint(merge_bb);
+    llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getInt1Ty(*context_), 2, "land");
+    phi->addIncoming(llvm::ConstantInt::getFalse(*context_), lhs_bb);
+    phi->addIncoming(right_val, rhs_bb);
+    current_value_ = phi;
+}
+
+void LLVMCodeGenerator::emitLogicalOrShortCircuit(parser::Expr* right_expr) {
+    llvm::Value* left_val = current_value_;
+    if (expectBoolValue(left_val, "||") == nullptr) {
+        return;
+    }
+
+    llvm::Function* fn = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* lhs_bb = builder_->GetInsertBlock();
+    llvm::BasicBlock* rhs_bb = llvm::BasicBlock::Create(*context_, "lor.rhs", fn);
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "lor.end", fn);
+
+    builder_->CreateCondBr(left_val, merge_bb, rhs_bb);
+
+    builder_->SetInsertPoint(rhs_bb);
+    right_expr->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* right_val = expectBoolValue(current_value_, "||");
+    if (right_val == nullptr) {
+        return;
+    }
+    builder_->CreateBr(merge_bb);
+
+    builder_->SetInsertPoint(merge_bb);
+    llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getInt1Ty(*context_), 2, "lor");
+    phi->addIncoming(llvm::ConstantInt::getTrue(*context_), lhs_bb);
+    phi->addIncoming(right_val, rhs_bb);
+    current_value_ = phi;
+}
+
 void LLVMCodeGenerator::visit(parser::BoolExpr* expr) {
     current_value_ = llvm::ConstantInt::get(llvm::Type::getInt1Ty(*context_), expr->value ? 1 : 0);
 }
@@ -305,6 +399,109 @@ void LLVMCodeGenerator::visit(parser::LetExpr* expr) {
     exitScope();
 }
 
+void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
+    const std::string& op = expr->op.lexeme;
+
+    if (isLogicalAndOp(op)) {
+        expr->left->accept(this);
+        if (had_error_) {
+            return;
+        }
+        emitLogicalAndShortCircuit(expr->right.get());
+        return;
+    }
+
+    if (isLogicalOrOp(op)) {
+        expr->left->accept(this);
+        if (had_error_) {
+            return;
+        }
+        emitLogicalOrShortCircuit(expr->right.get());
+        return;
+    }
+
+    expr->left->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* left = current_value_;
+
+    expr->right->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* right = current_value_;
+
+    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
+
+    if (op == "+" || op == "-" || op == "*" || op == "/" || op == "%" || op == "^") {
+        left = expectDoubleValue(left, op);
+        right = expectDoubleValue(right, op);
+        if (left == nullptr || right == nullptr) {
+            return;
+        }
+
+        if (op == "+") {
+            current_value_ = builder_->CreateFAdd(left, right, "add");
+        } else if (op == "-") {
+            current_value_ = builder_->CreateFSub(left, right, "sub");
+        } else if (op == "*") {
+            current_value_ = builder_->CreateFMul(left, right, "mul");
+        } else if (op == "/") {
+            current_value_ = builder_->CreateFDiv(left, right, "div");
+        } else if (op == "%") {
+            llvm::FunctionType* fmod_ty = llvm::FunctionType::get(double_ty, {double_ty, double_ty}, false);
+            llvm::Function* fmod_fn = getLibmFunction("fmod", fmod_ty);
+            current_value_ = builder_->CreateCall(fmod_fn, {left, right}, "mod");
+        } else {
+            llvm::FunctionType* pow_ty = llvm::FunctionType::get(double_ty, {double_ty, double_ty}, false);
+            llvm::Function* pow_fn = getLibmFunction("pow", pow_ty);
+            current_value_ = builder_->CreateCall(pow_fn, {left, right}, "pow");
+        }
+        return;
+    }
+
+    if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "==" || op == "!=") {
+        if (left->getType()->isDoubleTy() && right->getType()->isDoubleTy()) {
+            llvm::CmpInst::Predicate pred = llvm::CmpInst::FCMP_OEQ;
+            if (op == "<") {
+                pred = llvm::CmpInst::FCMP_OLT;
+            } else if (op == "<=") {
+                pred = llvm::CmpInst::FCMP_OLE;
+            } else if (op == ">") {
+                pred = llvm::CmpInst::FCMP_OGT;
+            } else if (op == ">=") {
+                pred = llvm::CmpInst::FCMP_OGE;
+            } else if (op == "!=") {
+                pred = llvm::CmpInst::FCMP_ONE;
+            }
+            current_value_ = builder_->CreateFCmp(pred, left, right, "cmp");
+            return;
+        }
+
+        if (left->getType()->isIntegerTy(1) && right->getType()->isIntegerTy(1)) {
+            if (op == "==") {
+                current_value_ = builder_->CreateICmpEQ(left, right, "cmp");
+            } else if (op == "!=") {
+                current_value_ = builder_->CreateICmpNE(left, right, "cmp");
+            } else {
+                fail("Operador binario no soportado: " + op);
+            }
+            return;
+        }
+
+        fail("Operador binario no soportado: " + op);
+        return;
+    }
+
+    if (op == "@" || op == "@@") {
+        fail("concatenacion de strings no implementada (iteracion posterior a I4)");
+        return;
+    }
+
+    fail("Operador binario no soportado: " + op);
+}
+
 HULK_VISIT_STUB(FunctionDecl)
 HULK_VISIT_STUB(ClassDecl)
 HULK_VISIT_STUB(MethodDecl)
@@ -312,7 +509,6 @@ HULK_VISIT_STUB(AttributeDecl)
 HULK_VISIT_STUB(SelfExpr)
 HULK_VISIT_STUB(GroupedExpr)
 HULK_VISIT_STUB(UnaryExpr)
-HULK_VISIT_STUB(BinaryExpr)
 HULK_VISIT_STUB(CallExpr)
 HULK_VISIT_STUB(GetAttrExpr)
 HULK_VISIT_STUB(BlockExpr)

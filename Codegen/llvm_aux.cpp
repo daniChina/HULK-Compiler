@@ -24,6 +24,18 @@ void registerRuntimeDeclarations(llvm::Module& module, llvm::LLVMContext& contex
         {llvm::Type::getInt64Ty(context)},
         false);
     module.getOrInsertFunction("malloc", malloc_ty);
+
+    llvm::FunctionType* pow_ty = llvm::FunctionType::get(
+        llvm::Type::getDoubleTy(context),
+        {llvm::Type::getDoubleTy(context), llvm::Type::getDoubleTy(context)},
+        false);
+    module.getOrInsertFunction("pow", pow_ty);
+
+    llvm::FunctionType* fmod_ty = llvm::FunctionType::get(
+        llvm::Type::getDoubleTy(context),
+        {llvm::Type::getDoubleTy(context), llvm::Type::getDoubleTy(context)},
+        false);
+    module.getOrInsertFunction("fmod", fmod_ty);
 }
 
 }  // namespace hulk::codegen

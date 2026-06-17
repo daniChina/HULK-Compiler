@@ -89,6 +89,11 @@ private:
     llvm::Value* createBoxedFromDouble(llvm::Value* double_val);
     llvm::Value* createBoxedFromBool(llvm::Value* bool_val);
     llvm::Value* createBoxedFromString(llvm::Value* str_val);
+    void emitLogicalAndShortCircuit(parser::Expr* right_expr);
+    void emitLogicalOrShortCircuit(parser::Expr* right_expr);
+    llvm::Function* getLibmFunction(const char* name, llvm::FunctionType* fn_type);
+    llvm::Value* expectBoolValue(llvm::Value* value, const std::string& op);
+    llvm::Value* expectDoubleValue(llvm::Value* value, const std::string& op);
 
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::Module> module_;
