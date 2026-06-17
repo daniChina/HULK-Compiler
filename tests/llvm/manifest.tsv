@@ -1,12 +1,17 @@
-# Fase 4 — manifest LLVM (reinicio jun 2026)
-
-# Formato:
-#   valid/<nombre.hulk>    llvm_ok    <subcadena en .ll o nota>
-#
-
-# Fixtures locales (activar fila a fila al implementar I1–I12):
-# valid/01_print_string.hulk    llvm_ok    hulk_print
-# valid/02_new_attr.hulk        llvm_ok    hulk_instance_new
-# valid/03_set_attr.hulk        llvm_ok    hulk_instance_set
-# valid/04_method_call.hulk     llvm_ok    @Counter_inc
-
+# Fase 4 — manifest LLVM (reinicio jun 2026)
+
+# Formato:
+#   valid/<nombre.hulk>    llvm_ok    <subcadena en .ll o nota>
+#
+
+# I0 — infra (@main vacío verificado por Codegen/tests/i0_module_smoke.cpp)
+# valid/01_l0_module_smoke.hulk    llvm_ok    @main    (runner hulk pendiente I4)
+
+# I1 — literales (oracle IR en Codegen/tests/i1_literals_smoke.cpp; stdout en I4)
+valid/10_l1_number.hulk    llvm_ok    double 4.200000e+01
+valid/11_l1_string.hulk    llvm_ok    c"hi\00"
+valid/12_l1_bool.hulk      llvm_ok    i1 true
+
+# I2 — let / ámbitos (oracle IR en Codegen/tests/i2_let_smoke.cpp; aritmética en I3)
+valid/20_l2_let.hulk        llvm_ok    %x = alloca
+valid/21_l2_nested_let.hulk llvm_ok    store double 2.000000e+00

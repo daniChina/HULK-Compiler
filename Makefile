@@ -1,14 +1,35 @@
 MATCOM_OOP_PARSE_TARGET = matcom_oop_parse_smoke
 
-.PHONY: all compile build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse
+.PHONY: all compile build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm
+
+# --- LLVM (Fase 4): solo test_llvm enlaza libLLVM; compile principal sin LLVM (~40 s) ---
+ifeq ($(OS),Windows_NT)
+LLVM_CONFIG ?= C:/ghcup/ghc/9.6.7/mingw/bin/llvm-config
+else
+LLVM_CONFIG ?= llvm-config
+endif
+LLVM_AVAILABLE := $(shell "$(LLVM_CONFIG)" --version)
+LLVM_CXXFLAGS_RAW := $(shell "$(LLVM_CONFIG)" --cxxflags)
+LLVM_LDFLAGS := $(shell "$(LLVM_CONFIG)" --ldflags --libs core support)
+LLVM_CXXFLAGS := $(filter-out -stdlib=libc++,$(LLVM_CXXFLAGS_RAW))
+LLVM_CXXFLAGS := $(filter-out -std=c++14,$(LLVM_CXXFLAGS))
+LLVM_CXXFLAGS := $(filter-out -std=gnu++14,$(LLVM_CXXFLAGS))
+# Mantener -fno-exceptions/-fno-rtti: libLLVM-14 (GHCup) exige ABI compatible en Windows.
+
+CODEGEN_SOURCES = Codegen/llvm_codegen.cpp Codegen/llvm_aux.cpp
+CODEGEN_I0_SOURCES = Codegen/tests/i0_module_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+LLVM_I0_TARGET = llvm_i0_smoke
+LLVM_I1_TARGET = llvm_i1_smoke
+LLVM_I2_TARGET = llvm_i2_smoke
 
 # Compilador y flags
 CXX = g++
 # FlexLexer.h: MSYS2/ghcup o WinFlexBison (winget install WinFlexBison.win_flex_bison)
 FLEX_WIN = $(LOCALAPPDATA)/Microsoft/WinGet/Packages/WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe
 CXXFLAGS = -std=c++17 -Wall -fuse-ld=bfd -I. -ILexer -IParser/core -IParser/ast -IParser/generator -IParser/syntax \
-           -ISemanticCheck -ISymbolTable -ITypes -IValue -IEvaluator \
+           -ISemanticCheck -ISymbolTable -ITypes -IValue -IEvaluator -ICodegen \
            -I/usr/include -IC:/ghcup/msys64/usr/include -I$(FLEX_WIN)
+LLVM_CXXFLAGS_ALL = -std=c++17 $(LLVM_CXXFLAGS)
 
 # Archivos fuente
 SOURCES = Lexer/hulk_lexer.cpp \
@@ -57,6 +78,9 @@ PARSER_TEST_COMMON = Lexer/hulk_lexer.cpp Parser/core/token_adapter.cpp Parser/c
           Parser/generator/grammar_reader.cpp Parser/generator/first_follow.cpp \
           Parser/generator/ll1_table.cpp Parser/syntax/ll1_parser.cpp \
           SemanticCheck/binding_list.cpp Types/type_info.cpp
+
+CODEGEN_I1_SOURCES = Codegen/tests/i1_literals_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I2_SOURCES = Codegen/tests/i2_let_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
@@ -145,6 +169,23 @@ test_matcom_oop_parse:
 	$(CXX) $(CXXFLAGS) Parser/tests/matcom_oop_parse_smoke.cpp $(PARSER_TEST_COMMON) -o $(MATCOM_OOP_PARSE_TARGET)
 	./$(MATCOM_OOP_PARSE_TARGET)
 
+test_llvm:
+ifeq ($(LLVM_AVAILABLE),)
+	@echo "LLVM no encontrado: instala llvm-config (GHCup: C:/ghcup/ghc/*/mingw/bin) o define LLVM_CONFIG=..."
+	@exit 1
+else
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I0_SOURCES) -o $(LLVM_I0_TARGET) $(LLVM_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I1_SOURCES) -o $(LLVM_I1_TARGET) $(LLVM_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I2_SOURCES) -o $(LLVM_I2_TARGET) $(LLVM_LDFLAGS)
+ifeq ($(OS),Windows_NT)
+	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe"
+else
+	./$(LLVM_I0_TARGET)
+	./$(LLVM_I1_TARGET)
+	./$(LLVM_I2_TARGET)
+endif
+endif
+
 test_eval:
 	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_TEST_TARGET)
 	./$(EVAL_TEST_TARGET)
@@ -196,4 +237,4 @@ test_eval_fixtures: compile
 endif
 
 clean:
-	rm -f $(TARGET) $(HULK_BIN) output .hulk_program.hulk $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_LITERALS_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) $(EVAL_OO_TEST_TARGET) $(IS_AS_SMOKE_TARGET) $(MATCOM_OOP_PARSE_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(HULK_BIN) output .hulk_program.hulk $(LLVM_TEST_TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_LITERALS_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) $(EVAL_OO_TEST_TARGET) $(IS_AS_SMOKE_TARGET) $(MATCOM_OOP_PARSE_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
