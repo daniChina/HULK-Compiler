@@ -1,0 +1,4 @@
+type Point(x: Number) {
+    x: Number = x;
+}
+print(let p = new Point(0) in { p.x := 5; p.x; });

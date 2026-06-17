@@ -79,7 +79,7 @@ int main() {
                        ErrorType::REDEFINED_FUNCTION);
     ok &= expect_ok("R4 forward reference in let",
                     "let r = f(1) in print(r);\nfunction f(n) => n;");
-    ok &= expect_ok("R4 mutual forward ( collectFunctions)",
+    ok &= expect_ok("R4 mutual forward (collectFunctions)",
                     "function a() => b();\nfunction b() => 1;\nprint(a());");
     ok &= expect_ok("R4 call before textual decl",
                     "print(h(1));\nfunction h(x) => x;");

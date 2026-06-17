@@ -1,7 +1,6 @@
 # HULK-Compiler
 
 Compilador del lenguaje **HULK** (lexer, parser LL(1), analisis semantico, interprete).  
-En desarrollo: codegen LLVM y alineacion con el CI de [matcom/compilers](https://github.com/matcom/compilers).
 
 ---
 

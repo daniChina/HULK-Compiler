@@ -111,16 +111,19 @@ void print_tokens(const parser::TokenList& tokens) {
 
 int run_matcom(const std::string& input_path) {
     const std::string source = read_file(input_path);
-    const auto diagnostic = hulk::compile_source(source);
-    if (diagnostic.exit_code != 0) {
-        for (const auto& line : diagnostic.lines) {
+    const auto compiled = hulk::compile_program(source);
+    if (compiled.diagnostic.exit_code != 0) {
+        for (const auto& line : compiled.diagnostic.lines) {
             std::cerr << line << '\n';
         }
-        return diagnostic.exit_code;
+        return compiled.diagnostic.exit_code;
     }
 
-    if (!hulk::build_output_executable(source)) {
-        std::cerr << hulk::format_semantic(0, 0, "could not link ./output") << '\n';
+    std::string build_error;
+    if (!hulk::build_output_executable(source, compiled.program.get(), &build_error)) {
+        const std::string message =
+            build_error.empty() ? "code generation failed" : build_error;
+        std::cerr << hulk::format_semantic(0, 0, message) << '\n';
         return 3;
     }
 
@@ -205,6 +208,7 @@ int run_development(const Options& options) {
                 return 1;
             }
         }
+
     }
 
     return 0;

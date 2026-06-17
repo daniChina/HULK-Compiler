@@ -67,6 +67,12 @@ CompileDiagnostic fail_semantic(const std::vector<SemanticError>& errors) {
 }  // namespace
 
 CompileDiagnostic compile_source(const std::string& source, const std::string& grammar_path) {
+    return compile_program(source, grammar_path).diagnostic;
+}
+
+CompiledProgram compile_program(const std::string& source, const std::string& grammar_path) {
+    CompiledProgram result;
+
     const auto grammar = parser::generator::read_grammar_file(grammar_path);
     const auto first_follow = parser::generator::compute_first_follow(grammar);
     const auto& table = ll1_table_cached(grammar, first_follow);
@@ -75,8 +81,9 @@ CompileDiagnostic compile_source(const std::string& source, const std::string& g
     for (const auto& token : tokens) {
         if (token.type == parser::TokenType::UNKNOWN) {
             const std::string ch = token.lexeme.empty() ? "?" : token.lexeme;
-            return fail_lexical(token.line, token.col,
-                                "unexpected character '" + ch + "'");
+            result.diagnostic = fail_lexical(token.line, token.col,
+                                             "unexpected character '" + ch + "'");
+            return result;
         }
     }
 
@@ -88,20 +95,24 @@ CompileDiagnostic compile_source(const std::string& source, const std::string& g
         semantic::Phase2Analyzer analyzer;
         analyzer.analyze(program.get());
         if (analyzer.hasErrors()) {
-            return fail_semantic(analyzer.getErrors());
+            result.diagnostic = fail_semantic(analyzer.getErrors());
+            return result;
         }
 
-        CompileDiagnostic ok;
-        ok.phase = CompilePhase::Ok;
-        ok.exit_code = 0;
-        return ok;
+        result.program = std::move(program);
+        result.diagnostic.phase = CompilePhase::Ok;
+        result.diagnostic.exit_code = 0;
+        return result;
     } catch (const parser::ParseError& error) {
         const auto& token = error.found();
-        return fail_syntactic(token.line, token.col, error.user_message());
+        result.diagnostic = fail_syntactic(token.line, token.col, error.user_message());
+        return result;
     } catch (const std::exception& error) {
-        return fail_syntactic(0, 0, error.what());
+        result.diagnostic = fail_syntactic(0, 0, error.what());
+        return result;
     }
 }
+
 
 int run_interpreted(const parser::Program& program, std::ostream& out, std::ostream& err) {
     eval::Evaluator evaluator(out);

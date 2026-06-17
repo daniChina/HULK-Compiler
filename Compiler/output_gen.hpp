@@ -1,11 +1,16 @@
-#pragma once
-
-#include <string>
-
-namespace hulk {
-
-// Escribe .hulk_program.hulk y compila ./output con g++ (contrato matcom).
-// Devuelve false si no se pudo invocar el linker (p. ej. en Windows sin toolchain Unix).
-bool build_output_executable(const std::string& program_source);
-
-}  // namespace hulk
+#pragma once
+
+#include <string>
+
+namespace parser {
+struct Program;
+}
+
+namespace hulk {
+
+// Fase 4: generará ./output vía IR LLVM + clang + runtime C (ver plan maestro).
+bool build_output_executable(const std::string& program_source, parser::Program* program,
+                             std::string* error_out = nullptr);
+
+}  // namespace hulk
+

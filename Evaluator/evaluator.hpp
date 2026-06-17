@@ -12,7 +12,7 @@
 
 namespace eval {
 
-// Fase 3 — intérprete sobre AST local .
+// Fase 3 — intérprete sobre AST local.
 class Evaluator : public parser::ExprVisitor, public parser::StmtVisitor {
 public:
     explicit Evaluator(std::ostream& out = std::cout);

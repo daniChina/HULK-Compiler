@@ -34,15 +34,22 @@ function Resolve-HulkFile([string]$Path) {
 function Ensure-HulkBuilt {
     if (Test-Path $Hulk) { return }
     if ($NoBuild) {
-        Write-Host "[ERROR] No existe $Hulk. Compila primero: make compile" -ForegroundColor Red
+        Write-Host "[ERROR] No existe $Hulk. Compila primero: mingw32-make compile" -ForegroundColor Red
         exit 1
     }
     Write-Host "Compilando hulk_c.exe ..." -ForegroundColor Yellow
-    if (Get-Command make -ErrorAction SilentlyContinue) {
+    $setup = Join-Path $PSScriptRoot "setup_build_env.ps1"
+    if (Test-Path -LiteralPath $setup) {
+        . $setup
+    }
+    if (Get-Command mingw32-make -ErrorAction SilentlyContinue) {
+        mingw32-make compile
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } elseif (Get-Command make -ErrorAction SilentlyContinue) {
         make compile
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } else {
-        Write-Host "[ERROR] No existe $Hulk y 'make' no esta en PATH." -ForegroundColor Red
+        Write-Host "[ERROR] No existe $Hulk y 'mingw32-make' no esta en PATH." -ForegroundColor Red
         exit 1
     }
 }

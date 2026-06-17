@@ -1,5 +1,12 @@
-# Fase 4 — manifest LLVM fixtures
-# Formato (cuando existan archivos):
-#   valid/<nombre.hulk>    llvm_ok    <subcadena en .ll o stdout tras lli>
-#   invalid/<nombre.hulk>  llvm       <fragmento stderr o nota exit!=0>
-#
+# Fase 4 — manifest LLVM (reinicio jun 2026)
+
+# Formato:
+#   valid/<nombre.hulk>    llvm_ok    <subcadena en .ll o nota>
+#
+
+# Fixtures locales (activar fila a fila al implementar I1–I12):
+# valid/01_print_string.hulk    llvm_ok    hulk_print
+# valid/02_new_attr.hulk        llvm_ok    hulk_instance_new
+# valid/03_set_attr.hulk        llvm_ok    hulk_instance_set
+# valid/04_method_call.hulk     llvm_ok    @Counter_inc
+
