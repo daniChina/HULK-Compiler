@@ -146,7 +146,7 @@ IDENT       {ALPHA}{ALNUM_}*
 "case"        { UPD(CASE);       }
 "of"          { UPD(OF);         }
 "function"    { UPD(FUNCTION);   }
-"class"       { UPD(CLASS);      }
+"type"        { UPD(TYPE);       }
 "protocol"    { UPD(PROTOCOL);   }
 "def"         { UPD(DEF);        }
 "let"         { UPD(LET);        }
@@ -154,8 +154,7 @@ IDENT       {ALPHA}{ALNUM_}*
 "new"         { UPD(NEW);        }
 "inherits"    { UPD(INHERITS);   }
 "self"        { UPD(SELF);       }
-"base"        { UPD(BASE);       }
-"is"          { UPD(IS);         }
+"base"("      { UPD(BASE);       }
 "as"          { UPD(AS);         }
 "and"         { UPD(AND);        }
 "or"          { UPD(OR);         }
@@ -175,6 +174,9 @@ IDENT       {ALPHA}{ALNUM_}*
                 }
                 if (lexeme_ == "of") {
                     return static_cast<int>(TokenType::OF);
+                }
+                if (lexeme_ == "type") {
+                    return static_cast<int>(TokenType::TYPE);
                 }
                 // `Null` se trata como literal dedicado aunque su patron base
                 // entre primero por identificador.

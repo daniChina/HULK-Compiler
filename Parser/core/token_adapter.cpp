@@ -26,7 +26,7 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::CASE:           return TokenType::CASE;
         case ::TokenType::OF:             return TokenType::OF;
         case ::TokenType::FUNCTION:       return TokenType::FUNCTION;
-        case ::TokenType::CLASS:          return TokenType::CLASS;
+        case ::TokenType::TYPE:           return TokenType::TYPE;
         case ::TokenType::PROTOCOL:       return TokenType::PROTOCOL;
         case ::TokenType::DEF:            return TokenType::DEF;
         case ::TokenType::LET:            return TokenType::LET;
@@ -35,7 +35,6 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::INHERITS:       return TokenType::INHERITS;
         case ::TokenType::SELF:           return TokenType::SELF;
         case ::TokenType::BASE:           return TokenType::BASE;
-        case ::TokenType::IS:             return TokenType::IS;
         case ::TokenType::AS:             return TokenType::AS;
         case ::TokenType::AND:            return TokenType::AND;
         case ::TokenType::OR:             return TokenType::OR;

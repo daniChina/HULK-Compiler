@@ -1,4 +1,4 @@
-class C {
+type C {
     double(x) => x + x;
 }
 print(let c = new C() in c.double(3));

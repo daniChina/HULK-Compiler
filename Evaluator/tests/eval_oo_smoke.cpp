@@ -50,45 +50,45 @@ int main() {
     bool ok = true;
 
     ok &= runProgram(
-        "class Point(x: Number, y: Number) { x: Number = x; y: Number = y; }\n"
+        "type Point(x: Number, y: Number) { x: Number = x; y: Number = y; }\n"
         "print(let p = new Point(1, 2) in p.x);\n",
         "1\n",
         "C2: new + attr read");
 
     ok &= runProgram(
-        "class Point(x: Number) { x: Number = x; }\n"
+        "type Point(x: Number) { x: Number = x; }\n"
         "print(let p = new Point(0) in { p.x := 5; p.x; });\n",
         "5\n",
         "C3: attr assign via GetAttr := ");
 
     ok &= runProgram(
-        "class Counter(n: Number) { n: Number = n; inc() => self.n := self.n + 1; }\n"
+        "type Counter(n: Number) { n: Number = n; inc() => self.n := self.n + 1; }\n"
         "print(let c = new Counter(0) in c.inc());\n",
         "1\n",
         "C4: method call + self");
 
     ok &= runProgram(
-        "class A() {}\n"
-        "class B() is A {}\n"
+        "type A() {}\n"
+        "type B() inherits A {}\n"
         "print(0);\n",
         "0\n",
-        "C1: dual pass registers all classes");
+        "C1: dual pass registers all types");
 
     ok &= runProgram(
-        "class Person(name:String) {\n"
+        "type Person(name:String) {\n"
         "  name:String = name;\n"
         "  greet() => \"Hello, \" @ self.name;\n"
         "}\n"
-        "class Student(name:String) is Person(name) {\n"
+        "type Student(name:String) inherits Person(name) {\n"
         "  greet() => base() @ \"!\";\n"
         "}\n"
         "print(let s = new Student(\"Alice\") in s.greet());\n",
-        "\"Hello, Alice!\"\n",
+        "Hello, Alice!\n",
         "C5: base() in method");
 
     ok &= runProgram(
-        "class Person(n: Number) { n: Number = n; }\n"
-        "class Sub(n: Number) is Person(n) { twice() => self.n * 2; }\n"
+        "type Person(n: Number) { n: Number = n; }\n"
+        "type Sub(n: Number) inherits Person(n) { twice() => self.n * 2; }\n"
         "print(let x = new Sub(5) in (x as Sub).twice());\n",
         "10\n",
         "C6: as downcast + method");

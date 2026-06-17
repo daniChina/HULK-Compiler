@@ -1,10 +1,12 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "../Parser/ast/cst_to_ast.hpp"
+#include "../Parser/core/parse_error.hpp"
 #include "../Parser/core/token_adapter.hpp"
 #include "../SymbolTable/decl_collector.hpp"
 #include "../SymbolTable/symbol_table.hpp"
@@ -15,6 +17,9 @@
 #include "../Parser/syntax/ll1_parser.hpp"
 #include "../SemanticCheck/phase2_checker.hpp"
 #include "../Evaluator/evaluator.hpp"
+#include "matcom_diagnostic.hpp"
+#include "output_gen.hpp"
+#include "pipeline.hpp"
 
 namespace {
 
@@ -25,17 +30,19 @@ struct Options {
     bool print_symbols = false;
     bool run_semantic = false;
     bool run_interpret = false;
+    bool matcom_mode = false;
     std::string input_path;
 };
 
 void print_usage(const char* program_name) {
     std::cerr
-        << "Uso: " << program_name
+        << "Uso: " << program_name << " <archivo.hulk>\n"
+        << "     " << program_name
         << " [--tokens] [--cst] [--ast] [--symbols] [--semantic] [--interpret] [archivo.hulk]\n"
-        << "  Si no se pasa archivo, lee desde stdin.\n";
+        << "  Modo matcom (sin flags): compila a ./output\n"
+        << "  Modo desarrollo: flags de depuracion; --interpret ejecuta el evaluador\n";
 }
 
-// Parser minimo de argumentos para no depender de ninguna libreria externa.
 Options parse_options(int argc, char* argv[]) {
     Options options;
 
@@ -78,7 +85,20 @@ Options parse_options(int argc, char* argv[]) {
         options.input_path = arg;
     }
 
+    const bool dev_mode = options.print_tokens || options.print_cst || options.print_ast ||
+                          options.print_symbols || options.run_semantic || options.run_interpret;
+    options.matcom_mode = !dev_mode && !options.input_path.empty();
     return options;
+}
+
+std::string read_file(const std::string& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input.is_open()) {
+        throw std::runtime_error("No se pudo abrir el archivo: " + path);
+    }
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
 }
 
 void print_tokens(const parser::TokenList& tokens) {
@@ -89,99 +109,128 @@ void print_tokens(const parser::TokenList& tokens) {
     }
 }
 
+int run_matcom(const std::string& input_path) {
+    const std::string source = read_file(input_path);
+    const auto diagnostic = hulk::compile_source(source);
+    if (diagnostic.exit_code != 0) {
+        for (const auto& line : diagnostic.lines) {
+            std::cerr << line << '\n';
+        }
+        return diagnostic.exit_code;
+    }
+
+    if (!hulk::build_output_executable(source)) {
+        std::cerr << hulk::format_semantic(0, 0, "could not link ./output") << '\n';
+        return 3;
+    }
+
+    return 0;
+}
+
+int run_development(const Options& options) {
+    const auto grammar = parser::generator::read_grammar_file("Parser/grammar/grammar.ll1");
+    const auto first_follow = parser::generator::compute_first_follow(grammar);
+    const auto ll1_table = parser::generator::build_ll1_table(grammar, first_follow);
+
+    if (!ll1_table.conflicts.empty()) {
+        std::cerr << "La gramatica actual no es LL(1). Conflictos detectados:\n";
+        for (const auto& conflict : ll1_table.conflicts) {
+            std::cerr << "  - " << parser::generator::conflict_to_string(conflict) << "\n";
+        }
+        return 1;
+    }
+
+    parser::TokenList tokens;
+    if (!options.input_path.empty()) {
+        tokens = parser::tokenize_file(options.input_path);
+    } else {
+        tokens = parser::tokenize_stream(std::cin);
+    }
+
+    if (options.print_tokens) {
+        std::cout << "== Tokens ==\n";
+        print_tokens(tokens);
+    }
+
+    parser::Ll1Parser parser_engine(std::move(tokens), grammar, ll1_table.table);
+    auto parse_result = parser_engine.parse();
+
+    const bool quiet_pipeline = options.run_interpret;
+
+    if (!quiet_pipeline) {
+        std::cout << "Parse OK\n";
+    }
+
+    if (options.print_cst && parse_result.cst_root) {
+        std::cout << "== CST ==\n";
+        std::cout << parser::cst_to_string(*parse_result.cst_root);
+    }
+
+    if (parse_result.cst_root) {
+        auto ast = parser::cst_to_ast(*parse_result.cst_root);
+
+        if (options.print_ast) {
+            std::cout << "== AST ==\n";
+            std::cout << parser::program_to_string(*ast) << "\n";
+        }
+
+        if (options.print_symbols) {
+            SymbolTable symbol_table;
+            TypeInfo::setSymbolTable(&symbol_table);
+            const auto decl_stats = collectTopLevelDeclarations(*ast, symbol_table);
+            std::cout << "== Symbols ==\n"
+                      << "  functions registered: " << decl_stats.functions_registered << "\n"
+                      << "  types registered: " << decl_stats.types_registered << "\n"
+                      << "  stmts skipped (non-decl): " << decl_stats.skipped_stmts << "\n";
+        }
+
+        if (options.run_semantic) {
+            semantic::Phase2Analyzer analyzer;
+            analyzer.analyze(ast.get());
+            if (analyzer.hasErrors()) {
+                std::cerr << "== Semantic errors ==\n";
+                analyzer.printErrors();
+                return 1;
+            }
+            if (!quiet_pipeline) {
+                std::cout << "Semantic OK\n";
+            }
+        }
+
+        if (options.run_interpret) {
+            eval::Evaluator evaluator;
+            evaluator.evaluate(ast.get());
+            if (evaluator.hadError()) {
+                std::cerr << evaluator.lastError() << "\n";
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        print_usage(argv[0]);
+        return 2;
+    }
+
     try {
         const auto options = parse_options(argc, argv);
-        const auto grammar = parser::generator::read_grammar_file("Parser/grammar/grammar.ll1");
-        const auto first_follow = parser::generator::compute_first_follow(grammar);
-        const auto ll1_table = parser::generator::build_ll1_table(grammar, first_follow);
-
-        // Antes de parsear entrada real, se valida que la gramatica actual no tenga conflictos LL(1).
-        if (!ll1_table.conflicts.empty()) {
-            std::cerr << "La gramatica actual no es LL(1). Conflictos detectados:\n";
-            for (const auto& conflict : ll1_table.conflicts) {
-                std::cerr << "  - " << parser::generator::conflict_to_string(conflict) << "\n";
-            }
-            return 1;
+        if (options.matcom_mode) {
+            return run_matcom(options.input_path);
         }
-
-        parser::TokenList tokens;
-
-        if (!options.input_path.empty()) {
-            tokens = parser::tokenize_file(options.input_path);
-        } else {
-            tokens = parser::tokenize_stream(std::cin);
-        }
-
-        if (options.print_tokens) {
-            std::cout << "== Tokens ==\n";
-            print_tokens(tokens);
-        }
-
-        parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table);
-        auto parse_result = parser.parse();
-
-        const bool quiet_pipeline = options.run_interpret;
-
-        if (!quiet_pipeline) {
-            std::cout << "Parse OK\n";
-        }
-
-        if (options.print_cst && parse_result.cst_root) {
-            std::cout << "== CST ==\n";
-            std::cout << parser::cst_to_string(*parse_result.cst_root);
-        }
-
-        if (parse_result.cst_root) {
-            auto ast = parser::cst_to_ast(*parse_result.cst_root);
-
-            if (options.print_ast) {
-                std::cout << "== AST ==\n";
-                std::cout << parser::program_to_string(*ast) << "\n";
-            }
-
-            // Fase 1 (--symbols): recorrido declarativo; no comparte tabla con --semantic (R4 orden textual).
-            if (options.print_symbols) {
-                SymbolTable symbol_table;
-                TypeInfo::setSymbolTable(&symbol_table);
-                const auto decl_stats = collectTopLevelDeclarations(*ast, symbol_table);
-                std::cout << "== Symbols ==\n"
-                          << "  functions registered: " << decl_stats.functions_registered << "\n"
-                          << "  types registered: " << decl_stats.types_registered << "\n"
-                          << "  stmts skipped (non-decl): " << decl_stats.skipped_stmts << "\n";
-            }
-
-            if (options.run_semantic) {
-                semantic::Phase2Analyzer analyzer;
-                analyzer.analyze(ast.get());
-                if (analyzer.hasErrors()) {
-                    std::cerr << "== Semantic errors ==\n";
-                    analyzer.printErrors();
-                    return 1;
-                }
-                if (!quiet_pipeline) {
-                    std::cout << "Semantic OK\n";
-                }
-            }
-
-            if (options.run_interpret) {
-                eval::Evaluator evaluator;
-                evaluator.evaluate(ast.get());
-                if (evaluator.hadError()) {
-                    std::cerr << evaluator.lastError() << "\n";
-                    return 1;
-                }
-            }
-        }
-
-        return 0;
+        return run_development(options);
     } catch (const parser::ParseError& error) {
-        std::cerr << error.what() << "\n";
-        return 1;
+        std::cerr << hulk::format_syntactic(error.found().line, error.found().col,
+                                            error.user_message())
+                  << '\n';
+        return 2;
     } catch (const std::exception& error) {
-        std::cerr << "Error: " << error.what() << "\n";
-        return 1;
+        std::cerr << hulk::format_syntactic(0, 0, error.what()) << '\n';
+        return 2;
     }
 }

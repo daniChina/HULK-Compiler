@@ -1,13 +1,13 @@
-class Animal(n: String) {
+type Animal(n: String) {
  name: String = n;
  sound() => "...";
 }
 
-class Dog(n: String) is Animal(n) {
+type Dog(n: String ) inherits Animal(n) {
  sound() => "Woof";
 }
 
-class Cat(n: String) is Animal(n) {
+type Cat(n: String ) inherits Animal(n) {
  sound() => "Meow";
 }
 

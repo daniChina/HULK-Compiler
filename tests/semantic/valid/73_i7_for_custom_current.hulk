@@ -1,4 +1,4 @@
-class MyIter() {
+type MyIter() {
     current() => 1;
 }
 

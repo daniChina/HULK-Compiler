@@ -1,4 +1,4 @@
-class C {
+type C {
     helper(x: Number) => x;
     outer(y) => self.helper(y);
 }

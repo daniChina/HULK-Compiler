@@ -25,7 +25,7 @@ bool is_top_level_expr_lookahead(const std::string& lookahead) {
 }
 
 bool is_program_stmt_only_lookahead(const std::string& lookahead) {
-    return lookahead == "FUNCTION" || lookahead == "CLASS";
+    return lookahead == "FUNCTION" || lookahead == "TYPE";
 }
 
 const char* keyword_for_top_level_expr(const std::string& lookahead) {
@@ -39,7 +39,7 @@ const char* keyword_for_top_level_expr(const std::string& lookahead) {
     if (lookahead == "REPEAT") return "repeat";
     if (lookahead == "LOOP") return "loop";
     if (lookahead == "FUNCTION") return "function";
-    if (lookahead == "CLASS") return "class";
+    if (lookahead == "TYPE") return "type";
     return nullptr;
 }
 
@@ -108,11 +108,7 @@ std::string block_context_message(
     const Token& previous_token) {
     if (non_terminal == "Expr") {
         return "Un bloque '{ ... }' no es una expresion; solo puede usarse como cuerpo de "
-               "let, if, while, with o como cuerpo en llaves de una function";
-    }
-    if (non_terminal == "Program") {
-        return "Un bloque '{ ... }' no puede ser una sentencia del programa por si solo; "
-               "use let, if, while, function u otra expresion";
+               "let, if, while, with, function, metodo o como sentencia de programa";
     }
     if (non_terminal == "ArgListOpt" || non_terminal == "ArgList") {
         return "Un bloque '{ ... }' no puede usarse como argumento de llamada";

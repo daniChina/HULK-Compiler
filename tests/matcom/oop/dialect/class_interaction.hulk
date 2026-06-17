@@ -1,11 +1,11 @@
-class Wallet(amount: Number) {
+type Wallet(amount: Number) {
  balance: Number = amount;
  deposit(n: Number) => self.balance := self.balance + n;
  withdraw(n: Number) => self.balance := self.balance - n;
  get_balance() => self.balance;
 }
 
-class Transaction(w: Wallet, amt: Number) {
+type Transaction(w: Wallet, amt: Number) {
  wallet: Wallet = w;
  amount: Number = amt;
  apply() => self.wallet.deposit(self.amount);

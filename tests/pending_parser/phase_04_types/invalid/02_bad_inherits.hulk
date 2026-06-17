@@ -1,2 +1,2 @@
-class Child is {
+type Child inherits {
 }

@@ -1,15 +1,15 @@
-class Vehicle(spd: Number) {
+type Vehicle(spd: Number) {
  speed: Number = spd;
  move() => "moving";
  max_speed() => self.speed;
 }
 
-class Car(spd: Number, d: Number) is Vehicle(spd) {
+type Car(spd: Number, d: Number ) inherits Vehicle(spd) {
  doors: Number = d;
  move() => "driving";
 }
 
-class Bike(spd: Number) is Vehicle(spd) {
+type Bike(spd: Number ) inherits Vehicle(spd) {
  move() => "cycling";
 }
 

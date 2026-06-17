@@ -2,7 +2,7 @@ function abs_num(x: Number): Number {
  if (x < 0) -x else x;
 }
 
-class Box(w: Number, h: Number, d: Number) {
+type Box(w: Number, h: Number, d: Number) {
  width: Number = abs_num(w);
  height: Number = abs_num(h);
  depth: Number = abs_num(d);

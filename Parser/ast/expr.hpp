@@ -95,6 +95,7 @@ struct AttributeDef {
 struct MethodDef {
     Token name;
     std::vector<std::pair<Token, std::optional<Token>>> params;
+    std::optional<Token> return_type;
     ExprPtr body;
 };
 

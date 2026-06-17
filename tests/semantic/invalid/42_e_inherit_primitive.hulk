@@ -1,1 +1,1 @@
-class Bad is Number {}
+type Bad inherits Number {}

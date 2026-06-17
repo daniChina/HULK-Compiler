@@ -56,9 +56,25 @@ int main() {
             cell_has_production(
                 ll1_table.table,
                 "Program",
-                "CLASS",
-                "Program -> ClassDeclList StmtList EOF_TOKEN"),
-            "M[Program, CLASS] starts optional class section");
+                "TYPE",
+                "Program -> StmtList EOF_TOKEN"),
+            "M[Program, TYPE] starts unified statement list");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "Stmt",
+                "LBRACE",
+                "Stmt -> BlockStmt"),
+            "M[Stmt, LBRACE] allows top-level block statement");
+
+        ok &= expect(
+            cell_has_production(
+                ll1_table.table,
+                "ClassParamsOpt",
+                "INHERITS",
+                std::string("ClassParamsOpt -> ") + parser::generator::kEpsilonSymbol),
+            "M[ClassParamsOpt, INHERITS] omits type params before inheritance");
 
         ok &= expect(
             cell_has_production(
@@ -66,31 +82,23 @@ int main() {
                 "ClassParamsOpt",
                 "LPAREN",
                 "ClassParamsOpt -> LPAREN ArgIdListOpt RPAREN"),
-            "M[ClassParamsOpt, LPAREN] uses parenthesized typed class params");
-
-        ok &= expect(
-            cell_has_production(
-                ll1_table.table,
-                "ClassParamsOpt",
-                "IS",
-                std::string("ClassParamsOpt -> ") + parser::generator::kEpsilonSymbol),
-            "M[ClassParamsOpt, IS] omits class params before inheritance");
+            "M[ClassParamsOpt, LPAREN] uses parenthesized typed type params");
 
         ok &= expect(
             cell_has_production(
                 ll1_table.table,
                 "ClassInheritanceOpt",
-                "IS",
-                "ClassInheritanceOpt -> IS IDENTIFIER ClassBaseArgsOpt"),
-            "M[ClassInheritanceOpt, IS] uses is-inheritance (B7)");
+                "INHERITS",
+                "ClassInheritanceOpt -> INHERITS IDENTIFIER ClassBaseArgsOpt"),
+            "M[ClassInheritanceOpt, INHERITS] uses inherits-inheritance (matcom)");
 
         ok &= expect(
             !cell_has_production(
                 ll1_table.table,
-                "ClassDeclList",
+                "StmtList",
                 "SEMICOLON",
-                "ClassDeclList -> ClassDecl ClassDeclList"),
-            "M[ClassDeclList, SEMICOLON] has no class-decl production (B6 rejects }; )");
+                "StmtList -> Stmt StmtList"),
+            "M[StmtList, SEMICOLON] has no bare-semicolon stmt (rejects }; )");
 
         ok &= expect(
             cell_has_production(
@@ -105,16 +113,16 @@ int main() {
                 ll1_table.table,
                 "ClassAttrListHead",
                 "LPAREN",
-                "ClassAttrListHead -> LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON ClassMethodList"),
-            "M[ClassAttrListHead, LPAREN] starts method via arrow body (B5)");
+                "ClassAttrListHead -> LPAREN ArgIdListOpt RPAREN MethodReturnTypeOpt MethodBody ClassMethodList"),
+            "M[ClassAttrListHead, LPAREN] starts method with matcom body forms");
 
         ok &= expect(
             cell_has_production(
                 ll1_table.table,
                 "ClassMethod",
                 "IDENTIFIER",
-                "ClassMethod -> IDENTIFIER LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON"),
-            "M[ClassMethod, IDENTIFIER] uses arrow method production (B5)");
+                "ClassMethod -> IDENTIFIER LPAREN ArgIdListOpt RPAREN MethodReturnTypeOpt MethodBody"),
+            "M[ClassMethod, IDENTIFIER] uses matcom method production");
 
         ok &= expect(
             cell_has_production(

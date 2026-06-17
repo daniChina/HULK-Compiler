@@ -1,4 +1,4 @@
-class C {
+type C {
     a(x) => self.b(x);
     b(x) => x + 1;
 }

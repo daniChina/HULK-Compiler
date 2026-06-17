@@ -15,7 +15,7 @@
 
 namespace semantic {
 
-// Analizador Fase 2 sobre el AST local (`parser::`). Analizador semántico activo (R1–R4).
+// Analizador Fase 2 sobre el AST local (`parser::`). Único analizador semántico activo (R1–R4 + I1–I11).
 // Pasadas: (1) collect; (2) clases; (3) fixed-point; (4) override retorno; TypeMap en cada visitExpr (I11).
 class Phase2Analyzer : public parser::ExprVisitor, public parser::StmtVisitor {
 public:

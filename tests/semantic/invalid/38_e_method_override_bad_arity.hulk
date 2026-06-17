@@ -1,7 +1,7 @@
-class Parent() {
+type Parent() {
     greet() => "hello";
 }
-class Child() is Parent() {
+type Child( ) inherits Parent() {
     greet(name:String) => "hello " @ name;
 }
 print(0);

@@ -1,7 +1,7 @@
-class A(x: Number, y: Number) {}
+type A(x: Number, y: Number) {}
 
-class B is A {}
+type B inherits A {}
 
-class C is B {}
+type C inherits B {}
 
 let o = new C(1, 2) in print(o);

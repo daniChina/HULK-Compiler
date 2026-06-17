@@ -1,14 +1,14 @@
-class A(v: Number) {
+type A(v: Number) {
  val: Number = v;
  name() => "A";
  get() => self.val;
 }
 
-class B(v: Number) is A(v) {
+type B(v: Number ) inherits A(v) {
  name() => "B";
 }
 
-class C(v: Number) is B(v) {
+type C(v: Number ) inherits B(v) {
  name() => "C";
 }
 

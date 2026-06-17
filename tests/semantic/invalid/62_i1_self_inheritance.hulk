@@ -1,1 +1,1 @@
-class Loop is Loop {}
+type Loop inherits Loop {}

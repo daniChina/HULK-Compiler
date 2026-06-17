@@ -2,9 +2,9 @@ type Point(x_val: Number, y_val: Number) {
  x: Number = x_val;
  y: Number = y_val;
 
- getX() => self.x;
- getY() => self.y;
- sum() => self.x + self.y;
+ getX(): Number => self.x;
+ getY(): Number => self.y;
+ sum(): Number => self.x + self.y;
 }
 
 let p = new Point(3, 4) in {

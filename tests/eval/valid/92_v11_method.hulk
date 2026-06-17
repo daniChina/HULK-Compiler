@@ -1,4 +1,4 @@
-class Counter(n: Number) {
+type Counter(n: Number) {
     n: Number = n;
     inc() => self.n := self.n + 1;
 }

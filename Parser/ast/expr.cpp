@@ -106,7 +106,7 @@ std::string stmt_to_string(const Stmt& stmt) {
                 out << ")";
             }
             if (class_decl.parent_name) {
-                out << " is " << class_decl.parent_name->lexeme;
+                out << " inherits " << class_decl.parent_name->lexeme;
                 if (!class_decl.parent_args.empty()) {
                     out << "(";
                     for (std::size_t i = 0; i < class_decl.parent_args.size(); ++i) {

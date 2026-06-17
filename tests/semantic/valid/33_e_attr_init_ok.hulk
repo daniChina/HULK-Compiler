@@ -1,4 +1,4 @@
-class Person(x: Number, name: String) {
+type Person(x: Number, name: String) {
     x_attr: Number = x;
     name_attr: String = name;
 }

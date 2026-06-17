@@ -97,26 +97,26 @@ int main() {
     ok &= expect_ok("I3 propagate from call",
                     "function g(x:Number) => x;\nfunction h(y) => g(y);\nprint(h(1));");
     ok &= expect_ok("I6 implicit inherit params",
-                    "class Parent(x: Number) {}\nclass Child is Parent {}\n"
+                    "type Parent(x: Number) {}\ntype Child inherits Parent {}\n"
                     "let c = new Child(1) in print(c);");
     ok &= expect_ok("I7 for range element Number", "for (i in range(0, 2)) print(i + 1);");
     ok &= expect_ok("I7 for typed iterator", "for (x: Number in range(0, 2)) print(x);");
     ok &= expect_ok("I8 attr infer no annotation",
-                    "class C { n = 0; }\nlet c = new C() in print(c.n + 1);");
+                    "type C { n = 0; }\nlet c = new C() in print(c.n + 1);");
     ok &= expect_ok("I9 method infer return",
-                    "class C { double(x) => x + x; }\nlet c = new C() in print(c.double(1));");
+                    "type C { double(x) => x + x; }\nlet c = new C() in print(c.double(1));");
     ok &= expect_ok("I9 method mutual infer",
-                    "class C { a(x) => self.b(x); b(x) => x + 1; }\nlet c = new C() in print(c.a(1));");
+                    "type C { a(x) => self.b(x); b(x) => x + 1; }\nlet c = new C() in print(c.a(1));");
     ok &= expect_ok("I9 method param via call",
-                    "class C { helper(x: Number) => x; outer(y) => self.helper(y); }\n"
+                    "type C { helper(x: Number) => x; outer(y) => self.helper(y); }\n"
                     "let c = new C() in print(c.outer(1));");
     ok &= expect_ok("I10 override chain 3 levels",
-                    "class GrandParent() { greet() => \"gp\"; }\nclass Parent() is GrandParent() {}\n"
-                    "class Child() is Parent() { greet() => \"child\"; }\n"
+                    "type GrandParent() { greet() => \"gp\"; }\ntype Parent() inherits GrandParent() {}\n"
+                    "type Child() inherits Parent() { greet() => \"child\"; }\n"
                     "let c = new Child() in print(c.greet());");
     ok &= expect_error("I10 grandchild return mismatch",
-                       "class GrandParent() { greet() => \"hello\"; }\nclass Parent() is GrandParent() {}\n"
-                       "class Child() is Parent() { greet() => 1; }\nprint(0);",
+                       "type GrandParent() { greet() => \"hello\"; }\ntype Parent() inherits GrandParent() {}\n"
+                       "type Child() inherits Parent() { greet() => 1; }\nprint(0);",
                        ErrorType::TYPE_ERROR);
 
     return ok ? 0 : 1;

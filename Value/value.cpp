@@ -63,7 +63,7 @@ std::ostream& operator<<(std::ostream& os, const Value& v) {
     } else if (v.isBool()) {
         os << (v.asBool() ? "true" : "false");
     } else if (v.isString()) {
-        os << '"' << v.asString() << '"';
+        os << v.asString();
     } else {
         os << v.toString();
     }

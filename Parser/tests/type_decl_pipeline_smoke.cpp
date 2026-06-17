@@ -16,7 +16,6 @@ namespace {
 
 using parser::TokenList;
 
-// Deja visible la forma léxica exacta (p. ej. CLASS + is en cabeceras de clases).
 std::string join_token_types(const TokenList& tokens) {
     std::ostringstream out;
     for (std::size_t i = 0; i < tokens.size(); ++i) {
@@ -61,8 +60,6 @@ bool expect_token_types(
     return true;
 }
 
-// Recorre lexer -> parser -> CST -> AST para dejar fija la forma canónica
-// del árbol OO que produce el compilador.
 bool expect_program_ast(
     const std::string& name,
     const parser::generator::Grammar& grammar,
@@ -103,14 +100,14 @@ int main() {
         bool ok = true;
 
         {
-            const auto tokens = tokenize_source("class Point(x:Number, y:Number) is Object() { x:Number = x; }");
+            const auto tokens = tokenize_source("type Point(x:Number, y:Number) inherits Object() { x:Number = x; }");
             ok &= expect_token_types(
-                "lexer recognizes class keyword, paren params and is inheritance",
+                "lexer recognizes type keyword, paren params and inherits",
                 tokens,
-                {parser::TokenType::CLASS, parser::TokenType::IDENTIFIER, parser::TokenType::LPAREN,
+                {parser::TokenType::TYPE, parser::TokenType::IDENTIFIER, parser::TokenType::LPAREN,
                  parser::TokenType::IDENTIFIER, parser::TokenType::COLON, parser::TokenType::IDENTIFIER,
                  parser::TokenType::COMMA, parser::TokenType::IDENTIFIER, parser::TokenType::COLON,
-                 parser::TokenType::IDENTIFIER, parser::TokenType::RPAREN, parser::TokenType::IS,
+                 parser::TokenType::IDENTIFIER, parser::TokenType::RPAREN, parser::TokenType::INHERITS,
                  parser::TokenType::IDENTIFIER, parser::TokenType::LPAREN, parser::TokenType::RPAREN,
                  parser::TokenType::LBRACE, parser::TokenType::IDENTIFIER, parser::TokenType::COLON,
                  parser::TokenType::IDENTIFIER, parser::TokenType::EQUAL, parser::TokenType::IDENTIFIER,
@@ -118,10 +115,10 @@ int main() {
         }
 
         ok &= expect_program_ast(
-            "class syntax with typed attributes reaches canonical ClassDecl AST",
+            "matcom type syntax with typed attributes reaches canonical ClassDecl AST",
             grammar,
             ll1_table,
-            "class Point(x:Number, y:Number) { x:Number = x; y:Number = y; norm() -> self.x * self.x + self.y * self.y; }\n"
+            "type Point(x:Number, y:Number) { x:Number = x; y:Number = y; norm(): Number => self.x * self.x + self.y * self.y; }\n"
             "function dist(p:Point):Number => p.norm();\n"
             "new Point(3, 4).norm();",
             "Program(\n"
@@ -135,14 +132,14 @@ int main() {
             ")");
 
         ok &= expect_program_ast(
-            "class inheritance with is passes parent args as expressions",
+            "type inheritance with inherits passes parent args as expressions",
             grammar,
             ll1_table,
-            "class Point(x:Number, y:Number) { x:Number = x; y:Number = y; }\n"
-            "class ColoredPoint(x:Number, y:Number, c:String) is Point(x, y) {\n"
+            "type Point(x:Number, y:Number) { x:Number = x; y:Number = y; }\n"
+            "type ColoredPoint(x:Number, y:Number, c:String) inherits Point(x, y) {\n"
             "  color:String = c;\n"
-            "  parent() -> base(x, y);\n"
-            "  label() -> self.color;\n"
+            "  parent() => base(x, y);\n"
+            "  label(): String => self.color;\n"
             "}\n"
             "new ColoredPoint(1, 2, \"red\").label();",
             "Program(\n"
@@ -150,7 +147,7 @@ int main() {
             "    x: Number = Identifier(x);\n"
             "    y: Number = Identifier(y);\n"
             "})\n"
-            "  ClassDecl(ColoredPoint(x: Number, y: Number, c: String) is Point(Identifier(x), Identifier(y)) {\n"
+            "  ClassDecl(ColoredPoint(x: Number, y: Number, c: String) inherits Point(Identifier(x), Identifier(y)) {\n"
             "    color: String = Identifier(c);\n"
             "    parent() -> BaseCall(Identifier(x), Identifier(y));\n"
             "    label() -> GetAttr(Self, color);\n"

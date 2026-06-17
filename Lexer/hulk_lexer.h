@@ -39,7 +39,7 @@ enum class TokenType : int {
     CASE,
     OF,
     FUNCTION,
-    CLASS,
+    TYPE,
     PROTOCOL,
     DEF,
     LET,
@@ -48,7 +48,6 @@ enum class TokenType : int {
     INHERITS,
     SELF,
     BASE,
-    IS,
     AS,
     AND,
     OR,
@@ -126,7 +125,7 @@ public:
             case TokenType::CASE:             return "CASE";
             case TokenType::OF:               return "OF";
             case TokenType::FUNCTION:         return "FUNCTION";
-            case TokenType::CLASS:            return "CLASS";
+            case TokenType::TYPE:             return "TYPE";
             case TokenType::PROTOCOL:         return "PROTOCOL";
             case TokenType::DEF:              return "DEF";
             case TokenType::LET:              return "LET";
@@ -135,7 +134,6 @@ public:
             case TokenType::INHERITS:         return "INHERITS";
             case TokenType::SELF:             return "SELF";
             case TokenType::BASE:             return "BASE";
-            case TokenType::IS:               return "IS";
             case TokenType::AS:               return "AS";
             case TokenType::AND:              return "AND";
             case TokenType::OR:               return "OR";

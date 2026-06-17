@@ -880,7 +880,8 @@ YY_RULE_SETUP
 case 19:
 YY_RULE_SETUP
 #line 150 "hulk_lexer.l"
-{ UPD(CLASS);      }
+{ MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                return static_cast<int>(TokenType::IDENTIFIER); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
@@ -920,12 +921,14 @@ YY_RULE_SETUP
 case 27:
 YY_RULE_SETUP
 #line 158 "hulk_lexer.l"
-{ UPD(BASE);       }
+{ MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                return static_cast<int>(TokenType::IDENTIFIER); }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
 #line 159 "hulk_lexer.l"
-{ UPD(IS);         }
+{ MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; sem.str_val = yytext;
+                return static_cast<int>(TokenType::IDENTIFIER); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
@@ -972,6 +975,9 @@ YY_RULE_SETUP
                 }
                 if (lexeme_ == "of") {
                     return static_cast<int>(TokenType::OF);
+                }
+                if (lexeme_ == "type") {
+                    return static_cast<int>(TokenType::TYPE);
                 }
                 // `Null` se trata como literal dedicado aunque su patron base
                 // entre primero por identificador.

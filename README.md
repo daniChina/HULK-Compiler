@@ -17,6 +17,14 @@ make compile
 
 Genera `hulk_c.exe` en la raiz.
 
+**Contrato matcom (CI):**
+
+```bash
+make build          # → ./hulk en raíz
+./hulk programa.hulk   # sin flags: genera ./output o stderr (line,col) TYPE: msg
+```
+
+
 ### 2. Escribir codigo
 
 Crea un archivo `.hulk` en la carpeta **`playground/`** (o en cualquier ruta). Ejemplo incluido: `playground/hello.hulk`.

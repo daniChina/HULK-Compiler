@@ -1,4 +1,4 @@
-class Point(x:Number) {
+type Point(x:Number) {
     x:Number = x;
 }
 let p = 1 as Point in print(0);

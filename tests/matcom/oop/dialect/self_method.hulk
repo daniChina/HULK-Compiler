@@ -1,4 +1,4 @@
-class Accumulator(init: Number) {
+type Accumulator(init: Number) {
  total: Number = init;
 
  add(n: Number) => self.total := self.total + n;

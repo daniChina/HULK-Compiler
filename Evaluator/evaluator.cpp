@@ -137,6 +137,12 @@ void Evaluator::initializeParentAttributes(value::Instance& instance, parser::Cl
     }
 
     parser::ClassDecl* base = base_it->second;
+
+    initializeParentAttributes(instance, base);
+    if (had_error_) {
+        return;
+    }
+
     if (base->params.size() != type_def->parent_args.size()) {
         setError("Número incorrecto de argumentos en llamada a base: " + base_name);
         return;
@@ -470,6 +476,10 @@ void Evaluator::visit(parser::BinaryExpr* expr) {
                (op == "==" || op == "!=")) {
         current_ = value::Value(op == "==" ? left.asBool() == right.asBool()
                                            : left.asBool() != right.asBool());
+    } else if (left.isString() && right.isString() &&
+               (op == "==" || op == "!=")) {
+        current_ = value::Value(op == "==" ? left.asString() == right.asString()
+                                           : left.asString() != right.asString());
     } else {
         setError("Operador binario no soportado: " + op);
     }

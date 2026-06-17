@@ -4,13 +4,20 @@ Copias locales de los 11 tests obligatorios de OOP del CI de [matcom/compilers](
 
 | Directorio | Contenido |
 |------------|-----------|
-| `*.hulk` | Fuente **exacta** de matcom (`type` / `inherits` / métodos con `{ }`) |
-| `dialect/*.hulk` | Traducción manual al dialecto local (`class` / `is` / `=>`) para medir capacidad real del compilador |
+| `*.hulk` | Fuente **matcom** (`type` / `inherits` / métodos con `{ }`) — **usar estos** |
+| `dialect/*.hulk` | ~~Traducción `class`/`is`~~ **obsoleta** (jun 2026) |
 
 
-**Ejecución manual:**
+**Ejecución:**
 
-```powershell
-.\hulk_c.exe tests\matcom\oop\basic_class.hulk --semantic
-.\hulk_c.exe tests\matcom\oop\dialect\basic_class.hulk --interpret
+```bash
+make build
+make test_matcom_oop_parse          # 11/11 Parse OK
+
+./hulk tests/matcom/oop/basic_class.hulk   # genera ./output
+./output                                   # stdout (M2: aún con comillas en strings)
+
+# Desarrollo
+./hulk_c.exe tests/matcom/oop/basic_class.hulk --semantic
+./hulk_c.exe tests/matcom/oop/basic_class.hulk --interpret
 ```

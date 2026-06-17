@@ -1,4 +1,4 @@
-class Vector(x: Number, y: Number) {
+type Vector(x: Number, y: Number) {
  x: Number = x;
  y: Number = y;
  length_sq() => self.x * self.x + self.y * self.y;

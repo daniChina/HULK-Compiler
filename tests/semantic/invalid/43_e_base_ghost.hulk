@@ -1,1 +1,1 @@
-class K is Ghost {}
+type K inherits Ghost {}

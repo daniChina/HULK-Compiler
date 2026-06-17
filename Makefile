@@ -1,4 +1,6 @@
-.PHONY: all compile lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke
+MATCOM_OOP_PARSE_TARGET = matcom_oop_parse_smoke
+
+.PHONY: all compile build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse
 
 # Compilador y flags
 CXX = g++
@@ -25,7 +27,30 @@ SOURCES = Lexer/hulk_lexer.cpp \
           SymbolTable/decl_collector.cpp \
           Value/value.cpp \
           Evaluator/evaluator.cpp \
+          Compiler/pipeline.cpp \
+          Compiler/output_gen.cpp \
           Compiler/main.cpp
+
+OUTPUT_SOURCES = Lexer/hulk_lexer.cpp \
+          Parser/core/token_adapter.cpp \
+          Parser/core/token_stream.cpp \
+          Parser/ast/expr.cpp \
+          Parser/ast/cst_nodes.cpp \
+          Parser/ast/cst_to_ast.cpp \
+          Parser/generator/grammar_reader.cpp \
+          Parser/generator/first_follow.cpp \
+          Parser/generator/ll1_table.cpp \
+          Parser/syntax/ll1_parser.cpp \
+          SemanticCheck/binding_list.cpp \
+          SemanticCheck/phase2_checker.cpp \
+          Types/type_info.cpp \
+          SymbolTable/decl_collector.cpp \
+          Value/value.cpp \
+          Evaluator/evaluator.cpp \
+          Compiler/pipeline.cpp \
+          Compiler/output_main.cpp
+
+HULK_BIN = hulk
 
 PARSER_TEST_COMMON = Lexer/hulk_lexer.cpp Parser/core/token_adapter.cpp Parser/core/token_stream.cpp \
           Parser/ast/expr.cpp Parser/ast/cst_nodes.cpp Parser/ast/cst_to_ast.cpp \
@@ -56,6 +81,16 @@ SYMBOL_TEST_AST_COLLECTOR = $(SYMBOL_TEST_AST) SymbolTable/decl_collector.cpp
 FILE ?= Parser/tests/valid_expr_pipeline.hulk
 
 all: compile
+
+build: $(HULK_BIN)
+
+ifeq ($(OS),Windows_NT)
+$(HULK_BIN): compile
+	cmd /c copy /Y $(TARGET) $(HULK_BIN) >nul
+else
+$(HULK_BIN):
+	$(CXX) $(CXXFLAGS) -O2 $(SOURCES) -o $(HULK_BIN)
+endif
 
 lexer:
 	flex++ --c++ -o Lexer/hulk_lexer.cpp Lexer/hulk_lexer.l
@@ -105,6 +140,10 @@ test_semantic: test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_bui
 test_is_as_smoke:
 	$(CXX) $(CXXFLAGS) Parser/tests/is_as_expr_pipeline_smoke.cpp $(PARSER_TEST_COMMON) -o $(IS_AS_SMOKE_TARGET)
 	./$(IS_AS_SMOKE_TARGET)
+
+test_matcom_oop_parse:
+	$(CXX) $(CXXFLAGS) Parser/tests/matcom_oop_parse_smoke.cpp $(PARSER_TEST_COMMON) -o $(MATCOM_OOP_PARSE_TARGET)
+	./$(MATCOM_OOP_PARSE_TARGET)
 
 test_eval:
 	$(CXX) $(CXXFLAGS) Evaluator/tests/eval_smoke.cpp $(PARSER_TEST_COMMON) Value/value.cpp Evaluator/evaluator.cpp -o $(EVAL_TEST_TARGET)
@@ -157,4 +196,4 @@ test_eval_fixtures: compile
 endif
 
 clean:
-	rm -f $(TARGET) $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_LITERALS_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) $(EVAL_OO_TEST_TARGET) $(IS_AS_SMOKE_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o
+	rm -f $(TARGET) $(HULK_BIN) output .hulk_program.hulk $(TYPE_TEST_TARGET) $(SYMBOL_SMOKE_TARGET) $(SYMBOL_SCOPE_TEST_TARGET) $(R1_SEMANTIC_TEST_TARGET) $(R2_SEMANTIC_TEST_TARGET) $(R3_R4_SEMANTIC_TEST_TARGET) $(A4_BUILTINS_TEST_TARGET) $(EVAL_TEST_TARGET) $(EVAL_LITERALS_TEST_TARGET) $(EVAL_FUNCTIONS_TEST_TARGET) $(EVAL_OPS_TEST_TARGET) $(EVAL_LOOPS_TEST_TARGET) $(EVAL_WITH_TEST_TARGET) $(EVAL_OO_TEST_TARGET) $(IS_AS_SMOKE_TARGET) $(MATCOM_OOP_PARSE_TARGET) Lexer/*.o Parser/core/*.o Parser/ast/*.o Parser/generator/*.o Parser/syntax/*.o

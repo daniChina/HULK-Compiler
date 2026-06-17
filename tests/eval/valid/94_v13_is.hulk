@@ -1,5 +1,5 @@
-class Person(name:String) {
+type Person(name:String) {
     name:String = name;
 }
-class Student(name:String) is Person(name) {}
+type Student(name:String ) inherits Person(name) {}
 print(let s = new Student("A") in s.name);

@@ -1,5 +1,5 @@
-class A is C {}
+type A inherits C {}
 
-class B is A {}
+type B inherits A {}
 
-class C is B {}
+type C inherits B {}

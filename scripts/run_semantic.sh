@@ -118,7 +118,7 @@ check_invalid() {
             fi
             ;;
         parse)
-            if [[ "$out" != *"Error de parseo"* ]]; then
+            if [[ "$out" != *"Error de parseo"* && "$out" != *"SYNTACTIC:"* ]]; then
                 fail "invalid/$base — se esperaba error de parseo"
                 echo "$out" | sed 's/^/  /'
                 return

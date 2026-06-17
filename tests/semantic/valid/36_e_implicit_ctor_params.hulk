@@ -1,2 +1,2 @@
-class Parent(x: Number) {}
-class Child(y: Number) is Parent {}
+type Parent(x: Number) {}
+type Child(y: Number ) inherits Parent {}

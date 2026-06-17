@@ -1,4 +1,4 @@
 // El lexer debe reportar $ como caracter desconocido dentro de un miembro de clase.
-class Point(x:Number, y:Number) {
+type Point(x:Number, y:Number) {
     x:Number = $;
 }

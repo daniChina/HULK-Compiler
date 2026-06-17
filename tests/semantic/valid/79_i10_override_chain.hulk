@@ -1,8 +1,8 @@
-class GrandParent() {
+type GrandParent() {
     greet() => "gp";
 }
-class Parent() is GrandParent() {}
-class Child() is Parent() {
+type Parent( ) inherits GrandParent() {}
+type Child( ) inherits Parent() {
     greet() => "child";
 }
 let c = new Child() in print(c.greet());

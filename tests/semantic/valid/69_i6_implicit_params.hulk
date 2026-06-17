@@ -1,5 +1,5 @@
-class Parent(x: Number) {}
+type Parent(x: Number) {}
 
-class Child is Parent {}
+type Child inherits Parent {}
 
 let c = new Child(1) in print(c);

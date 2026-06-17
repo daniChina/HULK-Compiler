@@ -18,9 +18,11 @@ $failures = 0
 $ran = 0
 
 function Run-Hulk([string]$File) {
-    $out = & $Hulk $File --semantic 2>&1 | Out-String
+    # cmd /c evita que PowerShell trate stderr nativo como error terminante
+    $raw = cmd /c "`"$Hulk`" `"$File`" --semantic 2>&1"
+    $out = if ($raw -is [array]) { ($raw | Out-String) } else { [string]$raw }
     $code = $LASTEXITCODE
-    if ($code -eq 0 -and ($out -match '== Semantic errors ==' -or $out -match 'Error de parseo')) {
+    if ($code -eq 0 -and ($out -match '== Semantic errors ==' -or $out -match 'Error de parseo' -or $out -match 'SYNTACTIC:')) {
         $code = 1
     }
     return @{ Output = $out; ExitCode = $code }
@@ -71,7 +73,7 @@ foreach ($f in Get-ChildItem "$InvalidDir\*.hulk" | Sort-Object Name) {
                 $ok = $false
             }
         }
-        "parse" { if ($r.Output -notmatch "Error de parseo") { $ok = $false } }
+        "parse" { if ($r.Output -notmatch "Error de parseo" -and $r.Output -notmatch "SYNTACTIC:") { $ok = $false } }
         "any" { }
         default { $ok = $false }
     }

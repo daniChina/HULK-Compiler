@@ -1,6 +1,6 @@
 // Primera gramatica LL(1) formal del proyecto.
-// Alcance actual:
-// - programa: lista de sentencias (expresion global, funciones globales, declaraciones class)
+// Alcance actual (dialecto matcom):
+// - programa: sentencias en orden libre (type, function, expresiones, bloque top-level)
 // - condicionales if / elif / else (cuerpos IfBody: expresion o bloque)
 // - while (cuerpo WhileBody; else opcional WhileElseOpt)
 // - expresiones y precedencia de operadores
@@ -10,16 +10,17 @@
 // - Los terminales usan exactamente los nombres expuestos por Parser/core/token.hpp
 // - ε representa epsilon
 
-Program         -> ClassDeclList StmtList EOF_TOKEN
-
-ClassDeclList   -> ClassDecl ClassDeclList
-                | ε
+Program         -> StmtList EOF_TOKEN
 
 StmtList        -> Stmt StmtList
                 | ε
 
 Stmt            -> ExprStmt
                 | FunctionDecl
+                | ClassDecl
+                | BlockStmt
+
+BlockStmt       -> BlockExpr
 
 FunctionDecl    -> FUNCTION IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
 
@@ -34,10 +35,10 @@ TypeAnnotation  -> COLON IDENTIFIER
 FunctionBody    -> ARROW Expr SEMICOLON
                 | BlockExpr
 
-ClassDecl           -> CLASS IDENTIFIER ClassParamsOpt ClassInheritanceOpt LBRACE ClassBody RBRACE
+ClassDecl           -> TYPE IDENTIFIER ClassParamsOpt ClassInheritanceOpt LBRACE ClassBody RBRACE
 ClassParamsOpt      -> LPAREN ArgIdListOpt RPAREN
                     | ε
-ClassInheritanceOpt -> IS IDENTIFIER ClassBaseArgsOpt
+ClassInheritanceOpt -> INHERITS IDENTIFIER ClassBaseArgsOpt
                     | ε
 ClassBaseArgsOpt    -> LPAREN ArgListOpt RPAREN
                     | ε
@@ -50,12 +51,18 @@ ClassAttrList   -> IDENTIFIER ClassAttrListHead ClassAttrList
 
 ClassAttrListHead -> TypeAnnotation EQUAL Expr SEMICOLON
                   | EQUAL Expr SEMICOLON
-                  | LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON ClassMethodList
+                  | LPAREN ArgIdListOpt RPAREN MethodReturnTypeOpt MethodBody ClassMethodList
+
+MethodReturnTypeOpt -> TypeAnnotation
+                    | ε
+
+MethodBody        -> ARROW Expr SEMICOLON
+                  | BlockExpr
 
 ClassMethodList -> ClassMethod ClassMethodList
                 | ε
 
-ClassMethod     -> IDENTIFIER LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON
+ClassMethod     -> IDENTIFIER LPAREN ArgIdListOpt RPAREN MethodReturnTypeOpt MethodBody
 
 ExprStmt        -> Expr SEMICOLON
 
@@ -235,7 +242,6 @@ Primary         -> NUMBER_LITERAL
                 | IDENTIFIER
                 | LPAREN Expr RPAREN
                 | NEW IDENTIFIER LPAREN ArgListOpt RPAREN
-                | BASE LPAREN ArgListOpt RPAREN
                 | SELF
 
 BlockExpr       -> LBRACE BlockList RBRACE

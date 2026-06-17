@@ -104,11 +104,11 @@ int main() {
         bool ok = true;
 
         {
-            const auto tokens = tokenize_source("class Colleague is Person { greet() -> \"Hi\" @@ self.name; }");
+            const auto tokens = tokenize_source("type Colleague inherits Person { greet() => \"Hi\" @@ self.name; }");
             ok &= expect_token_types(
-                "lexer recognizes inherited class and overriding method syntax",
+                "lexer recognizes inherited type and overriding method syntax",
                 tokens,
-                {parser::TokenType::CLASS, parser::TokenType::IDENTIFIER, parser::TokenType::IS,
+                {parser::TokenType::TYPE, parser::TokenType::IDENTIFIER, parser::TokenType::INHERITS,
                  parser::TokenType::IDENTIFIER, parser::TokenType::LBRACE, parser::TokenType::IDENTIFIER,
                  parser::TokenType::LPAREN, parser::TokenType::RPAREN, parser::TokenType::ARROW,
                  parser::TokenType::STRING_LITERAL, parser::TokenType::CONCAT_WS, parser::TokenType::SELF,
@@ -120,12 +120,12 @@ int main() {
             "pipeline parses implicit method override and inherited constructor args at call site",
             grammar,
             ll1_table,
-            "class Person(name:String) {\n"
+            "type Person(name:String) {\n"
             "  name:String = name;\n"
-            "  greet() -> \"Hello\" @@ self.name;\n"
+            "  greet() => \"Hello\" @@ self.name;\n"
             "}\n"
-            "class Colleague is Person {\n"
-            "  greet() -> \"Hi\" @@ self.name;\n"
+            "type Colleague inherits Person {\n"
+            "  greet() => \"Hi\" @@ self.name;\n"
             "}\n"
             "let p:Person = new Colleague(\"Pete\") in print(p.greet());",
             "Program(\n"
@@ -133,7 +133,7 @@ int main() {
             "    name: String = Identifier(name);\n"
             "    greet() -> Binary(String(\"\"Hello\"\"), @@, GetAttr(Self, name));\n"
             "})\n"
-            "  ClassDecl(Colleague is Person {\n"
+            "  ClassDecl(Colleague inherits Person {\n"
             "    greet() -> Binary(String(\"\"Hi\"\"), @@, GetAttr(Self, name));\n"
             "})\n"
             "  ExprStmt(Let(p: Person = New(Colleague(String(\"\"Pete\"\"))) in Call(Identifier(print), [Call(GetAttr(Identifier(p), greet), [])])))\n"
@@ -143,18 +143,18 @@ int main() {
             "pipeline parses explicit base argument computation in inherited class header",
             grammar,
             ll1_table,
-            "class Person(name:String) {\n"
+            "type Person(name:String) {\n"
             "  name:String = name;\n"
-            "  greet() -> \"Hello\" @@ self.name;\n"
+            "  greet() => \"Hello\" @@ self.name;\n"
             "}\n"
-            "class Noble(title:String, who:String) is Person(title @@ who) { }\n"
+            "type Noble(title:String, who:String) inherits Person(title @@ who) { }\n"
             "let p = new Noble(\"Sir\", \"Thomas\") in print(p.greet());",
             "Program(\n"
             "  ClassDecl(Person(name: String) {\n"
             "    name: String = Identifier(name);\n"
             "    greet() -> Binary(String(\"\"Hello\"\"), @@, GetAttr(Self, name));\n"
             "})\n"
-            "  ClassDecl(Noble(title: String, who: String) is Person(Binary(Identifier(title), @@, Identifier(who))) {\n"
+            "  ClassDecl(Noble(title: String, who: String) inherits Person(Binary(Identifier(title), @@, Identifier(who))) {\n"
             "})\n"
             "  ExprStmt(Let(p = New(Noble(String(\"\"Sir\"\"), String(\"\"Thomas\"\"))) in Call(Identifier(print), [Call(GetAttr(Identifier(p), greet), [])])))\n"
             ")");
@@ -163,13 +163,13 @@ int main() {
             "fixture 03_inherits_base_call: Knight is Person with forwarded args (decision 8d)",
             grammar,
             ll1_table,
-            "class Person(firstname:String, lastname:String) {\n"
+            "type Person(firstname:String, lastname:String) {\n"
             "  firstname:String = firstname;\n"
             "  lastname:String = lastname;\n"
-            "  name() -> self.firstname @@ self.lastname;\n"
+            "  name() => self.firstname @@ self.lastname;\n"
             "}\n"
-            "class Knight(firstname:String, lastname:String) is Person(firstname, lastname) {\n"
-            "  name() -> \"Sir\" @@ self.firstname;\n"
+            "type Knight(firstname:String, lastname:String) inherits Person(firstname, lastname) {\n"
+            "  name() => \"Sir\" @@ self.firstname;\n"
             "}\n"
             "new Knight(\"Phil\", \"Collins\").name();",
             "Program(\n"
@@ -178,7 +178,7 @@ int main() {
             "    lastname: String = Identifier(lastname);\n"
             "    name() -> Binary(GetAttr(Self, firstname), @@, GetAttr(Self, lastname));\n"
             "})\n"
-            "  ClassDecl(Knight(firstname: String, lastname: String) is Person(Identifier(firstname), Identifier(lastname)) {\n"
+            "  ClassDecl(Knight(firstname: String, lastname: String) inherits Person(Identifier(firstname), Identifier(lastname)) {\n"
             "    name() -> Binary(String(\"\"Sir\"\"), @@, GetAttr(Self, firstname));\n"
             "})\n"
             "  ExprStmt(Call(GetAttr(New(Knight(String(\"\"Phil\"\"), String(\"\"Collins\"\"))), name), []))\n"

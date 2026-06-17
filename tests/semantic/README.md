@@ -28,7 +28,17 @@ hulk.exe tests/semantic/invalid/07_r2_free_identifier.hulk --semantic
 
 **Expectativas inválidos:** `tests/semantic/manifest.tsv` (`kind`: `semantic` | `parse` | `any` + fragmento en stderr).
 
-**Bloques / `let`:** válido `17_r1_block_nested_let_manual.hulk` / `04_r1_shadow_block_nested_let.hulk`; inválido sin `in` → `19_block_multi_let_without_in.hulk`, bloque suelto → `20_block_stmt_alone.hulk`.
+**Errores de parse (jun 2026):** el driver emite `(line,col) SYNTACTIC: …` además del legacy `Error de parseo`. Los runners (`run_semantic.ps1` / `.sh`) aceptan ambos.
+
+**Bloques / `let` (M1 matcom):**
+
+| Fixture | Fuente | Qué prueba |
+|---------|--------|------------|
+| `19_block_multi_let_without_in` | `let outer = 1 in { let x = 1; let x = 2; x };` | Dos `let` en bloque **sin** `in` entre bindings → parse `BindingTail` |
+| `20_block_stmt_alone` | `{ let x = 1; let x = 2; x };` | Bloque suelto con lets encadenados sin `in` → parse `BindingTail` (no confundir con `{ let v in …; … }` top-level válido) |
+| `46_e_is_undefined_type` | `let x = 1 in x is Ghost;` | Tras M1, `is` ya no es keyword de herencia; la línea es **sintaxis inválida** → parse `PostfixTail` (no error semántico de tipo) |
+
+Válidos con bloque anidado correcto: `17_r1_block_nested_let_manual.hulk`, `04_r1_shadow_block_nested_let.hulk`.
 
 ## Parser (no en esta carpeta)
 

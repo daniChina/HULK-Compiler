@@ -1,10 +1,10 @@
-class Person(firstname:String, lastname:String) {
+type Person(firstname:String, lastname:String) {
     firstname:String = firstname;
     lastname:String = lastname;
     name() -> self.firstname @@ self.lastname;
 }
 
-class Knight(firstname:String, lastname:String) is Person(firstname, lastname) {
+type Knight(firstname:String, lastname:String ) inherits Person(firstname, lastname) {
     name() -> "Sir" @@ self.firstname;
 }
 

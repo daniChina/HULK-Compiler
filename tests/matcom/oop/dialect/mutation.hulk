@@ -1,4 +1,4 @@
-class Counter(start: Number) {
+type Counter(start: Number) {
  val = start;
 
  current() => self.val;

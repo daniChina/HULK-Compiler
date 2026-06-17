@@ -1,5 +1,6 @@
 # invalid/<archivo>	kind	fragmento en stderr (ASCII, sin depender de tildes)
 # kind: semantic | parse | any
+# parse: acepta "Error de parseo" (legacy) o "(line,col) SYNTACTIC:" (matcom/M0)
 invalid/01_r1_duplicate_bindings_same_let.hulk	semantic	ya est
 invalid/02_r1_redefine_pi.hulk	semantic	ya est
 invalid/03_r1_duplicate_let_in_function.hulk	semantic	ya est
@@ -13,8 +14,12 @@ invalid/12_r3_method_duplicate_params.hulk	semantic	ya est
 invalid/13_r3_overload_same_arity.hulk	semantic	ya est
 invalid/14_r4_undefined_call.hulk	semantic	no est
 invalid/15_r4_typo_undefined_function.hulk	semantic	prnt
+# parse: dos lets seguidos en BlockExpr sin 'in' entre bindings (no es BlockStmt top-level matcom)
 invalid/19_block_multi_let_without_in.hulk	parse	BindingTail
-invalid/20_block_stmt_alone.hulk	parse	no puede ser una sentencia
+# parse: bloque suelto con lets sin 'in'; distinto de { let x in ...; ... } permitido en M1
+invalid/20_block_stmt_alone.hulk	parse	BindingTail
+# parse: post-M1 'is' es IDENTIFIER; "x is Ghost" no es herencia → error PostfixTail (Ghost)
+invalid/46_e_is_undefined_type.hulk	parse	PostfixTail
 invalid/21_a4_redefine_e.hulk	semantic	ya est
 invalid/22_a4_redefine_builtin_sin.hulk	semantic	ya est
 invalid/23_r2_assign_without_let.hulk	semantic	no est
@@ -23,7 +28,6 @@ invalid/30_e_child_before_parent.hulk	semantic	no est
 invalid/31_e_undefined_type_new.hulk	semantic	no est
 invalid/32_e_redefined_class.hulk	semantic	ya est
 invalid/33_e_new_wrong_arity.hulk	semantic	espera
-invalid/46_e_is_undefined_type.hulk	parse	IS
 invalid/42_e_inherit_primitive.hulk	semantic	heredar
 invalid/43_e_base_ghost.hulk	semantic	no est
 invalid/44_e_base_args_arity.hulk	semantic	espera

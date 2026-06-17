@@ -112,9 +112,9 @@ std::vector<ExprPtr> build_arg_list(const CstNode& node);
 void append_arg_list_tail(const CstNode& node, std::vector<ExprPtr>& args);
 
 void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts);
-void extract_class_decl_list(const CstNode& node, std::vector<StmtPtr>& stmts);
 StmtPtr build_stmt(const CstNode& node);
 StmtPtr build_expr_stmt(const CstNode& node);
+StmtPtr build_block_stmt(const CstNode& node);
 StmtPtr build_function_decl(const CstNode& node);
 
 std::vector<std::pair<Token, std::optional<Token>>> build_arg_id_list_opt(const CstNode& node);
@@ -122,7 +122,9 @@ std::vector<std::pair<Token, std::optional<Token>>> build_arg_id_list(const CstN
 void extract_arg_id_list_tail(const CstNode& node, std::vector<std::pair<Token, std::optional<Token>>>& args);
 std::pair<Token, std::optional<Token>> build_arg_id(const CstNode& node);
 std::optional<Token> build_type_annotation_opt(const CstNode& node);
+std::optional<Token> build_method_return_type_opt(const CstNode& node);
 ExprPtr build_function_body(const CstNode& node);
+ExprPtr build_method_body(const CstNode& node);
 
 StmtPtr build_class_decl(const CstNode& node);
 Token build_type_annotation(const CstNode& node);
@@ -146,7 +148,15 @@ StmtPtr build_stmt(const CstNode& node) {
     if (first_child.symbol == "ClassDecl") {
         return build_class_decl(first_child);
     }
+    if (first_child.symbol == "BlockStmt") {
+        return build_block_stmt(first_child);
+    }
     throw std::runtime_error("Forma no esperada en Stmt");
+}
+
+StmtPtr build_block_stmt(const CstNode& node) {
+    expect_symbol(node, "BlockStmt");
+    return std::make_unique<ExprStmt>(build_block_expr(child(node, 0)));
 }
 
 StmtPtr build_expr_stmt(const CstNode& node) {
@@ -777,6 +787,11 @@ ExprPtr build_postfix_tail(ExprPtr left, const CstNode& node) {
     if (child(node, 0).symbol == "LPAREN") {
         Token lparen = child(node, 0).token;
         auto args = build_arg_list_opt(child(node, 1));
+        if (auto* id = dynamic_cast<IdentifierExpr*>(left.get());
+            id != nullptr && id->token.lexeme == "base") {
+            return build_postfix_tail(
+                std::make_unique<BaseCallExpr>(std::move(args)), child(node, 3));
+        }
         auto call = std::make_unique<CallExpr>(std::move(left), std::move(lparen), std::move(args));
         return build_postfix_tail(std::move(call), child(node, 3));
     }
@@ -862,12 +877,6 @@ ExprPtr build_primary(const CstNode& node) {
         return std::make_unique<NewExpr>(std::move(type_name), std::move(args));
     }
 
-    // Llamada explícita al constructor de la base: BASE LPAREN ArgListOpt RPAREN
-    if (node.children.size() == 4 && child(node, 0).symbol == "BASE") {
-        auto args = build_arg_list_opt(child(node, 2));
-        return std::make_unique<BaseCallExpr>(std::move(args));
-    }
-
     throw std::runtime_error("Forma de Primary no soportada en la conversion CST -> AST");
 }
 
@@ -894,18 +903,6 @@ void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts) {
     }
     stmts.push_back(build_stmt(child(node, 0)));
     extract_stmt_list(child(node, 1), stmts);
-}
-
-void extract_class_decl_list(const CstNode& node, std::vector<StmtPtr>& stmts) {
-    expect_symbol(node, "ClassDeclList");
-    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
-        return;
-    }
-
-    // El programa ahora obliga a que todas las clases aparezcan antes que las
-    // funciones y expresiones globales, por eso se extraen en una lista aparte.
-    stmts.push_back(build_class_decl(child(node, 0)));
-    extract_class_decl_list(child(node, 1), stmts);
 }
 
 StmtPtr build_function_decl(const CstNode& node) {
@@ -967,9 +964,26 @@ ExprPtr build_function_body(const CstNode& node) {
     return build_block_expr(first_child);
 }
 
+std::optional<Token> build_method_return_type_opt(const CstNode& node) {
+    expect_symbol(node, "MethodReturnTypeOpt");
+    if (node.children.empty() || is_epsilon_node(child(node, 0))) {
+        return std::nullopt;
+    }
+    return build_type_annotation(child(node, 0));
+}
+
+ExprPtr build_method_body(const CstNode& node) {
+    expect_symbol(node, "MethodBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "ARROW") {
+        return build_expr(child(node, 1));
+    }
+    return build_block_expr(first_child);
+}
+
 StmtPtr build_class_decl(const CstNode& node) {
     expect_symbol(node, "ClassDecl");
-    // CLASS IDENTIFIER ClassParamsOpt ClassInheritanceOpt LBRACE ClassBody RBRACE
+    // TYPE IDENTIFIER ClassParamsOpt ClassInheritanceOpt LBRACE ClassBody RBRACE
     Token name = child(node, 1).token;
 
     // ClassParamsOpt -> LPAREN ArgIdListOpt RPAREN | ε
@@ -979,7 +993,7 @@ StmtPtr build_class_decl(const CstNode& node) {
         params = build_arg_id_list_opt(child(class_params_opt, 1));
     }
 
-    // ClassInheritanceOpt -> IS IDENTIFIER ClassBaseArgsOpt | ε
+    // ClassInheritanceOpt -> INHERITS IDENTIFIER ClassBaseArgsOpt | ε
     std::optional<Token> parent_name = std::nullopt;
     std::vector<ExprPtr> parent_args;
     const auto& inheritance_opt = child(node, 3);
@@ -1029,8 +1043,9 @@ MethodDef build_class_method_from_head(const CstNode& head_node, Token name) {
         throw std::runtime_error("Se esperaba metodo en ClassAttrListHead");
     }
     auto params = build_arg_id_list_opt(child(head_node, 1));
-    ExprPtr body = build_expr(child(head_node, 4));
-    return {std::move(name), std::move(params), std::move(body)};
+    auto return_type = build_method_return_type_opt(child(head_node, 3));
+    ExprPtr body = build_method_body(child(head_node, 4));
+    return {std::move(name), std::move(params), std::move(return_type), std::move(body)};
 }
 
 void extract_class_attr_list_head(
@@ -1044,7 +1059,7 @@ void extract_class_attr_list_head(
         return;
     }
     methods.push_back(build_class_method_from_head(head_node, std::move(name)));
-    extract_class_method_list(child(head_node, 6), methods);
+    extract_class_method_list(child(head_node, 5), methods);
 }
 
 void extract_class_attr_list(const CstNode& node, std::vector<AttributeDef>& attributes, std::vector<MethodDef>& methods) {
@@ -1060,11 +1075,12 @@ void extract_class_attr_list(const CstNode& node, std::vector<AttributeDef>& att
 
 MethodDef build_class_method(const CstNode& node) {
     expect_symbol(node, "ClassMethod");
-    // IDENTIFIER LPAREN ArgIdListOpt RPAREN ARROW Expr SEMICOLON
+    // IDENTIFIER LPAREN ArgIdListOpt RPAREN MethodReturnTypeOpt MethodBody
     Token name = child(node, 0).token;
     auto params = build_arg_id_list_opt(child(node, 2));
-    ExprPtr body = build_expr(child(node, 5));
-    return {std::move(name), std::move(params), std::move(body)};
+    auto return_type = build_method_return_type_opt(child(node, 4));
+    ExprPtr body = build_method_body(child(node, 5));
+    return {std::move(name), std::move(params), std::move(return_type), std::move(body)};
 }
 
 void extract_class_method_list(const CstNode& node, std::vector<MethodDef>& methods) {
@@ -1088,8 +1104,7 @@ void extract_class_body(const CstNode& node, std::vector<AttributeDef>& attribut
 ProgramPtr cst_to_ast(const CstNode& root) {
     expect_symbol(root, "Program");
     std::vector<StmtPtr> stmts;
-    extract_class_decl_list(child(root, 0), stmts);
-    extract_stmt_list(child(root, 1), stmts);
+    extract_stmt_list(child(root, 0), stmts);
     return std::make_unique<Program>(std::move(stmts));
 }
 

@@ -1,8 +1,8 @@
-class GrandParent() {
+type GrandParent() {
     greet() => "hello";
 }
-class Parent() is GrandParent() {}
-class Child() is Parent() {
+type Parent( ) inherits GrandParent() {}
+type Child( ) inherits Parent() {
     greet() => 1;
 }
 print(0);

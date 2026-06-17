@@ -169,7 +169,19 @@ bool Phase2Analyzer::analyzeClassMethod(parser::ClassDecl* class_decl,
     current_class_ = old_class;
     symbol_table_.exitScope();
 
-    symbol_table_.updateMethodSignature(class_name, method.name.lexeme, param_types, body_type);
+    TypeInfo ret_type = method.return_type.has_value() ? resolveType(method.return_type) : body_type;
+    if (method.return_type.has_value()) {
+        validateTypeExists(method.return_type);
+        if (!body_type.conformsTo(ret_type)) {
+            report(ErrorType::TYPE_ERROR,
+                   "El tipo de retorno del método '" + method.name.lexeme + "' ('" +
+                       body_type.toString() + "') no conforma al tipo declarado '" +
+                       ret_type.toString() + "'",
+                   method.name.line, method.name.col, "declaración de método");
+        }
+    }
+
+    symbol_table_.updateMethodSignature(class_name, method.name.lexeme, param_types, ret_type);
 
     method_sym = symbol_table_.lookupType(class_name)->methods[method.name.lexeme];
     if (!method_sym) {
@@ -535,8 +547,11 @@ void Phase2Analyzer::registerClassDecl(parser::ClassDecl* stmt) {
             validateTypeExists(p.second);
         }
         std::vector<TypeInfo> method_params(method.params.size(), TypeInfo(TypeInfo::Kind::Unknown));
-        symbol_table_.addTypeMethod(name, method.name.lexeme, method_params,
-                                    TypeInfo(TypeInfo::Kind::Unknown), method.name.line);
+        TypeInfo method_ret = method.return_type.has_value()
+                                  ? resolveType(method.return_type)
+                                  : TypeInfo(TypeInfo::Kind::Unknown);
+        symbol_table_.addTypeMethod(name, method.name.lexeme, method_params, method_ret,
+                                    method.name.line);
     }
 
     for (const auto& method : stmt->methods) {

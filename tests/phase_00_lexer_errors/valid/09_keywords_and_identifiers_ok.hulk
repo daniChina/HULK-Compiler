@@ -1,3 +1,3 @@
 // El lexer debe reconocer keywords reales del lenguaje y tambien identificadores comunes.
-// `type` ya no es keyword (Fase 0); `class` si lo es.
-if else elif while for let in function class new inherits self base is as and or type variable;
+// `type` ya no es keyword (Fase 0); `type` si lo es.
+if else elif while for let in function type new inherits self base inherits as and or type variable;

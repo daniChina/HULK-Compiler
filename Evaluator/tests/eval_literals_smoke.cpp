@@ -49,9 +49,9 @@ bool runProgram(const std::string& source, const std::string& expected_stdout, c
 int main() {
     bool ok = true;
 
-    ok &= runProgram("print(\"hi\");\n", "\"hi\"\n", "A5: print string quoted");
-    ok &= runProgram("print(\"a\" @ \"b\");\n", "\"ab\"\n", "A5: string concat @");
-    ok &= runProgram("print(\"a\" @@ \"b\");\n", "\"a b\"\n", "A5: string concat @@ space");
+    ok &= runProgram("print(\"hi\");\n", "hi\n", "A5: print string");
+    ok &= runProgram("print(\"a\" @ \"b\");\n", "ab\n", "A5: string concat @");
+    ok &= runProgram("print(\"a\" @@ \"b\");\n", "a b\n", "A5: string concat @@ space");
 
     ok &= runProgram("print(Null);\n", "Null\n", "A4: print Null");
     ok &= runProgram("print(with (Null as x) 1 else 0);\n", "0\n", "A4: Null vs with else");

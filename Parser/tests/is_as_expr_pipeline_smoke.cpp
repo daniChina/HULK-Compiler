@@ -1,5 +1,4 @@
-// Smoke: operador `as` y herencia con `is` en declaraciones de clase.
-// Compilar: mingw32-make test_is_as_smoke  o  scripts/run_is_as_smoke.ps1
+// Smoke: operador `as` y herencia con `inherits` en declaraciones de type.
 #include <exception>
 #include <initializer_list>
 #include <iostream>
@@ -156,17 +155,17 @@ int main() {
             ")");
 
         ok &= expect_program_ast(
-            "pipeline parses class inheritance with is keyword",
+            "pipeline parses type inheritance with inherits keyword",
             grammar,
             ll1_table,
-            "class Child() is Parent() {}",
+            "type Child() inherits Parent() {}",
             "Program(\n"
-            "  ClassDecl(Child is Parent {\n"
+            "  ClassDecl(Child inherits Parent {\n"
             "})\n"
             ")");
 
         ok &= expect_parse_failure(
-            "pipeline rejects is as expression operator",
+            "pipeline rejects bare is identifier as binary operator",
             grammar,
             ll1_table,
             "x is Person;");
