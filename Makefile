@@ -16,12 +16,13 @@ LLVM_CXXFLAGS := $(filter-out -std=c++14,$(LLVM_CXXFLAGS))
 LLVM_CXXFLAGS := $(filter-out -std=gnu++14,$(LLVM_CXXFLAGS))
 # Mantener -fno-exceptions/-fno-rtti: libLLVM-14 (GHCup) exige ABI compatible en Windows.
 
-CODEGEN_SOURCES = Codegen/llvm_codegen.cpp Codegen/llvm_aux.cpp
+CODEGEN_SOURCES = Codegen/llvm_codegen.cpp Codegen/llvm_aux.cpp Codegen/output_build.cpp
 CODEGEN_I0_SOURCES = Codegen/tests/i0_module_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 LLVM_I0_TARGET = llvm_i0_smoke
 LLVM_I1_TARGET = llvm_i1_smoke
 LLVM_I2_TARGET = llvm_i2_smoke
 LLVM_I3_TARGET = llvm_i3_smoke
+LLVM_I4_TARGET = llvm_i4_smoke
 
 # Compilador y flags
 CXX = g++
@@ -83,6 +84,7 @@ PARSER_TEST_COMMON = Lexer/hulk_lexer.cpp Parser/core/token_adapter.cpp Parser/c
 CODEGEN_I1_SOURCES = Codegen/tests/i1_literals_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I2_SOURCES = Codegen/tests/i2_let_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I3_SOURCES = Codegen/tests/i3_binary_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I4_SOURCES = Codegen/tests/i4_print_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
@@ -180,13 +182,15 @@ else
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I1_SOURCES) -o $(LLVM_I1_TARGET) $(LLVM_LDFLAGS)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I2_SOURCES) -o $(LLVM_I2_TARGET) $(LLVM_LDFLAGS)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I3_SOURCES) -o $(LLVM_I3_TARGET) $(LLVM_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I4_SOURCES) -o $(LLVM_I4_TARGET) $(LLVM_LDFLAGS)
 ifeq ($(OS),Windows_NT)
-	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe && $(LLVM_I3_TARGET).exe"
+	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe && $(LLVM_I3_TARGET).exe && $(LLVM_I4_TARGET).exe"
 else
 	./$(LLVM_I0_TARGET)
 	./$(LLVM_I1_TARGET)
 	./$(LLVM_I2_TARGET)
 	./$(LLVM_I3_TARGET)
+	./$(LLVM_I4_TARGET)
 endif
 endif
 

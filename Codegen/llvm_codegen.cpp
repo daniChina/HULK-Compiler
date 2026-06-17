@@ -26,7 +26,7 @@ bool isLogicalOrOp(const std::string& op) {
 
 #define HULK_VISIT_STUB(Node) \
     void LLVMCodeGenerator::visit(parser::Node* /*node*/) { \
-        fail("codegen no implementado para " #Node " (iteracion posterior a I2)"); \
+        fail("codegen no implementado para " #Node " (iteracion posterior a I4)"); \
     }
 
 llvm::Function* getMallocFunction(llvm::Module& module, llvm::LLVMContext& context) {
@@ -60,6 +60,33 @@ void LLVMCodeGenerator::initialize(const std::string& module_name) {
     current_scope_ = scopes_.back().get();
     registerRuntimeDeclarations(*module_, *context_);
     registerMathematicalConstants();
+    registerPrintDeclarations();
+}
+
+void LLVMCodeGenerator::registerPrintDeclarations() {
+    llvm::StructType* boxed_ty = getBoxedValueType();
+    llvm::PointerType* boxed_ptr = llvm::PointerType::getUnqual(boxed_ty);
+
+    llvm::FunctionType* print_double_ty = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(*context_), {llvm::Type::getDoubleTy(*context_)}, false);
+    module_->getOrInsertFunction("hulk_print_double", print_double_ty);
+
+    llvm::FunctionType* print_bool_ty = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(*context_), {llvm::Type::getInt32Ty(*context_)}, false);
+    module_->getOrInsertFunction("hulk_print_bool", print_bool_ty);
+
+    module_->getOrInsertFunction("hulk_print_null", llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), false));
+    module_->getOrInsertFunction("hulk_print_newline",
+                                 llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), false));
+
+    llvm::FunctionType* print_boxed_ty =
+        llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), {boxed_ptr}, false);
+    module_->getOrInsertFunction("hulk_print_boxed", print_boxed_ty);
+
+    llvm::FunctionType* concat_ty =
+        llvm::FunctionType::get(boxed_ptr, {boxed_ptr, boxed_ptr}, false);
+    module_->getOrInsertFunction("hulk_string_concat", concat_ty);
+    module_->getOrInsertFunction("hulk_string_concat_ws", concat_ty);
 }
 
 void LLVMCodeGenerator::enterScope() {
@@ -117,7 +144,7 @@ llvm::GlobalVariable* LLVMCodeGenerator::registerStringConstant(const std::strin
         true,
         llvm::GlobalValue::PrivateLinkage,
         str_constant,
-        ".str." + std::to_string(var_counter_++));
+        "");
     string_constants_[value] = global_var;
     return global_var;
 }
@@ -358,8 +385,7 @@ void LLVMCodeGenerator::visit(parser::IdentifierExpr* expr) {
     const auto constant = global_constants_.find(name);
     if (constant != global_constants_.end()) {
         llvm::GlobalVariable* global = constant->second;
-        const std::string load_name = "const_" + name;
-        current_value_ = builder_->CreateLoad(global->getValueType(), global, load_name);
+        current_value_ = builder_->CreateLoad(global->getValueType(), global);
         return;
     }
 
@@ -368,8 +394,7 @@ void LLVMCodeGenerator::visit(parser::IdentifierExpr* expr) {
         if (found != scope->variables.end()) {
             llvm::AllocaInst* alloca = found->second;
             llvm::Type* var_type = scope->variable_types.at(name);
-            const std::string load_name = "var_" + name;
-            current_value_ = builder_->CreateLoad(var_type, alloca, load_name);
+            current_value_ = builder_->CreateLoad(var_type, alloca);
             return;
         }
     }
@@ -397,6 +422,85 @@ void LLVMCodeGenerator::visit(parser::LetExpr* expr) {
     expr->body->accept(this);
 
     exitScope();
+}
+
+bool LLVMCodeGenerator::isBoxedValuePointer(llvm::Type* type) {
+    if (type == nullptr || !type->isPointerTy()) {
+        return false;
+    }
+    llvm::StructType* boxed_ty = getBoxedValueType();
+    return type->getPointerElementType() == boxed_ty;
+}
+
+void LLVMCodeGenerator::emitPrintNewline() {
+    llvm::Function* fn = module_->getFunction("hulk_print_newline");
+    builder_->CreateCall(fn, {});
+}
+
+void LLVMCodeGenerator::emitPrintValue(llvm::Value* value) {
+    if (value == nullptr) {
+        fail("codegen: valor nulo en print");
+        return;
+    }
+
+    if (value->getType()->isDoubleTy()) {
+        llvm::Function* fn = module_->getFunction("hulk_print_double");
+        builder_->CreateCall(fn, {value});
+        return;
+    }
+
+    if (value->getType()->isIntegerTy(1)) {
+        llvm::Function* fn = module_->getFunction("hulk_print_bool");
+        llvm::Value* as_i32 = builder_->CreateZExt(value, llvm::Type::getInt32Ty(*context_), "print_bool_i32");
+        builder_->CreateCall(fn, {as_i32});
+        return;
+    }
+
+    if (!value->getType()->isPointerTy()) {
+        fail("codegen: tipo no imprimible en print");
+        return;
+    }
+
+    if (isBoxedValuePointer(value->getType())) {
+        llvm::Function* fn = module_->getFunction("hulk_print_boxed");
+        builder_->CreateCall(fn, {value});
+        return;
+    }
+
+    llvm::Function* null_fn = module_->getFunction("hulk_print_null");
+    builder_->CreateCall(null_fn, {});
+}
+
+void LLVMCodeGenerator::visit(parser::CallExpr* expr) {
+    if (expr->callee->kind != parser::ExprKind::IDENTIFIER) {
+        fail("codegen: solo llamadas a print builtin soportadas en I4");
+        return;
+    }
+
+    const auto* callee = static_cast<parser::IdentifierExpr*>(expr->callee.get());
+    const std::string& name = callee->token.lexeme;
+    if (name != "print") {
+        fail("codegen: funcion '" + name + "' no implementada (iteracion posterior a I4)");
+        return;
+    }
+
+    if (expr->args.empty()) {
+        emitPrintNewline();
+        current_value_ = llvm::ConstantFP::get(llvm::Type::getDoubleTy(*context_), 0.0);
+        return;
+    }
+
+    if (expr->args.size() != 1) {
+        fail("print espera 1 argumento");
+        return;
+    }
+
+    expr->args[0]->accept(this);
+    if (had_error_) {
+        return;
+    }
+    emitPrintValue(current_value_);
+    current_value_ = llvm::ConstantFP::get(llvm::Type::getDoubleTy(*context_), 0.0);
 }
 
 void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
@@ -495,7 +599,13 @@ void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
     }
 
     if (op == "@" || op == "@@") {
-        fail("concatenacion de strings no implementada (iteracion posterior a I4)");
+        if (!isBoxedValuePointer(left->getType()) || !isBoxedValuePointer(right->getType())) {
+            fail("Operador '" + op + "' requiere operandos string");
+            return;
+        }
+        const char* fn_name = op == "@" ? "hulk_string_concat" : "hulk_string_concat_ws";
+        llvm::Function* fn = module_->getFunction(fn_name);
+        current_value_ = builder_->CreateCall(fn, {left, right}, "concat");
         return;
     }
 
@@ -509,7 +619,6 @@ HULK_VISIT_STUB(AttributeDecl)
 HULK_VISIT_STUB(SelfExpr)
 HULK_VISIT_STUB(GroupedExpr)
 HULK_VISIT_STUB(UnaryExpr)
-HULK_VISIT_STUB(CallExpr)
 HULK_VISIT_STUB(GetAttrExpr)
 HULK_VISIT_STUB(BlockExpr)
 HULK_VISIT_STUB(IfExpr)

@@ -19,3 +19,6 @@ valid/21_l2_nested_let.hulk llvm_ok    store double 2.000000e+00
 # I3 — aritmética binaria (oracle IR en Codegen/tests/i3_binary_smoke.cpp; stdout en I4)
 valid/30_l3_add.hulk         llvm_ok    fadd double
 valid/31_l3_precedence.hulk  llvm_ok    fmul double
+
+# I4 — print + runtime (oracle E2E en Codegen/tests/i4_print_smoke.cpp)
+valid/40_l4_print_pi.hulk    llvm_ok    hulk_print_double

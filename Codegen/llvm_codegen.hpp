@@ -81,6 +81,7 @@ private:
     void fail(const std::string& message);
     void createEmptyMain();
     void registerMathematicalConstants();
+    void registerPrintDeclarations();
     void materializeExprResult();
     void enterScope();
     void exitScope();
@@ -94,6 +95,9 @@ private:
     llvm::Function* getLibmFunction(const char* name, llvm::FunctionType* fn_type);
     llvm::Value* expectBoolValue(llvm::Value* value, const std::string& op);
     llvm::Value* expectDoubleValue(llvm::Value* value, const std::string& op);
+    void emitPrintValue(llvm::Value* value);
+    void emitPrintNewline();
+    bool isBoxedValuePointer(llvm::Type* type);
 
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::Module> module_;
