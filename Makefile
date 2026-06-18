@@ -23,6 +23,7 @@ LLVM_I1_TARGET = llvm_i1_smoke
 LLVM_I2_TARGET = llvm_i2_smoke
 LLVM_I3_TARGET = llvm_i3_smoke
 LLVM_I4_TARGET = llvm_i4_smoke
+LLVM_I5_TARGET = llvm_i5_smoke
 
 # Compilador y flags
 CXX = g++
@@ -85,6 +86,7 @@ CODEGEN_I1_SOURCES = Codegen/tests/i1_literals_smoke.cpp $(CODEGEN_SOURCES) Pars
 CODEGEN_I2_SOURCES = Codegen/tests/i2_let_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I3_SOURCES = Codegen/tests/i3_binary_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I4_SOURCES = Codegen/tests/i4_print_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I5_SOURCES = Codegen/tests/i5_control_flow_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
@@ -183,14 +185,16 @@ else
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I2_SOURCES) -o $(LLVM_I2_TARGET) $(LLVM_LDFLAGS)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I3_SOURCES) -o $(LLVM_I3_TARGET) $(LLVM_LDFLAGS)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I4_SOURCES) -o $(LLVM_I4_TARGET) $(LLVM_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I5_SOURCES) -o $(LLVM_I5_TARGET) $(LLVM_LDFLAGS)
 ifeq ($(OS),Windows_NT)
-	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe && $(LLVM_I3_TARGET).exe && $(LLVM_I4_TARGET).exe"
+	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe && $(LLVM_I3_TARGET).exe && $(LLVM_I4_TARGET).exe && $(LLVM_I5_TARGET).exe"
 else
 	./$(LLVM_I0_TARGET)
 	./$(LLVM_I1_TARGET)
 	./$(LLVM_I2_TARGET)
 	./$(LLVM_I3_TARGET)
 	./$(LLVM_I4_TARGET)
+	./$(LLVM_I5_TARGET)
 endif
 endif
 

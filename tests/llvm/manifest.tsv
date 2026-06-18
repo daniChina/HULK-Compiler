@@ -22,3 +22,7 @@ valid/31_l3_precedence.hulk  llvm_ok    fmul double
 
 # I4 — print + runtime (oracle E2E en Codegen/tests/i4_print_smoke.cpp)
 valid/40_l4_print_pi.hulk    llvm_ok    hulk_print_double
+
+# I5 — control de flujo (oracle E2E en Codegen/tests/i5_control_flow_smoke.cpp)
+valid/50_l5_if.hulk          llvm_ok    if.then
+valid/51_l5_while.hulk       llvm_ok    while.else

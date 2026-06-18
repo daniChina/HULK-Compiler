@@ -95,6 +95,7 @@ private:
     llvm::Function* getLibmFunction(const char* name, llvm::FunctionType* fn_type);
     llvm::Value* expectBoolValue(llvm::Value* value, const std::string& op);
     llvm::Value* expectDoubleValue(llvm::Value* value, const std::string& op);
+    llvm::Value* defaultValueForType(llvm::Type* type);
     void emitPrintValue(llvm::Value* value);
     void emitPrintNewline();
     bool isBoxedValuePointer(llvm::Type* type);

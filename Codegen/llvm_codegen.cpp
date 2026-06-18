@@ -308,6 +308,22 @@ llvm::Value* LLVMCodeGenerator::expectDoubleValue(llvm::Value* value, const std:
     return value;
 }
 
+llvm::Value* LLVMCodeGenerator::defaultValueForType(llvm::Type* type) {
+    if (type == nullptr) {
+        return llvm::ConstantFP::get(llvm::Type::getDoubleTy(*context_), 0.0);
+    }
+    if (type->isDoubleTy()) {
+        return llvm::ConstantFP::get(type, 0.0);
+    }
+    if (type->isIntegerTy(1)) {
+        return llvm::ConstantInt::getFalse(*context_);
+    }
+    if (type->isPointerTy()) {
+        return llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(type->getPointerElementType()));
+    }
+    return llvm::ConstantFP::get(llvm::Type::getDoubleTy(*context_), 0.0);
+}
+
 void LLVMCodeGenerator::emitLogicalAndShortCircuit(parser::Expr* right_expr) {
     llvm::Value* left_val = current_value_;
     if (expectBoolValue(left_val, "&&") == nullptr) {
@@ -612,6 +628,163 @@ void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
     fail("Operador binario no soportado: " + op);
 }
 
+void LLVMCodeGenerator::visit(parser::BlockExpr* expr) {
+    for (const auto& sub : expr->exprs) {
+        sub->accept(this);
+        if (had_error_) {
+            return;
+        }
+    }
+}
+
+void LLVMCodeGenerator::visit(parser::IfExpr* expr) {
+    llvm::BasicBlock* cond_bb = builder_->GetInsertBlock();
+
+    expr->condition->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* cond = expectBoolValue(current_value_, "if");
+    if (cond == nullptr) {
+        return;
+    }
+
+    llvm::Function* fn = cond_bb->getParent();
+    llvm::BasicBlock* then_bb = llvm::BasicBlock::Create(*context_, "if.then", fn);
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "if.end", fn);
+    llvm::BasicBlock* else_bb = nullptr;
+
+    if (expr->else_branch) {
+        else_bb = llvm::BasicBlock::Create(*context_, "if.else", fn);
+        builder_->CreateCondBr(cond, then_bb, else_bb);
+    } else {
+        builder_->CreateCondBr(cond, then_bb, merge_bb);
+    }
+
+    builder_->SetInsertPoint(then_bb);
+    expr->then_branch->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* then_val = current_value_;
+    if (then_val == nullptr) {
+        fail("codegen: rama 'then' de if sin valor");
+        return;
+    }
+    llvm::Type* result_ty = then_val->getType();
+    builder_->CreateBr(merge_bb);
+    llvm::BasicBlock* then_end = builder_->GetInsertBlock();
+
+    llvm::BasicBlock* else_end = nullptr;
+    llvm::Value* else_val = nullptr;
+    if (expr->else_branch) {
+        builder_->SetInsertPoint(else_bb);
+        expr->else_branch->accept(this);
+        if (had_error_) {
+            return;
+        }
+        else_val = current_value_;
+        if (else_val == nullptr) {
+            fail("codegen: rama 'else' de if sin valor");
+            return;
+        }
+        builder_->CreateBr(merge_bb);
+        else_end = builder_->GetInsertBlock();
+    }
+
+    builder_->SetInsertPoint(merge_bb);
+    if (expr->else_branch) {
+        llvm::PHINode* phi = builder_->CreatePHI(result_ty, 2, "if.result");
+        phi->addIncoming(then_val, then_end);
+        phi->addIncoming(else_val, else_end);
+        current_value_ = phi;
+    } else {
+        llvm::PHINode* phi = builder_->CreatePHI(result_ty, 2, "if.result");
+        phi->addIncoming(then_val, then_end);
+        phi->addIncoming(defaultValueForType(result_ty), cond_bb);
+        current_value_ = phi;
+    }
+}
+
+void LLVMCodeGenerator::visit(parser::WhileExpr* expr) {
+    llvm::Function* fn = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* cond_bb = llvm::BasicBlock::Create(*context_, "while.cond", fn);
+    llvm::BasicBlock* body_bb = llvm::BasicBlock::Create(*context_, "while.body", fn);
+    llvm::BasicBlock* end_bb = llvm::BasicBlock::Create(*context_, "while.end", fn);
+
+    if (expr->else_branch) {
+        llvm::BasicBlock* else_bb = llvm::BasicBlock::Create(*context_, "while.else", fn);
+
+        builder_->CreateBr(cond_bb);
+
+        builder_->SetInsertPoint(cond_bb);
+        expr->condition->accept(this);
+        if (had_error_) {
+            return;
+        }
+        llvm::Value* cond = expectBoolValue(current_value_, "while");
+        if (cond == nullptr) {
+            return;
+        }
+        builder_->CreateCondBr(cond, body_bb, else_bb);
+
+        builder_->SetInsertPoint(body_bb);
+        expr->body->accept(this);
+        if (had_error_) {
+            return;
+        }
+        builder_->CreateBr(cond_bb);
+
+        builder_->SetInsertPoint(else_bb);
+        expr->else_branch->accept(this);
+        if (had_error_) {
+            return;
+        }
+        builder_->CreateBr(end_bb);
+
+        builder_->SetInsertPoint(end_bb);
+        return;
+    }
+
+    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
+    llvm::Type* i1_ty = llvm::Type::getInt1Ty(*context_);
+    llvm::AllocaInst* result_alloca = builder_->CreateAlloca(double_ty, nullptr, "while.last");
+    llvm::AllocaInst* ran_alloca = builder_->CreateAlloca(i1_ty, nullptr, "while.ran");
+    builder_->CreateStore(llvm::ConstantFP::get(double_ty, 0.0), result_alloca);
+    builder_->CreateStore(llvm::ConstantInt::getFalse(*context_), ran_alloca);
+
+    builder_->CreateBr(cond_bb);
+
+    builder_->SetInsertPoint(cond_bb);
+    expr->condition->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* cond = expectBoolValue(current_value_, "while");
+    if (cond == nullptr) {
+        return;
+    }
+    builder_->CreateCondBr(cond, body_bb, end_bb);
+
+    builder_->SetInsertPoint(body_bb);
+    expr->body->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* body_val = expectDoubleValue(current_value_, "while");
+    if (body_val == nullptr) {
+        return;
+    }
+    builder_->CreateStore(body_val, result_alloca);
+    builder_->CreateStore(llvm::ConstantInt::getTrue(*context_), ran_alloca);
+    builder_->CreateBr(cond_bb);
+
+    builder_->SetInsertPoint(end_bb);
+    llvm::Value* ran = builder_->CreateLoad(i1_ty, ran_alloca);
+    llvm::Value* last = builder_->CreateLoad(double_ty, result_alloca);
+    current_value_ = builder_->CreateSelect(ran, last, llvm::ConstantFP::get(double_ty, 0.0), "while.result");
+}
+
 HULK_VISIT_STUB(FunctionDecl)
 HULK_VISIT_STUB(ClassDecl)
 HULK_VISIT_STUB(MethodDecl)
@@ -620,9 +793,6 @@ HULK_VISIT_STUB(SelfExpr)
 HULK_VISIT_STUB(GroupedExpr)
 HULK_VISIT_STUB(UnaryExpr)
 HULK_VISIT_STUB(GetAttrExpr)
-HULK_VISIT_STUB(BlockExpr)
-HULK_VISIT_STUB(IfExpr)
-HULK_VISIT_STUB(WhileExpr)
 HULK_VISIT_STUB(ForExpr)
 HULK_VISIT_STUB(WithExpr)
 HULK_VISIT_STUB(CaseExpr)

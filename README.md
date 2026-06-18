@@ -148,8 +148,11 @@ make test_eval_fixtures     # todos los .hulk en tests/eval/
 
 ## Requisitos de build
 
+Guía completa (Windows + Ubuntu, base y Fase 4 LLVM): [`REQUIREMENTS.md`](REQUIREMENTS.md).
+
+Resumen mínimo:
+
 - C++17 (`g++`)
 - Flex++ (`flex++` → `Lexer/hulk_lexer.cpp`; ver `make lexer`)
-- Make
-
-En Windows, paths tipicos: MSYS2 (`C:\ghcup\msys64\...`) o WinFlexBison via winget (ver comentarios en el `Makefile`).
+- Make (`mingw32-make` en Windows MinGW)
+- Fase 4 (`make test_llvm`): `llvm-config`, libLLVM-14, `clang` en PATH

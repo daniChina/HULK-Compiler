@@ -32,8 +32,20 @@ declare %BoxedValue* @hulk_string_concat_ws(%BoxedValue*, %BoxedValue*)
 
 define i32 @main() {
 entry:
-  call void @hulk_print_newline()
+  br label %while.cond
+
+while.cond:                                       ; preds = %while.body, %entry
+  br i1 false, label %while.body, label %while.else
+
+while.body:                                       ; preds = %while.cond
+  br label %while.cond
+
+while.end:                                        ; preds = %while.else
+  call void @hulk_print_double(double 2.000000e+00)
   %expr_tmp = alloca double, align 8
   store double 0.000000e+00, double* %expr_tmp, align 8
   ret i32 0
+
+while.else:                                       ; preds = %while.cond
+  br label %while.end
 }
