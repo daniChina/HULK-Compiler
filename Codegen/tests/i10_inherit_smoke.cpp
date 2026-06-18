@@ -53,6 +53,11 @@ parser::ExprPtr asExpr(parser::ExprPtr object, const std::string& type_name) {
         std::move(object), token(parser::TokenType::AS, "as"), token(parser::TokenType::IDENTIFIER, type_name));
 }
 
+parser::ExprPtr grouped(parser::ExprPtr expression) {
+    return std::make_unique<parser::GroupedExpr>(
+        token(parser::TokenType::LPAREN, "("), std::move(expression));
+}
+
 parser::ExprPtr makeLet(const std::string& name, parser::ExprPtr init, parser::ExprPtr body) {
     return std::make_unique<parser::LetExpr>(
         token(parser::TokenType::IDENTIFIER, name),
@@ -204,8 +209,10 @@ std::unique_ptr<parser::Program> programAsDowncast() {
 
     std::vector<parser::ExprPtr> ctor_args;
     ctor_args.push_back(numberLiteral("5"));
-    parser::ExprPtr body =
-        methodCall(asExpr(identifier("x"), "Sub"), "twice", std::vector<parser::ExprPtr>{});
+    parser::ExprPtr body = methodCall(
+        grouped(asExpr(identifier("x"), "Sub")),
+        "twice",
+        std::vector<parser::ExprPtr>{});
     stmts.push_back(std::make_unique<parser::ExprStmt>(
         printCall(makeLet("x", newExpr("Sub", std::move(ctor_args)), std::move(body)))));
     return programWithStmts(std::move(stmts));

@@ -132,13 +132,11 @@ void LLVMCodeGenerator::defineUserFunction(parser::FunctionDecl* decl) {
 
     llvm::BasicBlock* saved_insert_block = builder_->GetInsertBlock();
     llvm::Function* saved_insert_fn = saved_insert_block != nullptr ? saved_insert_block->getParent() : nullptr;
-    LLVMScope* saved_scope = current_scope_;
     const std::size_t saved_scope_depth = scopes_.size();
 
     llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context_, "entry", fn);
     builder_->SetInsertPoint(entry);
 
-    scopes_.clear();
     scopes_.push_back(std::make_unique<LLVMScope>());
     current_scope_ = scopes_.back().get();
 
@@ -156,7 +154,7 @@ void LLVMCodeGenerator::defineUserFunction(parser::FunctionDecl* decl) {
     decl->body->accept(this);
     if (had_error_) {
         scopes_.resize(saved_scope_depth);
-        current_scope_ = saved_scope;
+        current_scope_ = scopes_.back().get();
         if (saved_insert_block != nullptr) {
             builder_->SetInsertPoint(saved_insert_block);
         }
@@ -169,7 +167,7 @@ void LLVMCodeGenerator::defineUserFunction(parser::FunctionDecl* decl) {
     } else if (!result->getType()->isDoubleTy()) {
         fail("La funcion '" + name + "' debe devolver un valor numerico en I7");
         scopes_.resize(saved_scope_depth);
-        current_scope_ = saved_scope;
+        current_scope_ = scopes_.back().get();
         if (saved_insert_block != nullptr) {
             builder_->SetInsertPoint(saved_insert_block);
         }
@@ -179,7 +177,7 @@ void LLVMCodeGenerator::defineUserFunction(parser::FunctionDecl* decl) {
     builder_->CreateRet(result);
 
     scopes_.resize(saved_scope_depth);
-    current_scope_ = saved_scope;
+    current_scope_ = scopes_.back().get();
     if (saved_insert_block != nullptr) {
         builder_->SetInsertPoint(saved_insert_block);
     } else if (saved_insert_fn != nullptr) {
@@ -545,17 +543,16 @@ void LLVMCodeGenerator::declareClassMethods(parser::ClassDecl* decl) {
     llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
     llvm::Type* self_ty = opaquePtr();
 
-    method_mangled_names_.reserve(method_mangled_names_.size() + decl->methods.size());
-
     for (const auto& method : decl->methods) {
         const std::size_t arity = method.params.size();
         std::vector<llvm::Type*> param_types;
         param_types.push_back(self_ty);
         param_types.insert(param_types.end(), arity, double_ty);
         llvm::FunctionType* fn_type = llvm::FunctionType::get(opaquePtr(), param_types, false);
-        method_mangled_names_.push_back(mangleMethodName(class_name, method.name.lexeme, arity));
+        const std::string mangled = mangleMethodName(class_name, method.name.lexeme, arity);
+        method_mangled_names_.push_back(mangled);
         llvm::Function* fn = llvm::Function::Create(
-            fn_type, llvm::Function::ExternalLinkage, method_mangled_names_.back(), module_.get());
+            fn_type, llvm::Function::ExternalLinkage, mangled, module_.get());
         class_methods_[class_name][method.name.lexeme + "#" + std::to_string(arity)] = fn;
     }
 }
@@ -575,7 +572,6 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
     llvm::BasicBlock* saved_insert_block = builder_->GetInsertBlock();
     llvm::Function* saved_insert_fn =
         saved_insert_block != nullptr ? saved_insert_block->getParent() : nullptr;
-    LLVMScope* saved_scope = current_scope_;
     const std::size_t saved_scope_depth = scopes_.size();
     llvm::AllocaInst* saved_self_alloca = current_self_alloca_;
     parser::ClassDecl* saved_self_class = current_self_class_;
@@ -584,7 +580,6 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
     llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context_, "entry", fn);
     builder_->SetInsertPoint(entry);
 
-    scopes_.clear();
     scopes_.push_back(std::make_unique<LLVMScope>());
     current_scope_ = scopes_.back().get();
 
@@ -609,7 +604,7 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
     method.body->accept(this);
     if (had_error_) {
         scopes_.resize(saved_scope_depth);
-        current_scope_ = saved_scope;
+        current_scope_ = scopes_.back().get();
         current_self_alloca_ = saved_self_alloca;
         current_self_class_ = saved_self_class;
         current_method_name_ = saved_method_name;
@@ -622,7 +617,7 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
     llvm::Value* result = materializeMethodResult(current_value_, method.name.lexeme);
     if (result == nullptr) {
         scopes_.resize(saved_scope_depth);
-        current_scope_ = saved_scope;
+        current_scope_ = scopes_.back().get();
         current_self_alloca_ = saved_self_alloca;
         current_self_class_ = saved_self_class;
         current_method_name_ = saved_method_name;
@@ -635,7 +630,7 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
     builder_->CreateRet(result);
 
     scopes_.resize(saved_scope_depth);
-    current_scope_ = saved_scope;
+    current_scope_ = scopes_.back().get();
     current_self_alloca_ = saved_self_alloca;
     current_self_class_ = saved_self_class;
     current_method_name_ = saved_method_name;
