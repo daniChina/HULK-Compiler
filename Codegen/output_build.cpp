@@ -55,6 +55,8 @@ bool build_executable(parser::Program* program, const std::string& exe_path, std
         return false;
     }
 
+    std::remove(exe_path.c_str());
+
     std::ostringstream cmd;
 #if defined(_WIN32)
     cmd << "clang \"" << kIrPath << "\" \"" << kRuntimePath << "\" -o \"" << exe_path

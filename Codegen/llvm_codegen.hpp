@@ -24,6 +24,19 @@ class Value;
 
 namespace hulk::codegen {
 
+struct ClassInfo {
+    parser::ClassDecl* decl = nullptr;
+    llvm::StructType* struct_ty = nullptr;
+    std::vector<std::string> field_names;
+    std::vector<llvm::Type*> field_llvm_types;
+    std::unordered_map<std::string, unsigned> field_index;
+};
+
+struct MethodResolution {
+    const parser::MethodDef* method = nullptr;
+    parser::ClassDecl* declaring_class = nullptr;
+};
+
 struct LLVMScope {
     std::unordered_map<std::string, llvm::AllocaInst*> variables;
     std::unordered_map<std::string, llvm::Type*> variable_types;
@@ -119,6 +132,38 @@ private:
     void defineUserFunction(parser::FunctionDecl* decl);
     llvm::Function* lookupUserFunction(const std::string& name, std::size_t arity);
     llvm::Value* invokeUserFunction(llvm::Function* fn, const std::vector<llvm::Value*>& args);
+    void registerClassDecl(parser::ClassDecl* decl);
+    void buildAllClassStructTypes();
+    parser::ClassDecl* getParentClass(parser::ClassDecl* decl);
+    llvm::Type* llvmTypeForHulkType(const std::optional<parser::Token>& declared_type);
+    bool isStringHulkType(const std::optional<parser::Token>& declared_type);
+    ClassInfo* lookupClassInfoByStruct(llvm::StructType* struct_ty);
+    MethodResolution resolveMethod(parser::ClassDecl* type_def, const std::string& method_name) const;
+    bool instanceConformsTo(parser::ClassDecl* dynamic_type, const std::string& static_type_name) const;
+    void initializeParentAttributes(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
+                                    parser::ClassDecl* type_def);
+    llvm::Value* materializeMethodResult(llvm::Value* result, const std::string& label);
+    llvm::Value* expectFieldValue(llvm::Value* value, llvm::Type* field_ty, const std::string& op);
+    ClassInfo* lookupClassInfo(const std::string& name);
+    llvm::StructType* getInstanceStructType(const std::string& class_name);
+    bool isInstanceSemanticType(llvm::Type* type);
+    llvm::Value* resolveInstancePtr(parser::Expr* object_expr, llvm::StructType** out_struct);
+    llvm::Value* loadInstanceField(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
+                                   parser::ClassDecl* class_decl, const std::string& field);
+    bool lookupFieldIndex(ClassInfo* info, const std::string& field, unsigned* out_idx);
+    void storeInstanceField(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
+                            parser::ClassDecl* class_decl, const std::string& field, llvm::Value* value);
+    void declareClassMethods(parser::ClassDecl* decl);
+    void defineClassMethods(parser::ClassDecl* decl);
+    void defineMethod(parser::ClassDecl* class_decl, const parser::MethodDef& method);
+    const parser::MethodDef* findMethod(parser::ClassDecl* type_def, const std::string& method_name) const;
+    void buildClassStructType(parser::ClassDecl* decl);
+    llvm::Function* lookupMethod(const std::string& class_name, const std::string& method_name,
+                                 std::size_t arity);
+    std::string mangleMethodName(const std::string& class_name, const std::string& method_name,
+                                 std::size_t arity);
+    void emitMethodCall(parser::Expr* object_expr, const std::string& method_name,
+                        const std::vector<parser::ExprPtr>& args);
 
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::Module> module_;
@@ -133,6 +178,13 @@ private:
     std::unordered_map<std::string, llvm::GlobalVariable*> global_constants_;
     std::unordered_map<std::string, std::unordered_map<std::size_t, llvm::Function*>> user_functions_;
     std::vector<std::string> user_function_names_;
+    std::unordered_map<std::string, parser::ClassDecl*> class_decls_;
+    std::unordered_map<std::string, ClassInfo> class_info_;
+    std::unordered_map<std::string, std::unordered_map<std::string, llvm::Function*>> class_methods_;
+    std::vector<std::string> method_mangled_names_;
+    llvm::AllocaInst* current_self_alloca_ = nullptr;
+    parser::ClassDecl* current_self_class_ = nullptr;
+    std::string current_method_name_;
 
     std::vector<std::unique_ptr<LLVMScope>> scopes_;
     LLVMScope* current_scope_ = nullptr;

@@ -1,0 +1,8 @@
+type Person(name: String) {
+  name: String = name;
+  greet() => "Hello, " @ self.name;
+}
+type Student(name: String) inherits Person(name) {
+  greet() => base() @ "!";
+}
+print(let s = new Student("Alice") in s.greet());

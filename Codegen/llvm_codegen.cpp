@@ -1,5 +1,7 @@
 #include "llvm_codegen.hpp"
 
+#include <unordered_set>
+
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -61,6 +63,13 @@ void LLVMCodeGenerator::initialize(const std::string& module_name) {
     current_scope_ = scopes_.back().get();
     user_functions_.clear();
     user_function_names_.clear();
+    class_decls_.clear();
+    class_info_.clear();
+    class_methods_.clear();
+    method_mangled_names_.clear();
+    current_self_alloca_ = nullptr;
+    current_self_class_ = nullptr;
+    current_method_name_.clear();
     registerRuntimeDeclarations(*module_, *context_);
     registerMathematicalConstants();
     registerPrintDeclarations();
@@ -195,6 +204,507 @@ llvm::Value* LLVMCodeGenerator::invokeUserFunction(llvm::Function* fn,
     return builder_->CreateCall(fn, args);
 }
 
+std::string LLVMCodeGenerator::mangleMethodName(const std::string& class_name,
+                                                const std::string& method_name,
+                                                std::size_t arity) {
+    return "hulk_meth_" + class_name + "_" + method_name + "_" + std::to_string(arity);
+}
+
+llvm::Type* LLVMCodeGenerator::llvmTypeForHulkType(const std::optional<parser::Token>& declared_type) {
+    if (isStringHulkType(declared_type)) {
+        return opaquePtr();
+    }
+    return llvm::Type::getDoubleTy(*context_);
+}
+
+bool LLVMCodeGenerator::isStringHulkType(const std::optional<parser::Token>& declared_type) {
+    return declared_type.has_value() && declared_type->lexeme == "String";
+}
+
+parser::ClassDecl* LLVMCodeGenerator::getParentClass(parser::ClassDecl* decl) {
+    if (decl == nullptr || !decl->parent_name.has_value()) {
+        return nullptr;
+    }
+    const auto it = class_decls_.find(decl->parent_name->lexeme);
+    if (it == class_decls_.end()) {
+        return nullptr;
+    }
+    return it->second;
+}
+
+void LLVMCodeGenerator::registerClassDecl(parser::ClassDecl* decl) {
+    const std::string& name = decl->name.lexeme;
+    if (class_decls_.find(name) != class_decls_.end()) {
+        fail("Tipo redefinido: " + name);
+        return;
+    }
+    class_decls_[name] = decl;
+}
+
+void LLVMCodeGenerator::buildClassStructType(parser::ClassDecl* decl) {
+    const std::string& name = decl->name.lexeme;
+    if (class_info_.find(name) != class_info_.end()) {
+        return;
+    }
+
+    parser::ClassDecl* parent_decl = getParentClass(decl);
+    if (parent_decl != nullptr) {
+        buildClassStructType(parent_decl);
+    }
+
+    ClassInfo info;
+    info.decl = decl;
+    std::unordered_set<std::string> seen;
+
+    if (parent_decl != nullptr) {
+        ClassInfo* parent_info = lookupClassInfo(parent_decl->name.lexeme);
+        if (parent_info != nullptr) {
+            info.field_names = parent_info->field_names;
+            info.field_llvm_types = parent_info->field_llvm_types;
+            for (const auto& field_name : info.field_names) {
+                seen.insert(field_name);
+            }
+        }
+    }
+
+    for (const auto& param : decl->params) {
+        const std::string& field_name = param.first.lexeme;
+        if (seen.insert(field_name).second) {
+            info.field_names.push_back(field_name);
+            info.field_llvm_types.push_back(llvmTypeForHulkType(param.second));
+        }
+    }
+    for (const auto& attr : decl->attributes) {
+        const std::string& field_name = attr.name.lexeme;
+        if (seen.insert(field_name).second) {
+            info.field_names.push_back(field_name);
+            info.field_llvm_types.push_back(llvmTypeForHulkType(attr.declared_type));
+        }
+    }
+
+    info.struct_ty = llvm::StructType::create(*context_, info.field_llvm_types, "HulkInstance_" + name);
+    for (std::size_t i = 0; i < info.field_names.size(); ++i) {
+        info.field_index[info.field_names[i]] = static_cast<unsigned>(i);
+    }
+    class_info_[name] = std::move(info);
+}
+
+void LLVMCodeGenerator::buildAllClassStructTypes() {
+    for (const auto& [name, decl] : class_decls_) {
+        (void)name;
+        buildClassStructType(decl);
+        if (had_error_) {
+            return;
+        }
+    }
+}
+
+ClassInfo* LLVMCodeGenerator::lookupClassInfoByStruct(llvm::StructType* struct_ty) {
+    if (struct_ty == nullptr) {
+        return nullptr;
+    }
+    for (auto& [class_name, info] : class_info_) {
+        (void)class_name;
+        if (info.struct_ty == struct_ty) {
+            return &info;
+        }
+    }
+    return nullptr;
+}
+
+llvm::Value* LLVMCodeGenerator::expectFieldValue(llvm::Value* value, llvm::Type* field_ty,
+                                                 const std::string& op) {
+    if (value == nullptr) {
+        fail("codegen: valor nulo en " + op);
+        return nullptr;
+    }
+    if (field_ty->isDoubleTy()) {
+        return expectDoubleValue(value, op);
+    }
+    if (field_ty == opaquePtr()) {
+        if (!value->getType()->isPointerTy()) {
+            fail("codegen: se esperaba string en " + op);
+            return nullptr;
+        }
+        return value;
+    }
+    fail("codegen: tipo de campo no soportado en " + op);
+    return nullptr;
+}
+
+llvm::Value* LLVMCodeGenerator::materializeMethodResult(llvm::Value* result, const std::string& label) {
+    if (result == nullptr) {
+        return llvm::ConstantPointerNull::get(opaquePtr());
+    }
+    if (result->getType()->isDoubleTy()) {
+        return createBoxedFromDouble(result);
+    }
+    if (result->getType()->isIntegerTy(1)) {
+        return createBoxedFromBool(result);
+    }
+    if (result->getType()->isPointerTy()) {
+        return result;
+    }
+    fail("codegen: tipo de retorno no soportado en metodo '" + label + "'");
+    return nullptr;
+}
+
+ClassInfo* LLVMCodeGenerator::lookupClassInfo(const std::string& name) {
+    const auto it = class_info_.find(name);
+    if (it == class_info_.end()) {
+        return nullptr;
+    }
+    return &it->second;
+}
+
+llvm::StructType* LLVMCodeGenerator::getInstanceStructType(const std::string& class_name) {
+    ClassInfo* info = lookupClassInfo(class_name);
+    if (info == nullptr) {
+        return nullptr;
+    }
+    return info->struct_ty;
+}
+
+bool LLVMCodeGenerator::isInstanceSemanticType(llvm::Type* type) {
+    if (type == nullptr || !type->isStructTy()) {
+        return false;
+    }
+    const llvm::StructType* struct_ty = llvm::cast<llvm::StructType>(type);
+    return struct_ty->hasName() && struct_ty->getName().starts_with("HulkInstance_");
+}
+
+llvm::Value* LLVMCodeGenerator::loadInstanceField(llvm::Value* instance_ptr,
+                                                  llvm::StructType* struct_ty,
+                                                  parser::ClassDecl* class_decl,
+                                                  const std::string& field) {
+    ClassInfo* info = lookupClassInfo(class_decl->name.lexeme);
+    if (info == nullptr) {
+        fail("codegen: tipo de instancia no registrado");
+        return nullptr;
+    }
+    const auto field_it = info->field_index.find(field);
+    if (field_it == info->field_index.end()) {
+        fail("codegen: atributo '" + field + "' no definido en " + class_decl->name.lexeme);
+        return nullptr;
+    }
+
+    const unsigned idx = field_it->second;
+    llvm::Type* field_ty = info->field_llvm_types[idx];
+    llvm::Value* field_ptr = builder_->CreateStructGEP(struct_ty, instance_ptr, idx);
+    return builder_->CreateLoad(field_ty, field_ptr);
+}
+
+bool LLVMCodeGenerator::lookupFieldIndex(ClassInfo* info, const std::string& field,
+                                         unsigned* out_idx) {
+    if (info == nullptr) {
+        fail("codegen: layout de instancia no registrado");
+        return false;
+    }
+    const auto field_it = info->field_index.find(field);
+    if (field_it == info->field_index.end()) {
+        fail("codegen: atributo '" + field + "' no definido");
+        return false;
+    }
+    *out_idx = field_it->second;
+    return true;
+}
+
+void LLVMCodeGenerator::storeInstanceField(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
+                                           parser::ClassDecl* class_decl, const std::string& field,
+                                           llvm::Value* value) {
+    ClassInfo* info = lookupClassInfo(class_decl->name.lexeme);
+    if (info == nullptr) {
+        fail("codegen: tipo de instancia no registrado");
+        return;
+    }
+    const auto field_it = info->field_index.find(field);
+    if (field_it == info->field_index.end()) {
+        fail("codegen: atributo '" + field + "' no definido en " + class_decl->name.lexeme);
+        return;
+    }
+
+    const unsigned idx = field_it->second;
+    llvm::Type* field_ty = info->field_llvm_types[idx];
+    llvm::Value* coerced = expectFieldValue(value, field_ty, field);
+    if (coerced == nullptr) {
+        return;
+    }
+    llvm::Value* field_ptr = builder_->CreateStructGEP(struct_ty, instance_ptr, idx);
+    builder_->CreateStore(coerced, field_ptr);
+}
+
+llvm::Value* LLVMCodeGenerator::resolveInstancePtr(parser::Expr* object_expr,
+                                                   llvm::StructType** out_struct) {
+    if (object_expr->kind == parser::ExprKind::SELF_REF) {
+        if (current_self_alloca_ == nullptr || current_self_class_ == nullptr) {
+            fail("codegen: self fuera de metodo");
+            return nullptr;
+        }
+        *out_struct = getInstanceStructType(current_self_class_->name.lexeme);
+        return builder_->CreateLoad(opaquePtr(), current_self_alloca_);
+    }
+
+    if (object_expr->kind == parser::ExprKind::IDENTIFIER) {
+        const auto* id = static_cast<const parser::IdentifierExpr*>(object_expr);
+        llvm::AllocaInst* alloca = nullptr;
+        llvm::Type* var_type = nullptr;
+        if (!lookupLocalVariable(id->token.lexeme, &alloca, &var_type)) {
+            fail("codegen: variable '" + id->token.lexeme + "' no definida");
+            return nullptr;
+        }
+        if (!isInstanceSemanticType(var_type)) {
+            fail("codegen: no se puede acceder a atributos de un valor no instancia");
+            return nullptr;
+        }
+        *out_struct = llvm::cast<llvm::StructType>(var_type);
+        return builder_->CreateLoad(opaquePtr(), alloca);
+    }
+
+    object_expr->accept(this);
+    if (had_error_) {
+        return nullptr;
+    }
+    llvm::Type* semantic_type = classifySemanticType(current_value_);
+    if (!isInstanceSemanticType(semantic_type)) {
+        fail("codegen: no se puede acceder a atributos de un valor no instancia");
+        return nullptr;
+    }
+    *out_struct = llvm::cast<llvm::StructType>(semantic_type);
+    return current_value_;
+}
+
+const parser::MethodDef* LLVMCodeGenerator::findMethod(parser::ClassDecl* type_def,
+                                                       const std::string& method_name) const {
+    return resolveMethod(type_def, method_name).method;
+}
+
+MethodResolution LLVMCodeGenerator::resolveMethod(parser::ClassDecl* type_def,
+                                                  const std::string& method_name) const {
+    MethodResolution resolution;
+    if (type_def == nullptr) {
+        return resolution;
+    }
+    for (const auto& method : type_def->methods) {
+        if (method.name.lexeme == method_name) {
+            resolution.method = &method;
+            resolution.declaring_class = type_def;
+            return resolution;
+        }
+    }
+    parser::ClassDecl* parent = nullptr;
+    if (type_def->parent_name.has_value()) {
+        const auto parent_it = class_decls_.find(type_def->parent_name->lexeme);
+        if (parent_it != class_decls_.end()) {
+            parent = parent_it->second;
+        }
+    }
+    if (parent != nullptr) {
+        return resolveMethod(parent, method_name);
+    }
+    return resolution;
+}
+
+bool LLVMCodeGenerator::instanceConformsTo(parser::ClassDecl* dynamic_type,
+                                           const std::string& static_type_name) const {
+    if (dynamic_type == nullptr) {
+        return false;
+    }
+    if (dynamic_type->name.lexeme == static_type_name) {
+        return true;
+    }
+    if (dynamic_type->parent_name.has_value()) {
+        const std::string& parent = dynamic_type->parent_name->lexeme;
+        if (parent == "Object") {
+            return static_type_name == "Object";
+        }
+        const auto parent_it = class_decls_.find(parent);
+        if (parent_it != class_decls_.end()) {
+            return instanceConformsTo(parent_it->second, static_type_name);
+        }
+    }
+    return false;
+}
+
+llvm::Function* LLVMCodeGenerator::lookupMethod(const std::string& class_name,
+                                                const std::string& method_name,
+                                                std::size_t arity) {
+    const auto class_it = class_methods_.find(class_name);
+    if (class_it == class_methods_.end()) {
+        return nullptr;
+    }
+    const std::string key = method_name + "#" + std::to_string(arity);
+    const auto method_it = class_it->second.find(key);
+    if (method_it == class_it->second.end()) {
+        return nullptr;
+    }
+    return method_it->second;
+}
+
+void LLVMCodeGenerator::declareClassMethods(parser::ClassDecl* decl) {
+    const std::string& class_name = decl->name.lexeme;
+    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
+    llvm::Type* self_ty = opaquePtr();
+
+    method_mangled_names_.reserve(method_mangled_names_.size() + decl->methods.size());
+
+    for (const auto& method : decl->methods) {
+        const std::size_t arity = method.params.size();
+        std::vector<llvm::Type*> param_types;
+        param_types.push_back(self_ty);
+        param_types.insert(param_types.end(), arity, double_ty);
+        llvm::FunctionType* fn_type = llvm::FunctionType::get(opaquePtr(), param_types, false);
+        method_mangled_names_.push_back(mangleMethodName(class_name, method.name.lexeme, arity));
+        llvm::Function* fn = llvm::Function::Create(
+            fn_type, llvm::Function::ExternalLinkage, method_mangled_names_.back(), module_.get());
+        class_methods_[class_name][method.name.lexeme + "#" + std::to_string(arity)] = fn;
+    }
+}
+
+void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser::MethodDef& method) {
+    const std::string& class_name = class_decl->name.lexeme;
+    const std::size_t arity = method.params.size();
+    llvm::Function* fn = lookupMethod(class_name, method.name.lexeme, arity);
+    if (fn == nullptr) {
+        fail("Metodo interno '" + method.name.lexeme + "' no declarado");
+        return;
+    }
+    if (!fn->empty()) {
+        return;
+    }
+
+    llvm::BasicBlock* saved_insert_block = builder_->GetInsertBlock();
+    llvm::Function* saved_insert_fn =
+        saved_insert_block != nullptr ? saved_insert_block->getParent() : nullptr;
+    LLVMScope* saved_scope = current_scope_;
+    const std::size_t saved_scope_depth = scopes_.size();
+    llvm::AllocaInst* saved_self_alloca = current_self_alloca_;
+    parser::ClassDecl* saved_self_class = current_self_class_;
+    const std::string saved_method_name = current_method_name_;
+
+    llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context_, "entry", fn);
+    builder_->SetInsertPoint(entry);
+
+    scopes_.clear();
+    scopes_.push_back(std::make_unique<LLVMScope>());
+    current_scope_ = scopes_.back().get();
+
+    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
+    llvm::Function::arg_iterator arg_it = fn->arg_begin();
+    llvm::Value* self_arg = &*arg_it;
+    ++arg_it;
+
+    current_self_alloca_ = builder_->CreateAlloca(opaquePtr(), nullptr, "");
+    builder_->CreateStore(self_arg, current_self_alloca_);
+    current_self_class_ = class_decl;
+    current_method_name_ = method.name.lexeme;
+
+    for (const auto& param : method.params) {
+        llvm::AllocaInst* alloca = builder_->CreateAlloca(double_ty, nullptr, "");
+        builder_->CreateStore(&*arg_it, alloca);
+        current_scope_->variables[param.first.lexeme] = alloca;
+        current_scope_->variable_types[param.first.lexeme] = double_ty;
+        ++arg_it;
+    }
+
+    method.body->accept(this);
+    if (had_error_) {
+        scopes_.resize(saved_scope_depth);
+        current_scope_ = saved_scope;
+        current_self_alloca_ = saved_self_alloca;
+        current_self_class_ = saved_self_class;
+        current_method_name_ = saved_method_name;
+        if (saved_insert_block != nullptr) {
+            builder_->SetInsertPoint(saved_insert_block);
+        }
+        return;
+    }
+
+    llvm::Value* result = materializeMethodResult(current_value_, method.name.lexeme);
+    if (result == nullptr) {
+        scopes_.resize(saved_scope_depth);
+        current_scope_ = saved_scope;
+        current_self_alloca_ = saved_self_alloca;
+        current_self_class_ = saved_self_class;
+        current_method_name_ = saved_method_name;
+        if (saved_insert_block != nullptr) {
+            builder_->SetInsertPoint(saved_insert_block);
+        }
+        return;
+    }
+
+    builder_->CreateRet(result);
+
+    scopes_.resize(saved_scope_depth);
+    current_scope_ = saved_scope;
+    current_self_alloca_ = saved_self_alloca;
+    current_self_class_ = saved_self_class;
+    current_method_name_ = saved_method_name;
+    if (saved_insert_block != nullptr) {
+        builder_->SetInsertPoint(saved_insert_block);
+    } else if (saved_insert_fn != nullptr) {
+        builder_->SetInsertPoint(&saved_insert_fn->getEntryBlock());
+    }
+}
+
+void LLVMCodeGenerator::defineClassMethods(parser::ClassDecl* decl) {
+    for (const auto& method : decl->methods) {
+        defineMethod(decl, method);
+        if (had_error_) {
+            return;
+        }
+    }
+}
+
+void LLVMCodeGenerator::emitMethodCall(parser::Expr* object_expr, const std::string& method_name,
+                                       const std::vector<parser::ExprPtr>& args) {
+    llvm::StructType* struct_ty = nullptr;
+    llvm::Value* instance_ptr = resolveInstancePtr(object_expr, &struct_ty);
+    if (instance_ptr == nullptr || had_error_) {
+        return;
+    }
+
+    ClassInfo* info = lookupClassInfoByStruct(struct_ty);
+    if (info == nullptr || info->decl == nullptr) {
+        fail("codegen: tipo de instancia desconocido para llamada a metodo");
+        return;
+    }
+
+    const MethodResolution resolution = resolveMethod(info->decl, method_name);
+    if (resolution.method == nullptr || resolution.declaring_class == nullptr) {
+        fail("Metodo no definido: " + method_name);
+        return;
+    }
+    if (resolution.method->params.size() != args.size()) {
+        fail("El metodo '" + method_name + "' espera " + std::to_string(resolution.method->params.size()) +
+             " argumento(s)");
+        return;
+    }
+
+    llvm::Function* fn =
+        lookupMethod(resolution.declaring_class->name.lexeme, method_name, args.size());
+    if (fn == nullptr) {
+        fail("Metodo interno '" + method_name + "' no declarado");
+        return;
+    }
+
+    std::vector<llvm::Value*> arg_values;
+    arg_values.reserve(args.size() + 1);
+    arg_values.push_back(instance_ptr);
+    for (const auto& arg : args) {
+        arg->accept(this);
+        if (had_error_) {
+            return;
+        }
+        llvm::Value* value = expectDoubleValue(current_value_, method_name);
+        if (value == nullptr) {
+            return;
+        }
+        arg_values.push_back(value);
+    }
+
+    current_value_ = builder_->CreateCall(fn, arg_values);
+}
+
 void LLVMCodeGenerator::registerPrintDeclarations() {
     llvm::PointerType* ptr_ty = opaquePtr();
 
@@ -241,7 +751,11 @@ bool LLVMCodeGenerator::lookupLocalVariable(const std::string& name, llvm::Alloc
                 *out_alloca = found->second;
             }
             if (out_type != nullptr) {
-                *out_type = scope->variable_types.at(name);
+                const auto type_it = scope->variable_types.find(name);
+                if (type_it == scope->variable_types.end()) {
+                    return false;
+                }
+                *out_type = type_it->second;
             }
             return true;
         }
@@ -398,8 +912,48 @@ void LLVMCodeGenerator::visit(parser::Program* stmt) {
     }
 
     for (const auto& child : stmt->stmts) {
+        if (child->stmt_kind == parser::StmtKind::CLASS_DECL) {
+            registerClassDecl(static_cast<parser::ClassDecl*>(child.get()));
+            if (had_error_) {
+                return;
+            }
+        }
+    }
+
+    buildAllClassStructTypes();
+    if (had_error_) {
+        return;
+    }
+
+    std::size_t method_count = 0;
+    for (const auto& child : stmt->stmts) {
+        if (child->stmt_kind == parser::StmtKind::CLASS_DECL) {
+            method_count += static_cast<parser::ClassDecl*>(child.get())->methods.size();
+        }
+    }
+    method_mangled_names_.reserve(method_mangled_names_.size() + method_count);
+
+    for (const auto& child : stmt->stmts) {
+        if (child->stmt_kind == parser::StmtKind::CLASS_DECL) {
+            declareClassMethods(static_cast<parser::ClassDecl*>(child.get()));
+            if (had_error_) {
+                return;
+            }
+        }
+    }
+
+    for (const auto& child : stmt->stmts) {
         if (child->stmt_kind == parser::StmtKind::FUNCTION_DECL) {
             defineUserFunction(static_cast<parser::FunctionDecl*>(child.get()));
+            if (had_error_) {
+                return;
+            }
+        }
+    }
+
+    for (const auto& child : stmt->stmts) {
+        if (child->stmt_kind == parser::StmtKind::CLASS_DECL) {
+            defineClassMethods(static_cast<parser::ClassDecl*>(child.get()));
             if (had_error_) {
                 return;
             }
@@ -571,11 +1125,22 @@ void LLVMCodeGenerator::visit(parser::IdentifierExpr* expr) {
     llvm::Type* var_type = nullptr;
     if (lookupLocalVariable(name, &alloca, &var_type)) {
         llvm::Type* load_ty = var_type;
-        if (isBoxedSemanticType(var_type) || isRangeSemanticType(var_type) || var_type == opaquePtr()) {
+        if (isBoxedSemanticType(var_type) || isRangeSemanticType(var_type) || isInstanceSemanticType(var_type) ||
+            var_type == opaquePtr()) {
             load_ty = opaquePtr();
         }
         current_value_ = builder_->CreateLoad(load_ty, alloca);
         return;
+    }
+
+    if (current_self_alloca_ != nullptr && current_self_class_ != nullptr) {
+        ClassInfo* info = lookupClassInfo(current_self_class_->name.lexeme);
+        if (info != nullptr && info->field_index.find(name) != info->field_index.end()) {
+            llvm::Value* self_ptr = builder_->CreateLoad(opaquePtr(), current_self_alloca_);
+            current_value_ =
+                loadInstanceField(self_ptr, info->struct_ty, current_self_class_, name);
+            return;
+        }
     }
 
     fail("codegen: variable '" + name + "' no definida");
@@ -588,9 +1153,21 @@ void LLVMCodeGenerator::visit(parser::LetExpr* expr) {
     }
 
     llvm::Value* init_value = current_value_;
-    llvm::Type* storage_ty =
-        init_value->getType()->isPointerTy() ? static_cast<llvm::Type*>(opaquePtr()) : init_value->getType();
-    llvm::Type* var_type = classifySemanticType(init_value);
+    llvm::Type* var_type = nullptr;
+    if (expr->initializer->kind == parser::ExprKind::NEW_OBJ) {
+        const auto* new_expr = static_cast<const parser::NewExpr*>(expr->initializer.get());
+        var_type = getInstanceStructType(new_expr->type_name.lexeme);
+        if (var_type == nullptr) {
+            fail("codegen: tipo de instancia no registrado para let");
+            return;
+        }
+    } else {
+        var_type = classifySemanticType(init_value);
+    }
+    llvm::Type* storage_ty = init_value->getType();
+    if (init_value->getType()->isPointerTy()) {
+        storage_ty = opaquePtr();
+    }
     const std::string var_name = expr->name.lexeme;
 
     enterScope();
@@ -628,7 +1205,11 @@ bool LLVMCodeGenerator::lookupSemanticTypeForAlloca(llvm::AllocaInst* alloca,
         for (const auto& [name, slot] : scope->variables) {
             if (slot == alloca) {
                 if (out_type != nullptr) {
-                    *out_type = scope->variable_types.at(name);
+                    const auto type_it = scope->variable_types.find(name);
+                    if (type_it == scope->variable_types.end()) {
+                        return false;
+                    }
+                    *out_type = type_it->second;
                 }
                 return true;
             }
@@ -667,6 +1248,13 @@ llvm::Type* LLVMCodeGenerator::classifySemanticType(llvm::Value* value) {
     if (auto* cast = llvm::dyn_cast<llvm::BitCastInst>(value)) {
         if (cast->hasName() && cast->getName().starts_with("boxed_")) {
             return getBoxedValueType();
+        }
+        if (cast->hasName() && cast->getName().starts_with("inst_")) {
+            const std::string class_name = cast->getName().substr(5).str();
+            llvm::StructType* struct_ty = getInstanceStructType(class_name);
+            if (struct_ty != nullptr) {
+                return struct_ty;
+            }
         }
     }
 
@@ -817,8 +1405,14 @@ void LLVMCodeGenerator::emitPrintValue(llvm::Value* value) {
 }
 
 void LLVMCodeGenerator::visit(parser::CallExpr* expr) {
+    if (expr->callee->kind == parser::ExprKind::GET_ATTR) {
+        const auto* get_attr = static_cast<const parser::GetAttrExpr*>(expr->callee.get());
+        emitMethodCall(get_attr->object.get(), get_attr->name.lexeme, expr->args);
+        return;
+    }
+
     if (expr->callee->kind != parser::ExprKind::IDENTIFIER) {
-        fail("codegen: solo llamadas a identificadores soportadas en I7");
+        fail("codegen: llamada no soportada");
         return;
     }
 
@@ -1155,7 +1749,35 @@ void LLVMCodeGenerator::visit(parser::AssignExpr* expr) {
     }
 
     if (expr->lhs->kind != parser::ExprKind::IDENTIFIER) {
-        fail("codegen: asignacion ':=' solo a variable local en I6 (attrs/metodos en I9+)");
+        if (expr->lhs->kind == parser::ExprKind::GET_ATTR) {
+            const auto* get_attr = static_cast<const parser::GetAttrExpr*>(expr->lhs.get());
+            llvm::StructType* struct_ty = nullptr;
+            llvm::Value* instance_ptr = resolveInstancePtr(get_attr->object.get(), &struct_ty);
+            if (instance_ptr == nullptr || had_error_) {
+                return;
+            }
+
+            ClassInfo* info = lookupClassInfoByStruct(struct_ty);
+            if (info == nullptr || info->decl == nullptr) {
+                fail("codegen: tipo de instancia desconocido para asignacion");
+                return;
+            }
+
+            unsigned idx = 0;
+            if (!lookupFieldIndex(info, get_attr->name.lexeme, &idx)) {
+                return;
+            }
+            llvm::Type* field_ty = info->field_llvm_types[idx];
+            rhs_value = expectFieldValue(rhs_value, field_ty, ":=");
+            if (rhs_value == nullptr) {
+                return;
+            }
+            storeInstanceField(instance_ptr, struct_ty, info->decl, get_attr->name.lexeme, rhs_value);
+            current_value_ = rhs_value;
+            return;
+        }
+
+        fail("codegen: asignacion ':=' no soportada para este destino");
         return;
     }
 
@@ -1245,20 +1867,320 @@ void LLVMCodeGenerator::visit(parser::ForExpr* expr) {
 
 void LLVMCodeGenerator::visit(parser::FunctionDecl* /*stmt*/) {}
 
-HULK_VISIT_STUB(ClassDecl)
-HULK_VISIT_STUB(MethodDecl)
-HULK_VISIT_STUB(AttributeDecl)
-HULK_VISIT_STUB(SelfExpr)
-HULK_VISIT_STUB(GroupedExpr)
+void LLVMCodeGenerator::visit(parser::ClassDecl* /*stmt*/) {}
+
+void LLVMCodeGenerator::visit(parser::MethodDecl* /*stmt*/) {}
+
+void LLVMCodeGenerator::visit(parser::AttributeDecl* /*stmt*/) {}
+
+void LLVMCodeGenerator::visit(parser::SelfExpr* /*expr*/) {
+    if (current_self_alloca_ == nullptr) {
+        fail("codegen: self fuera de metodo");
+        return;
+    }
+    current_value_ = builder_->CreateLoad(opaquePtr(), current_self_alloca_);
+}
+
+void LLVMCodeGenerator::initializeParentAttributes(llvm::Value* instance_ptr,
+                                                   llvm::StructType* struct_ty,
+                                                   parser::ClassDecl* type_def) {
+    if (type_def == nullptr || !type_def->parent_name.has_value()) {
+        return;
+    }
+
+    parser::ClassDecl* parent_decl = getParentClass(type_def);
+    if (parent_decl == nullptr) {
+        fail("Tipo base no registrado: " + type_def->parent_name->lexeme);
+        return;
+    }
+
+    initializeParentAttributes(instance_ptr, struct_ty, parent_decl);
+    if (had_error_) {
+        return;
+    }
+
+    if (parent_decl->params.size() != type_def->parent_args.size()) {
+        fail("Numero incorrecto de argumentos en llamada a base: " + parent_decl->name.lexeme);
+        return;
+    }
+
+    ClassInfo* layout_info = lookupClassInfo(type_def->name.lexeme);
+    if (layout_info == nullptr) {
+        fail("codegen: layout de instancia no registrado");
+        return;
+    }
+
+    llvm::AllocaInst* saved_self_alloca = current_self_alloca_;
+    parser::ClassDecl* saved_self_class = current_self_class_;
+    current_self_alloca_ = builder_->CreateAlloca(opaquePtr(), nullptr, "");
+    builder_->CreateStore(instance_ptr, current_self_alloca_);
+    current_self_class_ = type_def;
+
+    for (std::size_t i = 0; i < parent_decl->params.size(); ++i) {
+        const std::string& param_name = parent_decl->params[i].first.lexeme;
+        unsigned idx = 0;
+        if (!lookupFieldIndex(layout_info, param_name, &idx)) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        llvm::Type* field_ty = layout_info->field_llvm_types[idx];
+
+        type_def->parent_args[i]->accept(this);
+        if (had_error_) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        llvm::Value* value = expectFieldValue(current_value_, field_ty, "base arg");
+        if (value == nullptr) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        storeInstanceField(instance_ptr, struct_ty, type_def, param_name, value);
+    }
+
+    for (const auto& attr : parent_decl->attributes) {
+        attr.value->accept(this);
+        if (had_error_) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        unsigned idx = 0;
+        if (!lookupFieldIndex(layout_info, attr.name.lexeme, &idx)) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        llvm::Type* field_ty = layout_info->field_llvm_types[idx];
+        llvm::Value* value = expectFieldValue(current_value_, field_ty, "base attr");
+        if (value == nullptr) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        storeInstanceField(instance_ptr, struct_ty, type_def, attr.name.lexeme, value);
+    }
+
+    current_self_alloca_ = saved_self_alloca;
+    current_self_class_ = saved_self_class;
+}
+
+void LLVMCodeGenerator::visit(parser::GetAttrExpr* expr) {
+    llvm::StructType* struct_ty = nullptr;
+    llvm::Value* instance_ptr = resolveInstancePtr(expr->object.get(), &struct_ty);
+    if (instance_ptr == nullptr || had_error_) {
+        return;
+    }
+
+    ClassInfo* info = lookupClassInfoByStruct(struct_ty);
+    if (info == nullptr || info->decl == nullptr) {
+        fail("codegen: tipo de instancia desconocido para lectura de atributo");
+        return;
+    }
+
+    current_value_ = loadInstanceField(instance_ptr, struct_ty, info->decl, expr->name.lexeme);
+}
+
+void LLVMCodeGenerator::visit(parser::NewExpr* expr) {
+    const std::string& type_name = expr->type_name.lexeme;
+    const auto type_it = class_decls_.find(type_name);
+    if (type_it == class_decls_.end()) {
+        fail("Tipo no registrado: " + type_name);
+        return;
+    }
+
+    parser::ClassDecl* type_def = type_it->second;
+    if (type_def->params.size() != expr->args.size()) {
+        fail("Numero de argumentos invalido para " + type_name);
+        return;
+    }
+
+    ClassInfo* info = lookupClassInfo(type_name);
+    if (info == nullptr) {
+        fail("codegen: tipo de instancia no registrado");
+        return;
+    }
+
+    std::vector<llvm::Value*> ctor_args;
+    ctor_args.reserve(expr->args.size());
+    for (std::size_t i = 0; i < expr->args.size(); ++i) {
+        const std::string& param_name = type_def->params[i].first.lexeme;
+        unsigned idx = 0;
+        if (!lookupFieldIndex(info, param_name, &idx)) {
+            return;
+        }
+        llvm::Type* field_ty = info->field_llvm_types[idx];
+
+        expr->args[i]->accept(this);
+        if (had_error_) {
+            return;
+        }
+        llvm::Value* value = expectFieldValue(current_value_, field_ty, "new");
+        if (value == nullptr) {
+            return;
+        }
+        ctor_args.push_back(value);
+    }
+
+    llvm::Function* malloc_fn = getMallocFunction(*module_, *context_);
+    llvm::Value* size = llvm::ConstantInt::get(
+        llvm::Type::getInt64Ty(*context_), module_->getDataLayout().getTypeAllocSize(info->struct_ty));
+    llvm::Value* raw_ptr = builder_->CreateCall(malloc_fn, {size});
+    llvm::Value* instance_ptr = builder_->CreateBitCast(raw_ptr, opaquePtr());
+
+    for (std::size_t i = 0; i < type_def->params.size(); ++i) {
+        storeInstanceField(instance_ptr, info->struct_ty, type_def, type_def->params[i].first.lexeme,
+                           ctor_args[i]);
+    }
+
+    initializeParentAttributes(instance_ptr, info->struct_ty, type_def);
+    if (had_error_) {
+        return;
+    }
+
+    llvm::AllocaInst* saved_self_alloca = current_self_alloca_;
+    parser::ClassDecl* saved_self_class = current_self_class_;
+    current_self_alloca_ = builder_->CreateAlloca(opaquePtr(), nullptr, "");
+    builder_->CreateStore(instance_ptr, current_self_alloca_);
+    current_self_class_ = type_def;
+
+    for (const auto& attr : type_def->attributes) {
+        attr.value->accept(this);
+        if (had_error_) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        unsigned idx = 0;
+        if (!lookupFieldIndex(info, attr.name.lexeme, &idx)) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        llvm::Type* field_ty = info->field_llvm_types[idx];
+        llvm::Value* value = expectFieldValue(current_value_, field_ty, "attr init");
+        if (value == nullptr) {
+            current_self_alloca_ = saved_self_alloca;
+            current_self_class_ = saved_self_class;
+            return;
+        }
+        storeInstanceField(instance_ptr, info->struct_ty, type_def, attr.name.lexeme, value);
+    }
+
+    current_self_alloca_ = saved_self_alloca;
+    current_self_class_ = saved_self_class;
+
+    std::string inst_name = "inst_" + type_name;
+    current_value_ = builder_->CreateBitCast(instance_ptr, opaquePtr(), inst_name);
+}
+
+void LLVMCodeGenerator::visit(parser::BaseCallExpr* expr) {
+    (void)expr;
+    if (current_self_alloca_ == nullptr || current_self_class_ == nullptr ||
+        current_method_name_.empty()) {
+        fail("codegen: base() fuera de contexto de metodo");
+        return;
+    }
+
+    parser::ClassDecl* parent_decl = getParentClass(current_self_class_);
+    if (parent_decl == nullptr || parent_decl->name.lexeme == "Object") {
+        fail("codegen: base(): metodo base no encontrado");
+        return;
+    }
+
+    const MethodResolution resolution = resolveMethod(parent_decl, current_method_name_);
+    if (resolution.method == nullptr || resolution.declaring_class == nullptr) {
+        fail("codegen: base(): metodo base no encontrado");
+        return;
+    }
+
+    llvm::Function* fn = lookupMethod(resolution.declaring_class->name.lexeme, current_method_name_,
+                                      resolution.method->params.size());
+    if (fn == nullptr) {
+        fail("codegen: base(): metodo base no declarado");
+        return;
+    }
+
+    llvm::Value* self_ptr = builder_->CreateLoad(opaquePtr(), current_self_alloca_);
+    current_value_ = builder_->CreateCall(fn, {self_ptr});
+}
+
+void LLVMCodeGenerator::visit(parser::AsExpr* expr) {
+    expr->object->accept(this);
+    if (had_error_) {
+        return;
+    }
+
+    llvm::Type* semantic_type = classifySemanticType(current_value_);
+    if (!isInstanceSemanticType(semantic_type)) {
+        fail("codegen: 'as' requiere instancia en I10");
+        return;
+    }
+
+    ClassInfo* info = lookupClassInfoByStruct(llvm::cast<llvm::StructType>(semantic_type));
+    if (info == nullptr || info->decl == nullptr) {
+        fail("codegen: tipo de instancia desconocido en 'as'");
+        return;
+    }
+
+    const std::string& target = expr->type_name.lexeme;
+    if (!instanceConformsTo(info->decl, target)) {
+        fail("No se puede convertir de " + info->decl->name.lexeme + " a " + target);
+        return;
+    }
+
+    if (getInstanceStructType(target) == nullptr) {
+        fail("Tipo no registrado: " + target);
+        return;
+    }
+
+    current_value_ = builder_->CreateBitCast(current_value_, opaquePtr(), "inst_" + target);
+}
+
+void LLVMCodeGenerator::visit(parser::MethodCallExpr* expr) {
+    emitMethodCall(expr->object.get(), expr->method_name.lexeme, expr->args);
+}
+
+void LLVMCodeGenerator::visit(parser::SetAttrExpr* expr) {
+    llvm::StructType* struct_ty = nullptr;
+    llvm::Value* instance_ptr = resolveInstancePtr(expr->object.get(), &struct_ty);
+    if (instance_ptr == nullptr || had_error_) {
+        return;
+    }
+
+    ClassInfo* info = lookupClassInfoByStruct(struct_ty);
+    if (info == nullptr || info->decl == nullptr) {
+        fail("codegen: tipo de instancia desconocido para asignacion");
+        return;
+    }
+
+    expr->value->accept(this);
+    if (had_error_) {
+        return;
+    }
+    unsigned idx = 0;
+    if (!lookupFieldIndex(info, expr->attr_name.lexeme, &idx)) {
+        return;
+    }
+    llvm::Type* field_ty = info->field_llvm_types[idx];
+    llvm::Value* value = expectFieldValue(current_value_, field_ty, "set attr");
+    if (value == nullptr) {
+        return;
+    }
+    storeInstanceField(instance_ptr, struct_ty, info->decl, expr->attr_name.lexeme, value);
+    current_value_ = value;
+}
+
+void LLVMCodeGenerator::visit(parser::GroupedExpr* expr) {
+    expr->expression->accept(this);
+}
+
 HULK_VISIT_STUB(UnaryExpr)
-HULK_VISIT_STUB(GetAttrExpr)
 HULK_VISIT_STUB(WithExpr)
 HULK_VISIT_STUB(CaseExpr)
-HULK_VISIT_STUB(AsExpr)
-HULK_VISIT_STUB(NewExpr)
-HULK_VISIT_STUB(BaseCallExpr)
-HULK_VISIT_STUB(SetAttrExpr)
-HULK_VISIT_STUB(MethodCallExpr)
 HULK_VISIT_STUB(UnlessExpr)
 HULK_VISIT_STUB(RepeatExpr)
 HULK_VISIT_STUB(LoopWhileExpr)

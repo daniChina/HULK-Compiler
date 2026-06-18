@@ -37,3 +37,12 @@ valid/71_l7_recursion.hulk   llvm_ok    call double @hulk_fn_fact_1
 # I8 — builtins math / range (oracle E2E en Codegen/tests/i8_builtins_smoke.cpp)
 valid/80_l8_sin.hulk         llvm_ok    call double @sin
 valid/81_l8_range_for.hulk   llvm_ok    for.cond
+
+# I9 — OOP type/new/attrs/methods (oracle E2E en Codegen/tests/i9_oo_smoke.cpp)
+valid/02_new_attr.hulk       llvm_ok    HulkInstance_Point
+valid/03_set_attr.hulk       llvm_ok    store double 5.000000e+00
+valid/04_method_call.hulk    llvm_ok    @hulk_meth_Counter_inc_0
+
+# I10 — herencia / base / as (oracle E2E en Codegen/tests/i10_inherit_smoke.cpp)
+valid/05_inherit_base.hulk   llvm_ok    @hulk_meth_Person_greet_0
+valid/06_as_method.hulk      llvm_ok    @hulk_meth_Sub_twice_0

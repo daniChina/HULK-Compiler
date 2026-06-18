@@ -117,6 +117,8 @@ CODEGEN_I5_SOURCES = Codegen/tests/i5_control_flow_smoke.cpp $(CODEGEN_SOURCES) 
 CODEGEN_I6_SOURCES = Codegen/tests/i6_assign_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I7_SOURCES = Codegen/tests/i7_functions_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I8_SOURCES = Codegen/tests/i8_builtins_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I9_SOURCES = Codegen/tests/i9_oo_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I10_SOURCES = Codegen/tests/i10_inherit_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
