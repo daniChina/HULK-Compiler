@@ -1,6 +1,7 @@
 #include "llvm_codegen.hpp"
 
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instructions.h>
@@ -35,7 +36,7 @@ llvm::Function* getMallocFunction(llvm::Module& module, llvm::LLVMContext& conte
         return malloc_fn;
     }
     llvm::FunctionType* malloc_ty = llvm::FunctionType::get(
-        llvm::PointerType::getUnqual(llvm::Type::getInt8Ty(context)),
+        llvm::PointerType::getUnqual(context),
         {llvm::Type::getInt64Ty(context)},
         false);
     return llvm::Function::Create(malloc_ty, llvm::Function::ExternalLinkage, "malloc", module);
@@ -69,9 +70,8 @@ void LLVMCodeGenerator::initialize(const std::string& module_name) {
 
 void LLVMCodeGenerator::registerRangeDeclarations() {
     llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
-    llvm::PointerType* range_ptr = llvm::PointerType::getUnqual(getRangeType());
     llvm::FunctionType* range_create_ty =
-        llvm::FunctionType::get(range_ptr, {double_ty, double_ty}, false);
+        llvm::FunctionType::get(opaquePtr(), {double_ty, double_ty}, false);
     module_->getOrInsertFunction("hulk_range_create", range_create_ty);
 }
 
@@ -196,8 +196,7 @@ llvm::Value* LLVMCodeGenerator::invokeUserFunction(llvm::Function* fn,
 }
 
 void LLVMCodeGenerator::registerPrintDeclarations() {
-    llvm::StructType* boxed_ty = getBoxedValueType();
-    llvm::PointerType* boxed_ptr = llvm::PointerType::getUnqual(boxed_ty);
+    llvm::PointerType* ptr_ty = opaquePtr();
 
     llvm::FunctionType* print_double_ty = llvm::FunctionType::get(
         llvm::Type::getVoidTy(*context_), {llvm::Type::getDoubleTy(*context_)}, false);
@@ -212,11 +211,10 @@ void LLVMCodeGenerator::registerPrintDeclarations() {
                                  llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), false));
 
     llvm::FunctionType* print_boxed_ty =
-        llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), {boxed_ptr}, false);
+        llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), {ptr_ty}, false);
     module_->getOrInsertFunction("hulk_print_boxed", print_boxed_ty);
 
-    llvm::FunctionType* concat_ty =
-        llvm::FunctionType::get(boxed_ptr, {boxed_ptr, boxed_ptr}, false);
+    llvm::FunctionType* concat_ty = llvm::FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
     module_->getOrInsertFunction("hulk_string_concat", concat_ty);
     module_->getOrInsertFunction("hulk_string_concat_ws", concat_ty);
 }
@@ -304,14 +302,12 @@ llvm::Value* LLVMCodeGenerator::createBoxedFromDouble(llvm::Value* double_val) {
 
     llvm::Value* size = llvm::ConstantExpr::getSizeOf(boxed_ty);
     llvm::Value* raw_ptr = builder_->CreateCall(malloc_fn, {size});
-    llvm::Value* boxed =
-        builder_->CreateBitCast(raw_ptr, llvm::PointerType::getUnqual(boxed_ty), "boxed_double");
+    llvm::Value* boxed = builder_->CreateBitCast(raw_ptr, opaquePtr(), "boxed_double");
 
     builder_->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), 1),
                           builder_->CreateStructGEP(boxed_ty, boxed, 0));
 
     llvm::Value* data_ptr = builder_->CreateStructGEP(boxed_ty, boxed, 1);
-    data_ptr = builder_->CreatePointerCast(data_ptr, llvm::PointerType::getUnqual(llvm::Type::getDoubleTy(*context_)));
     builder_->CreateStore(double_val, data_ptr);
     return boxed;
 }
@@ -322,14 +318,12 @@ llvm::Value* LLVMCodeGenerator::createBoxedFromBool(llvm::Value* bool_val) {
 
     llvm::Value* size = llvm::ConstantExpr::getSizeOf(boxed_ty);
     llvm::Value* raw_ptr = builder_->CreateCall(malloc_fn, {size});
-    llvm::Value* boxed =
-        builder_->CreateBitCast(raw_ptr, llvm::PointerType::getUnqual(boxed_ty), "boxed_bool");
+    llvm::Value* boxed = builder_->CreateBitCast(raw_ptr, opaquePtr(), "boxed_bool");
 
     builder_->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), 0),
                           builder_->CreateStructGEP(boxed_ty, boxed, 0));
 
     llvm::Value* data_ptr = builder_->CreateStructGEP(boxed_ty, boxed, 1);
-    data_ptr = builder_->CreatePointerCast(data_ptr, llvm::PointerType::getUnqual(llvm::Type::getInt1Ty(*context_)));
     builder_->CreateStore(bool_val, data_ptr);
     return boxed;
 }
@@ -340,15 +334,13 @@ llvm::Value* LLVMCodeGenerator::createBoxedFromString(llvm::Value* str_val) {
 
     llvm::Value* size = llvm::ConstantExpr::getSizeOf(boxed_ty);
     llvm::Value* raw_ptr = builder_->CreateCall(malloc_fn, {size});
-    llvm::Value* boxed =
-        builder_->CreateBitCast(raw_ptr, llvm::PointerType::getUnqual(boxed_ty), "boxed_str");
+    llvm::Value* boxed = builder_->CreateBitCast(raw_ptr, opaquePtr(), "boxed_str");
 
     builder_->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), 2),
                           builder_->CreateStructGEP(boxed_ty, boxed, 0));
 
     llvm::Value* data_ptr = builder_->CreateStructGEP(boxed_ty, boxed, 1);
-    llvm::Value* slot = builder_->CreateBitCast(data_ptr, llvm::PointerType::getUnqual(str_val->getType()));
-    builder_->CreateStore(str_val, slot);
+    builder_->CreateStore(str_val, data_ptr);
     return boxed;
 }
 
@@ -490,7 +482,7 @@ llvm::Value* LLVMCodeGenerator::defaultValueForType(llvm::Type* type) {
         return llvm::ConstantInt::getFalse(*context_);
     }
     if (type->isPointerTy()) {
-        return llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(type->getPointerElementType()));
+        return llvm::ConstantPointerNull::get(opaquePtr());
     }
     return llvm::ConstantFP::get(llvm::Type::getDoubleTy(*context_), 0.0);
 }
@@ -562,8 +554,7 @@ void LLVMCodeGenerator::visit(parser::BoolExpr* expr) {
 }
 
 void LLVMCodeGenerator::visit(parser::NullExpr* /*expr*/) {
-    current_value_ = llvm::ConstantPointerNull::get(
-        llvm::PointerType::getUnqual(llvm::Type::getInt8Ty(*context_)));
+    current_value_ = llvm::ConstantPointerNull::get(opaquePtr());
 }
 
 void LLVMCodeGenerator::visit(parser::IdentifierExpr* expr) {
@@ -579,7 +570,11 @@ void LLVMCodeGenerator::visit(parser::IdentifierExpr* expr) {
     llvm::AllocaInst* alloca = nullptr;
     llvm::Type* var_type = nullptr;
     if (lookupLocalVariable(name, &alloca, &var_type)) {
-        current_value_ = builder_->CreateLoad(var_type, alloca);
+        llvm::Type* load_ty = var_type;
+        if (isBoxedSemanticType(var_type) || isRangeSemanticType(var_type) || var_type == opaquePtr()) {
+            load_ty = opaquePtr();
+        }
+        current_value_ = builder_->CreateLoad(load_ty, alloca);
         return;
     }
 
@@ -593,12 +588,14 @@ void LLVMCodeGenerator::visit(parser::LetExpr* expr) {
     }
 
     llvm::Value* init_value = current_value_;
-    llvm::Type* var_type = init_value->getType();
+    llvm::Type* storage_ty =
+        init_value->getType()->isPointerTy() ? static_cast<llvm::Type*>(opaquePtr()) : init_value->getType();
+    llvm::Type* var_type = classifySemanticType(init_value);
     const std::string var_name = expr->name.lexeme;
 
     enterScope();
 
-    llvm::AllocaInst* alloca = builder_->CreateAlloca(var_type, nullptr, "");
+    llvm::AllocaInst* alloca = builder_->CreateAlloca(storage_ty, nullptr, "");
     builder_->CreateStore(init_value, alloca);
     current_scope_->variables[var_name] = alloca;
     current_scope_->variable_types[var_name] = var_type;
@@ -618,11 +615,101 @@ llvm::StructType* LLVMCodeGenerator::getRangeType() {
     return range_type_;
 }
 
-bool LLVMCodeGenerator::isRangePointer(llvm::Type* type) {
-    if (type == nullptr || !type->isPointerTy()) {
+llvm::PointerType* LLVMCodeGenerator::opaquePtr() {
+    return llvm::PointerType::getUnqual(*context_);
+}
+
+bool LLVMCodeGenerator::lookupSemanticTypeForAlloca(llvm::AllocaInst* alloca,
+                                                    llvm::Type** out_type) {
+    if (alloca == nullptr) {
         return false;
     }
-    return type->getPointerElementType() == getRangeType();
+    for (LLVMScope* scope = current_scope_; scope != nullptr; scope = scope->parent) {
+        for (const auto& [name, slot] : scope->variables) {
+            if (slot == alloca) {
+                if (out_type != nullptr) {
+                    *out_type = scope->variable_types.at(name);
+                }
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+llvm::Type* LLVMCodeGenerator::classifySemanticType(llvm::Value* value) {
+    if (value == nullptr) {
+        return llvm::Type::getDoubleTy(*context_);
+    }
+
+    llvm::Type* llvm_ty = value->getType();
+    if (!llvm_ty->isPointerTy()) {
+        return llvm_ty;
+    }
+
+    if (llvm::isa<llvm::ConstantPointerNull>(value)) {
+        return opaquePtr();
+    }
+
+    if (auto* call = llvm::dyn_cast<llvm::CallInst>(value)) {
+        llvm::Function* callee = call->getCalledFunction();
+        if (callee != nullptr) {
+            const llvm::StringRef name = callee->getName();
+            if (name == "hulk_range_create") {
+                return getRangeType();
+            }
+            if (name == "hulk_string_concat" || name == "hulk_string_concat_ws") {
+                return getBoxedValueType();
+            }
+        }
+    }
+
+    if (auto* cast = llvm::dyn_cast<llvm::BitCastInst>(value)) {
+        if (cast->hasName() && cast->getName().starts_with("boxed_")) {
+            return getBoxedValueType();
+        }
+    }
+
+    if (auto* load = llvm::dyn_cast<llvm::LoadInst>(value)) {
+        llvm::Type* sem_type = nullptr;
+        if (auto* alloca = llvm::dyn_cast<llvm::AllocaInst>(load->getPointerOperand())) {
+            if (lookupSemanticTypeForAlloca(alloca, &sem_type)) {
+                return sem_type;
+            }
+        }
+    }
+
+    return getBoxedValueType();
+}
+
+bool LLVMCodeGenerator::isBoxedSemanticType(llvm::Type* type) {
+    return type == getBoxedValueType();
+}
+
+bool LLVMCodeGenerator::isRangeSemanticType(llvm::Type* type) {
+    return type == getRangeType();
+}
+
+bool LLVMCodeGenerator::isRangeValue(llvm::Value* value) {
+    return classifySemanticType(value) == getRangeType();
+}
+
+bool LLVMCodeGenerator::isBoxedValue(llvm::Value* value) {
+    if (value == nullptr || !value->getType()->isPointerTy()) {
+        return false;
+    }
+    if (llvm::isa<llvm::ConstantPointerNull>(value)) {
+        return false;
+    }
+    return isBoxedSemanticType(classifySemanticType(value));
+}
+
+bool LLVMCodeGenerator::isRangePointer(llvm::Type* type) {
+    return isRangeSemanticType(type);
+}
+
+bool LLVMCodeGenerator::isBoxedValuePointer(llvm::Type* type) {
+    return isBoxedSemanticType(type);
 }
 
 bool LLVMCodeGenerator::emitBuiltinCall(const std::string& name,
@@ -690,14 +777,6 @@ bool LLVMCodeGenerator::emitBuiltinCall(const std::string& name,
     return false;
 }
 
-bool LLVMCodeGenerator::isBoxedValuePointer(llvm::Type* type) {
-    if (type == nullptr || !type->isPointerTy()) {
-        return false;
-    }
-    llvm::StructType* boxed_ty = getBoxedValueType();
-    return type->getPointerElementType() == boxed_ty;
-}
-
 void LLVMCodeGenerator::emitPrintNewline() {
     llvm::Function* fn = module_->getFunction("hulk_print_newline");
     builder_->CreateCall(fn, {});
@@ -727,7 +806,7 @@ void LLVMCodeGenerator::emitPrintValue(llvm::Value* value) {
         return;
     }
 
-    if (isBoxedValuePointer(value->getType())) {
+    if (isBoxedValue(value)) {
         llvm::Function* fn = module_->getFunction("hulk_print_boxed");
         builder_->CreateCall(fn, {value});
         return;
@@ -894,7 +973,7 @@ void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
     }
 
     if (op == "@" || op == "@@") {
-        if (!isBoxedValuePointer(left->getType()) || !isBoxedValuePointer(right->getType())) {
+        if (!isBoxedValue(left) || !isBoxedValue(right)) {
             fail("Operador '" + op + "' requiere operandos string");
             return;
         }
@@ -1090,7 +1169,7 @@ void LLVMCodeGenerator::visit(parser::AssignExpr* expr) {
         return;
     }
 
-    if (rhs_value->getType() != var_type) {
+    if (classifySemanticType(rhs_value) != var_type) {
         fail("codegen: tipo incompatible en asignacion a '" + name + "'");
         return;
     }
@@ -1106,7 +1185,7 @@ void LLVMCodeGenerator::visit(parser::ForExpr* expr) {
     }
 
     llvm::Value* range_ptr = current_value_;
-    if (!isRangePointer(range_ptr->getType())) {
+    if (!isRangeValue(range_ptr)) {
         fail("for requiere un iterable (p. ej. range)");
         return;
     }

@@ -16,6 +16,7 @@ namespace llvm {
 class AllocaInst;
 class Function;
 class GlobalVariable;
+class PointerType;
 class StructType;
 class Type;
 class Value;
@@ -90,6 +91,13 @@ private:
     bool lookupLocalVariable(const std::string& name, llvm::AllocaInst** out_alloca, llvm::Type** out_type);
     llvm::StructType* getBoxedValueType();
     llvm::StructType* getRangeType();
+    llvm::PointerType* opaquePtr();
+    llvm::Type* classifySemanticType(llvm::Value* value);
+    bool lookupSemanticTypeForAlloca(llvm::AllocaInst* alloca, llvm::Type** out_type);
+    bool isBoxedSemanticType(llvm::Type* type);
+    bool isRangeSemanticType(llvm::Type* type);
+    bool isBoxedValue(llvm::Value* value);
+    bool isRangeValue(llvm::Value* value);
     llvm::GlobalVariable* registerStringConstant(const std::string& value);
     llvm::Value* createBoxedFromDouble(llvm::Value* double_val);
     llvm::Value* createBoxedFromBool(llvm::Value* bool_val);

@@ -12,6 +12,7 @@ bool build_output_executable(const std::string& /*program_source*/, parser::Prog
     return codegen::build_executable(program, "output", error_out);
 #else
     if (error_out) {
+        *error_out = "codegen LLVM no disponible: instala llvm-21, pon llvm-config en PATH y ejecuta make compile (ver REQUIREMENTS.md)";
     }
     return false;
 #endif

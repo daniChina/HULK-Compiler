@@ -1,20 +1,29 @@
 MATCOM_OOP_PARSE_TARGET = matcom_oop_parse_smoke
 
-.PHONY: all compile build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm
+.PHONY: all compile compile_nollvm build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm
 
-# --- LLVM (Fase 4): solo test_llvm enlaza libLLVM; compile principal sin LLVM (~40 s) ---
-ifeq ($(OS),Windows_NT)
-LLVM_CONFIG ?= C:/ghcup/ghc/9.6.7/mingw/bin/llvm-config
-else
+# --- LLVM (Fase 4): compile enlaza libLLVM si llvm-config está en PATH (Fase D) ---
 LLVM_CONFIG ?= llvm-config
+ifeq ($(OS),Windows_NT)
+# MSYS make usa sh: 2>NUL crea un archivo literal "NUL" (nombre reservado Windows).
+LLVM_AVAILABLE := $(shell "$(LLVM_CONFIG)" --version 2>/dev/null)
+LLVM_CXXFLAGS_RAW := $(shell "$(LLVM_CONFIG)" --cxxflags 2>/dev/null)
+LLVM_LDFLAGS := $(shell "$(LLVM_CONFIG)" --ldflags --libs core support 2>/dev/null)
+else
+LLVM_AVAILABLE := $(shell "$(LLVM_CONFIG)" --version 2>/dev/null)
+LLVM_CXXFLAGS_RAW := $(shell "$(LLVM_CONFIG)" --cxxflags 2>/dev/null)
+LLVM_LDFLAGS := $(shell "$(LLVM_CONFIG)" --ldflags --libs core support 2>/dev/null)
 endif
-LLVM_AVAILABLE := $(shell "$(LLVM_CONFIG)" --version)
-LLVM_CXXFLAGS_RAW := $(shell "$(LLVM_CONFIG)" --cxxflags)
-LLVM_LDFLAGS := $(shell "$(LLVM_CONFIG)" --ldflags --libs core support)
 LLVM_CXXFLAGS := $(filter-out -stdlib=libc++,$(LLVM_CXXFLAGS_RAW))
 LLVM_CXXFLAGS := $(filter-out -std=c++14,$(LLVM_CXXFLAGS))
 LLVM_CXXFLAGS := $(filter-out -std=gnu++14,$(LLVM_CXXFLAGS))
-# Mantener -fno-exceptions/-fno-rtti: libLLVM-14 (GHCup) exige ABI compatible en Windows.
+# Mantener -fno-exceptions/-fno-rtti en test_llvm; hulk usa LLVM_CXXFLAGS_HULK_ALL.
+
+ifeq ($(OS),Windows_NT)
+RUN_TIMER = C:/msys64/usr/bin/bash.exe scripts/run_with_timer.sh
+else
+RUN_TIMER = bash scripts/run_with_timer.sh
+endif
 
 CODEGEN_SOURCES = Codegen/llvm_codegen.cpp Codegen/llvm_aux.cpp Codegen/output_build.cpp
 CODEGEN_I0_SOURCES = Codegen/tests/i0_module_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
@@ -30,12 +39,27 @@ LLVM_I8_TARGET = llvm_i8_smoke
 
 # Compilador y flags
 CXX = g++
-# FlexLexer.h: MSYS2/ghcup o WinFlexBison (winget install WinFlexBison.win_flex_bison)
+# FlexLexer.h: MSYS2 usr/include o WinFlexBison (winget install WinFlexBison.win_flex_bison)
 FLEX_WIN = $(LOCALAPPDATA)/Microsoft/WinGet/Packages/WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe
 CXXFLAGS = -std=c++17 -Wall -fuse-ld=bfd -I. -ILexer -IParser/core -IParser/ast -IParser/generator -IParser/syntax \
            -ISemanticCheck -ISymbolTable -ITypes -IValue -IEvaluator -ICodegen \
-           -I/usr/include -IC:/ghcup/msys64/usr/include -I$(FLEX_WIN)
+           -I/usr/include -IC:/msys64/usr/include -I$(FLEX_WIN)
+# Smokes: -fno-exceptions/-fno-rtti de llvm-config. hulk (main.cpp): excepciones habilitadas.
+LLVM_CXXFLAGS_HULK := $(filter-out -fno-exceptions -fno-rtti,$(LLVM_CXXFLAGS))
 LLVM_CXXFLAGS_ALL = -std=c++17 $(LLVM_CXXFLAGS)
+LLVM_CXXFLAGS_HULK_ALL = -std=c++17 $(LLVM_CXXFLAGS_HULK)
+
+ifneq ($(LLVM_AVAILABLE),)
+HULK_HAVE_LLVM := 1
+COMPILE_SOURCES = $(SOURCES) $(CODEGEN_SOURCES)
+COMPILE_CXXFLAGS = $(CXXFLAGS) $(LLVM_CXXFLAGS_HULK_ALL) -DHULK_HAVE_LLVM
+COMPILE_LDFLAGS = $(LLVM_LDFLAGS)
+else
+HULK_HAVE_LLVM :=
+COMPILE_SOURCES = $(SOURCES)
+COMPILE_CXXFLAGS = $(CXXFLAGS)
+COMPILE_LDFLAGS =
+endif
 
 # Archivos fuente
 SOURCES = Lexer/hulk_lexer.cpp \
@@ -124,14 +148,24 @@ ifeq ($(OS),Windows_NT)
 $(HULK_BIN): compile
 	cmd /c copy /Y $(TARGET) $(HULK_BIN) >nul
 else
-$(HULK_BIN):
-	$(CXX) $(CXXFLAGS) -O2 $(SOURCES) -o $(HULK_BIN)
+$(HULK_BIN): compile
+	$(CXX) $(COMPILE_CXXFLAGS) -O2 $(COMPILE_SOURCES) -o $(HULK_BIN) $(COMPILE_LDFLAGS)
 endif
 
 lexer:
 	flex++ --c++ -o Lexer/hulk_lexer.cpp Lexer/hulk_lexer.l
 
 compile:
+ifeq ($(HULK_HAVE_LLVM),1)
+	@echo "[make] Compilando $(TARGET) con codegen LLVM $(LLVM_AVAILABLE) (varios minutos)..."
+	$(RUN_TIMER) --label compile $(CXX) $(COMPILE_CXXFLAGS) $(COMPILE_SOURCES) -o $(TARGET) $(COMPILE_LDFLAGS)
+else
+	@echo "[make] LLVM no detectado: $(TARGET) sin codegen (solo interprete). Instala llvm-21 o usa compile_nollvm."
+	$(CXX) $(COMPILE_CXXFLAGS) $(COMPILE_SOURCES) -o $(TARGET) $(COMPILE_LDFLAGS)
+endif
+
+compile_nollvm:
+	@echo "[make] compile_nollvm: sin libLLVM"
 	$(CXX) $(CXXFLAGS) $(SOURCES) -o $(TARGET)
 
 execute: compile
@@ -183,31 +217,14 @@ test_matcom_oop_parse:
 
 test_llvm:
 ifeq ($(LLVM_AVAILABLE),)
-	@echo "LLVM no encontrado: instala llvm-config (GHCup: C:/ghcup/ghc/*/mingw/bin) o define LLVM_CONFIG=..."
+	@echo "LLVM no encontrado: instala llvm-21 (MSYS2 UCRT64 / apt.llvm.org) y pon llvm-config en PATH, o define LLVM_CONFIG=..."
 	@exit 1
 else
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I0_SOURCES) -o $(LLVM_I0_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I1_SOURCES) -o $(LLVM_I1_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I2_SOURCES) -o $(LLVM_I2_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I3_SOURCES) -o $(LLVM_I3_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I4_SOURCES) -o $(LLVM_I4_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I5_SOURCES) -o $(LLVM_I5_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I6_SOURCES) -o $(LLVM_I6_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I7_SOURCES) -o $(LLVM_I7_TARGET) $(LLVM_LDFLAGS)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I8_SOURCES) -o $(LLVM_I8_TARGET) $(LLVM_LDFLAGS)
-ifeq ($(OS),Windows_NT)
-	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe && $(LLVM_I3_TARGET).exe && $(LLVM_I4_TARGET).exe && $(LLVM_I5_TARGET).exe && $(LLVM_I6_TARGET).exe && $(LLVM_I7_TARGET).exe && $(LLVM_I8_TARGET).exe"
-else
-	./$(LLVM_I0_TARGET)
-	./$(LLVM_I1_TARGET)
-	./$(LLVM_I2_TARGET)
-	./$(LLVM_I3_TARGET)
-	./$(LLVM_I4_TARGET)
-	./$(LLVM_I5_TARGET)
-	./$(LLVM_I6_TARGET)
-	./$(LLVM_I7_TARGET)
-	./$(LLVM_I8_TARGET)
-endif
+	CXX='$(CXX)' \
+	CXXFLAGS='$(CXXFLAGS)' \
+	LLVM_CXXFLAGS_ALL='$(LLVM_CXXFLAGS_ALL)' \
+	LLVM_LDFLAGS='$(LLVM_LDFLAGS)' \
+	$(RUN_TIMER) --label test_llvm bash scripts/test_llvm.sh
 endif
 
 test_eval:

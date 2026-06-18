@@ -20,7 +20,7 @@ $CXXFLAGS = @(
     "-std=c++17", "-Wall", "-fuse-ld=bfd",
     "-I.", "-ILexer", "-IParser/core", "-IParser/ast", "-IParser/generator", "-IParser/syntax",
     "-ISemanticCheck", "-ITypes",
-    "-IC:/ghcup/msys64/usr/include",
+    "-IC:/msys64/usr/include",
     "-I$FlexWin"
 )
 

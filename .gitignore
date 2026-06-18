@@ -1,12 +1,38 @@
 
 # Build artifacts
 hulk.exe
+hulk_c.exe
+hulk
+output
+output.exe
 *.o
 Lexer/hulk_lexer.cpp
+
+# LLVM codegen intermediates
+.hulk_out.ll
+.hulk_program.hulk
+
+# Smoke / test binaries
+llvm_i*_smoke*
+llvm_i*_out*
+*_smoke.exe
+*_smoke
+eval_*.exe
+r*_semantic_smoke*
+a4_builtins_smoke*
+type_map_smoke*
+matcom_oop_parse_smoke*
+
+# Local logs
+*.log
+err_*.txt
+i*_out.txt
+
+# Windows reserved-name accidents (never commit)
+NUL
+nul
 
 # Editor / tooling
 .vscode/
 .codex
-
-
 

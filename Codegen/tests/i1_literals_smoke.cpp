@@ -76,7 +76,7 @@ int main() {
 
     ok &= checkLiteralIR(
         programWithExpr(std::make_unique<parser::NullExpr>(token(parser::TokenType::NULL_LITERAL, "Null"))).get(),
-        {"store i8* null"},
+        {"store ptr null"},
         "I1: literal Null");
 
     ok &= checkLiteralIR(
