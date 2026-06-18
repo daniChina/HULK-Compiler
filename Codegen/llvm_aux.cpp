@@ -38,4 +38,17 @@ void registerRuntimeDeclarations(llvm::Module& module, llvm::LLVMContext& contex
     module.getOrInsertFunction("fmod", fmod_ty);
 }
 
+void registerBuiltinDeclarations(llvm::Module& module, llvm::LLVMContext& context) {
+    llvm::Type* double_ty = llvm::Type::getDoubleTy(context);
+    llvm::FunctionType* unary_double_ty =
+        llvm::FunctionType::get(double_ty, {double_ty}, false);
+
+    for (const char* name : {"sin", "cos", "sqrt", "log", "exp"}) {
+        module.getOrInsertFunction(name, unary_double_ty);
+    }
+
+    llvm::FunctionType* rand_ty = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), false);
+    module.getOrInsertFunction("rand", rand_ty);
+}
+
 }  // namespace hulk::codegen

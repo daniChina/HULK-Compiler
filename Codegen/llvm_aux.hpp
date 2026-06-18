@@ -8,5 +8,6 @@ class Module;
 namespace hulk::codegen {
 
 void registerRuntimeDeclarations(llvm::Module& module, llvm::LLVMContext& context);
+void registerBuiltinDeclarations(llvm::Module& module, llvm::LLVMContext& context);
 
 }  // namespace hulk::codegen

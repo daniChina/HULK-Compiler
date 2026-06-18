@@ -24,6 +24,9 @@ LLVM_I2_TARGET = llvm_i2_smoke
 LLVM_I3_TARGET = llvm_i3_smoke
 LLVM_I4_TARGET = llvm_i4_smoke
 LLVM_I5_TARGET = llvm_i5_smoke
+LLVM_I6_TARGET = llvm_i6_smoke
+LLVM_I7_TARGET = llvm_i7_smoke
+LLVM_I8_TARGET = llvm_i8_smoke
 
 # Compilador y flags
 CXX = g++
@@ -87,6 +90,9 @@ CODEGEN_I2_SOURCES = Codegen/tests/i2_let_smoke.cpp $(CODEGEN_SOURCES) Parser/as
 CODEGEN_I3_SOURCES = Codegen/tests/i3_binary_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I4_SOURCES = Codegen/tests/i4_print_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I5_SOURCES = Codegen/tests/i5_control_flow_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I6_SOURCES = Codegen/tests/i6_assign_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I7_SOURCES = Codegen/tests/i7_functions_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I8_SOURCES = Codegen/tests/i8_builtins_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
@@ -186,8 +192,11 @@ else
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I3_SOURCES) -o $(LLVM_I3_TARGET) $(LLVM_LDFLAGS)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I4_SOURCES) -o $(LLVM_I4_TARGET) $(LLVM_LDFLAGS)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I5_SOURCES) -o $(LLVM_I5_TARGET) $(LLVM_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I6_SOURCES) -o $(LLVM_I6_TARGET) $(LLVM_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I7_SOURCES) -o $(LLVM_I7_TARGET) $(LLVM_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS_ALL) $(CODEGEN_I8_SOURCES) -o $(LLVM_I8_TARGET) $(LLVM_LDFLAGS)
 ifeq ($(OS),Windows_NT)
-	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe && $(LLVM_I3_TARGET).exe && $(LLVM_I4_TARGET).exe && $(LLVM_I5_TARGET).exe"
+	cmd /c "set PATH=C:/ghcup/ghc/9.6.7/mingw/bin;%PATH% && $(LLVM_I0_TARGET).exe && $(LLVM_I1_TARGET).exe && $(LLVM_I2_TARGET).exe && $(LLVM_I3_TARGET).exe && $(LLVM_I4_TARGET).exe && $(LLVM_I5_TARGET).exe && $(LLVM_I6_TARGET).exe && $(LLVM_I7_TARGET).exe && $(LLVM_I8_TARGET).exe"
 else
 	./$(LLVM_I0_TARGET)
 	./$(LLVM_I1_TARGET)
@@ -195,6 +204,9 @@ else
 	./$(LLVM_I3_TARGET)
 	./$(LLVM_I4_TARGET)
 	./$(LLVM_I5_TARGET)
+	./$(LLVM_I6_TARGET)
+	./$(LLVM_I7_TARGET)
+	./$(LLVM_I8_TARGET)
 endif
 endif
 

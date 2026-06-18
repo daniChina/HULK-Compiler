@@ -9,6 +9,20 @@ typedef struct {
 
 enum { HULK_TAG_BOOL = 0, HULK_TAG_NUMBER = 1, HULK_TAG_STRING = 2 };
 
+typedef struct {
+    double start;
+    double end;
+} HulkRange;
+
+void* hulk_range_create(double start, double end) {
+    HulkRange* range = (HulkRange*)malloc(sizeof(HulkRange));
+    if (range != NULL) {
+        range->start = start;
+        range->end = end;
+    }
+    return range;
+}
+
 void hulk_runtime_init(void) {}
 
 static char* boxed_string_ptr(BoxedValue* boxed) {

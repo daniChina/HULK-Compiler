@@ -20,10 +20,11 @@ El proyecto separa dos niveles: **build base** (lexer → evaluador) y **codegen
 | **FlexLexer.h** | Cabecera del lexer C++ | ✓ | ✓ |
 | **Git** | Clonar repos (código + docs) | ✓ | ✓ |
 | **llvm-config** | Flags/enlace contra libLLVM | — | ✓ |
-| **libLLVM** (14 en Windows) | Smokes y API IR | — | ✓ |
+| **libLLVM** (14 hoy; ver nota) | Smokes y API IR | — | ✓ |
 | **clang** | E2E I4+: compilar `.ll` + `runtime.c` → ejecutable | — | ✓ |
 
 > **Nota:** el parser es **LL(1) manual**; no se usa Bison en el build habitual.
+
 
 ---
 

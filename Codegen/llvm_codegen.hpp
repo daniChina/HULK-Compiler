@@ -14,6 +14,7 @@
 
 namespace llvm {
 class AllocaInst;
+class Function;
 class GlobalVariable;
 class StructType;
 class Type;
@@ -82,10 +83,13 @@ private:
     void createEmptyMain();
     void registerMathematicalConstants();
     void registerPrintDeclarations();
+    void registerRangeDeclarations();
     void materializeExprResult();
     void enterScope();
     void exitScope();
+    bool lookupLocalVariable(const std::string& name, llvm::AllocaInst** out_alloca, llvm::Type** out_type);
     llvm::StructType* getBoxedValueType();
+    llvm::StructType* getRangeType();
     llvm::GlobalVariable* registerStringConstant(const std::string& value);
     llvm::Value* createBoxedFromDouble(llvm::Value* double_val);
     llvm::Value* createBoxedFromBool(llvm::Value* bool_val);
@@ -99,6 +103,14 @@ private:
     void emitPrintValue(llvm::Value* value);
     void emitPrintNewline();
     bool isBoxedValuePointer(llvm::Type* type);
+    bool isRangePointer(llvm::Type* type);
+    bool emitBuiltinCall(const std::string& name, const std::vector<parser::ExprPtr>& args);
+    static bool isBuiltinFunctionName(const std::string& name);
+    static std::string mangleUserFunctionName(const std::string& name, std::size_t arity);
+    void declareUserFunction(parser::FunctionDecl* decl);
+    void defineUserFunction(parser::FunctionDecl* decl);
+    llvm::Function* lookupUserFunction(const std::string& name, std::size_t arity);
+    llvm::Value* invokeUserFunction(llvm::Function* fn, const std::vector<llvm::Value*>& args);
 
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::Module> module_;
@@ -107,9 +119,12 @@ private:
     llvm::Value* current_value_ = nullptr;
     int var_counter_ = 0;
     llvm::StructType* boxed_value_type_ = nullptr;
+    llvm::StructType* range_type_ = nullptr;
 
     std::unordered_map<std::string, llvm::GlobalVariable*> string_constants_;
     std::unordered_map<std::string, llvm::GlobalVariable*> global_constants_;
+    std::unordered_map<std::string, std::unordered_map<std::size_t, llvm::Function*>> user_functions_;
+    std::vector<std::string> user_function_names_;
 
     std::vector<std::unique_ptr<LLVMScope>> scopes_;
     LLVMScope* current_scope_ = nullptr;

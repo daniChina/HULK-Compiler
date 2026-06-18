@@ -26,3 +26,14 @@ valid/40_l4_print_pi.hulk    llvm_ok    hulk_print_double
 # I5 — control de flujo (oracle E2E en Codegen/tests/i5_control_flow_smoke.cpp)
 valid/50_l5_if.hulk          llvm_ok    if.then
 valid/51_l5_while.hulk       llvm_ok    while.else
+
+# I6 — asignacion (oracle E2E en Codegen/tests/i6_assign_smoke.cpp)
+valid/60_l6_assign.hulk      llvm_ok    store double 3.000000e+00
+
+# I7 — funciones globales (oracle E2E en Codegen/tests/i7_functions_smoke.cpp)
+valid/70_l7_function.hulk    llvm_ok    @hulk_fn_f_1
+valid/71_l7_recursion.hulk   llvm_ok    call double @hulk_fn_fact_1
+
+# I8 — builtins math / range (oracle E2E en Codegen/tests/i8_builtins_smoke.cpp)
+valid/80_l8_sin.hulk         llvm_ok    call double @sin
+valid/81_l8_range_for.hulk   llvm_ok    for.cond
