@@ -1,0 +1,3 @@
+type Person(n: Number) { n: Number = n; }
+type Sub(n: Number) inherits Person(n) { twice() => self.n * 2; }
+print(let v: Person = new Sub(5) in (v as Sub).twice());

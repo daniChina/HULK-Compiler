@@ -83,6 +83,7 @@ public:
     void visit(parser::WithExpr* expr) override;
     void visit(parser::CaseExpr* expr) override;
     void visit(parser::AsExpr* expr) override;
+    void visit(parser::IsExpr* expr) override;
     void visit(parser::AssignExpr* expr) override;
     void visit(parser::NewExpr* expr) override;
     void visit(parser::BaseCallExpr* expr) override;
@@ -120,6 +121,11 @@ private:
     llvm::Function* getLibmFunction(const char* name, llvm::FunctionType* fn_type);
     llvm::Value* expectBoolValue(llvm::Value* value, const std::string& op);
     llvm::Value* expectDoubleValue(llvm::Value* value, const std::string& op);
+    llvm::Value* unboxDoubleValue(llvm::Value* value, const std::string& op);
+    llvm::Value* unboxBoolValue(llvm::Value* value, const std::string& op);
+    llvm::Value* emitBoxedEquality(llvm::Value* left, llvm::Value* right, bool equal);
+    llvm::Value* coerceStringBoxed(llvm::Value* value, const std::string& op);
+    llvm::Type* semanticTypeForHulkType(const std::optional<parser::Token>& declared_type);
     llvm::Value* defaultValueForType(llvm::Type* type);
     void emitPrintValue(llvm::Value* value);
     void emitPrintNewline();
@@ -140,6 +146,16 @@ private:
     ClassInfo* lookupClassInfoByStruct(llvm::StructType* struct_ty);
     MethodResolution resolveMethod(parser::ClassDecl* type_def, const std::string& method_name) const;
     bool instanceConformsTo(parser::ClassDecl* dynamic_type, const std::string& static_type_name) const;
+    llvm::GlobalVariable* getClassNameGlobal(const std::string& class_name);
+    llvm::Value* loadInstanceRuntimeType(llvm::Value* instance_ptr, llvm::StructType* struct_ty);
+    void storeInstanceRuntimeType(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
+                                  const std::string& class_name);
+    llvm::Value* emitRuntimeTypeConforms(llvm::Value* runtime_type_ptr, const std::string& target_type);
+    llvm::Value* emitScalarIsCheck(llvm::Value* value, const std::string& target_type);
+    bool isInstanceValue(llvm::Value* value);
+    llvm::StructType* resolveInstanceStructType(llvm::Value* value);
+    void emitCastFailure();
+    void trackInstanceType(llvm::Value* value, llvm::StructType* struct_ty);
     void initializeParentAttributes(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
                                     parser::ClassDecl* type_def);
     llvm::Value* materializeMethodResult(llvm::Value* result, const std::string& label);
@@ -182,6 +198,8 @@ private:
     std::unordered_map<std::string, ClassInfo> class_info_;
     std::unordered_map<std::string, std::unordered_map<std::string, llvm::Function*>> class_methods_;
     std::vector<std::string> method_mangled_names_;
+    std::unordered_map<std::string, llvm::GlobalVariable*> class_name_globals_;
+    std::unordered_map<llvm::Value*, llvm::StructType*> value_instance_types_;
     llvm::AllocaInst* current_self_alloca_ = nullptr;
     parser::ClassDecl* current_self_class_ = nullptr;
     std::string current_method_name_;

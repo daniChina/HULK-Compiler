@@ -48,6 +48,7 @@ public:
     void visit(parser::WithExpr* expr) override;
     void visit(parser::CaseExpr* expr) override;
     void visit(parser::AsExpr* expr) override;
+    void visit(parser::IsExpr* expr) override;
     void visit(parser::AssignExpr* expr) override;
     void visit(parser::NewExpr* expr) override;
     void visit(parser::BaseCallExpr* expr) override;

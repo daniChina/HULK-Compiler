@@ -36,6 +36,7 @@ TokenType from_lexer_token(::TokenType lexer_type) {
         case ::TokenType::SELF:           return TokenType::SELF;
         case ::TokenType::BASE:           return TokenType::BASE;
         case ::TokenType::AS:             return TokenType::AS;
+        case ::TokenType::IS:             return TokenType::IS;
         case ::TokenType::AND:            return TokenType::AND;
         case ::TokenType::OR:             return TokenType::OR;
         case ::TokenType::REPEAT:         return TokenType::REPEAT;

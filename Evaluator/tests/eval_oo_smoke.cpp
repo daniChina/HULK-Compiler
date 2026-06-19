@@ -93,5 +93,19 @@ int main() {
         "10\n",
         "C6: as downcast + method");
 
+    ok &= runProgram(
+        "type Person(n: Number) { n: Number = n; }\n"
+        "type Sub(n: Number) inherits Person(n) {}\n"
+        "print(let x = new Sub(5) in x is Sub);\n",
+        "true\n",
+        "C7: is downcast true");
+
+    ok &= runProgram(
+        "type Person(n: Number) { n: Number = n; }\n"
+        "type Sub(n: Number) inherits Person(n) { twice() => self.n * 2; }\n"
+        "print(let v: Person = new Sub(5) in (v as Sub).twice());\n",
+        "10\n",
+        "C8: polymorphic let + as downcast");
+
     return ok ? 0 : 1;
 }

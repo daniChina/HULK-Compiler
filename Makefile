@@ -1,6 +1,6 @@
 MATCOM_OOP_PARSE_TARGET = matcom_oop_parse_smoke
 
-.PHONY: all compile compile_nollvm build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm
+.PHONY: all compile compile_nollvm build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm test_llvm_fixtures
 
 # --- LLVM (Fase 4): compile enlaza libLLVM si llvm-config está en PATH (Fase D) ---
 LLVM_CONFIG ?= llvm-config
@@ -119,6 +119,7 @@ CODEGEN_I7_SOURCES = Codegen/tests/i7_functions_smoke.cpp $(CODEGEN_SOURCES) Par
 CODEGEN_I8_SOURCES = Codegen/tests/i8_builtins_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I9_SOURCES = Codegen/tests/i9_oo_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 CODEGEN_I10_SOURCES = Codegen/tests/i10_inherit_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
+CODEGEN_I11_SOURCES = Codegen/tests/i11_is_as_smoke.cpp $(CODEGEN_SOURCES) Parser/ast/expr.cpp
 
 R1_SEMANTIC_TEST_TARGET = r1_semantic_smoke
 R2_SEMANTIC_TEST_TARGET = r2_semantic_smoke
@@ -227,6 +228,14 @@ else
 	LLVM_CXXFLAGS_ALL='$(LLVM_CXXFLAGS_ALL)' \
 	LLVM_LDFLAGS='$(LLVM_LDFLAGS)' \
 	$(RUN_TIMER) --label test_llvm bash scripts/test_llvm.sh
+endif
+
+test_llvm_fixtures: compile
+ifeq ($(LLVM_AVAILABLE),)
+	@echo "LLVM no encontrado: instala llvm-21 (MSYS2 UCRT64 / apt.llvm.org) y pon llvm-config en PATH, o define LLVM_CONFIG=..."
+	@exit 1
+else
+	$(RUN_TIMER) --label test_llvm_fixtures bash scripts/test_llvm_fixtures.sh
 endif
 
 test_eval:

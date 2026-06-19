@@ -25,6 +25,11 @@ void* hulk_range_create(double start, double end) {
 
 void hulk_runtime_init(void) {}
 
+void hulk_runtime_cast_error(void) {
+    fprintf(stderr, "Runtime error: invalid cast\n");
+    exit(1);
+}
+
 static char* boxed_string_ptr(BoxedValue* boxed) {
     char** slot = (char**)(boxed->data);
     return *slot;
@@ -105,6 +110,44 @@ BoxedValue* hulk_string_concat(BoxedValue* left, BoxedValue* right) {
     char** slot = (char**)(boxed->data);
     *slot = merged;
     return boxed;
+}
+
+int hulk_string_equals(BoxedValue* left, BoxedValue* right) {
+    if (left == NULL || right == NULL) {
+        return 0;
+    }
+    if (left->tag != HULK_TAG_STRING || right->tag != HULK_TAG_STRING) {
+        return 0;
+    }
+    const char* a = boxed_string_ptr(left);
+    const char* b = boxed_string_ptr(right);
+    if (a == NULL || b == NULL) {
+        return a == b;
+    }
+    return strcmp(a, b) == 0;
+}
+
+int hulk_boxed_equals(BoxedValue* left, BoxedValue* right) {
+    if (left == NULL || right == NULL) {
+        return left == right;
+    }
+    if (left->tag != right->tag) {
+        return 0;
+    }
+    if (left->tag == HULK_TAG_NUMBER) {
+        double* a = (double*)(left->data);
+        double* b = (double*)(right->data);
+        return *a == *b;
+    }
+    if (left->tag == HULK_TAG_STRING) {
+        return hulk_string_equals(left, right);
+    }
+    if (left->tag == HULK_TAG_BOOL) {
+        int* a = (int*)(left->data);
+        int* b = (int*)(right->data);
+        return *a == *b;
+    }
+    return 0;
 }
 
 BoxedValue* hulk_string_concat_ws(BoxedValue* left, BoxedValue* right) {

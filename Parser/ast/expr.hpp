@@ -30,6 +30,7 @@ enum class ExprKind {
     WITH,
     CASE_EXPR,
     AS_EXPR,
+    IS_EXPR,
     ASSIGN_EXPR,
     NEW_OBJ,
     BASE_CALL,
@@ -305,6 +306,15 @@ struct AsExpr final : Expr {
 
     ExprPtr object;
     Token as_keyword;
+    Token type_name;
+};
+
+struct IsExpr final : Expr {
+    IsExpr(ExprPtr object, Token is_keyword, Token type_name);
+    void accept(ExprVisitor* visitor) override;
+
+    ExprPtr object;
+    Token is_keyword;
     Token type_name;
 };
 

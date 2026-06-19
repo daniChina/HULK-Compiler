@@ -18,8 +18,8 @@ invalid/15_r4_typo_undefined_function.hulk	semantic	prnt
 invalid/19_block_multi_let_without_in.hulk	parse	BindingTail
 # parse: bloque suelto con lets sin 'in'; distinto de { let x in ...; ... } permitido en M1
 invalid/20_block_stmt_alone.hulk	parse	BindingTail
-# parse: post-M1 'is' es IDENTIFIER; "x is Ghost" no es herencia → error PostfixTail (Ghost)
-invalid/46_e_is_undefined_type.hulk	parse	PostfixTail
+# parse: post-M1 'is' es operador de comparacion; tipo inexistente → error semantico
+invalid/46_e_is_undefined_type.hulk	semantic	Ghost
 invalid/21_a4_redefine_e.hulk	semantic	ya est
 invalid/22_a4_redefine_builtin_sin.hulk	semantic	ya est
 invalid/23_r2_assign_without_let.hulk	semantic	no est

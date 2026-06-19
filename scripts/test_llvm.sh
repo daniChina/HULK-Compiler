@@ -28,7 +28,7 @@ run_smoke() {
     "./${target}"
 }
 
-TOTAL=22
+TOTAL=24
 N=0
 
 next_step() { N=$((N + 1)); echo "$N"; }
@@ -47,6 +47,7 @@ build_smoke "$(next_step)" "$TOTAL" "Codegen/tests/i7_functions_smoke.cpp $COMMO
 build_smoke "$(next_step)" "$TOTAL" "Codegen/tests/i8_builtins_smoke.cpp $COMMON" "llvm_i8_smoke"
 build_smoke "$(next_step)" "$TOTAL" "Codegen/tests/i9_oo_smoke.cpp $COMMON" "llvm_i9_smoke"
 build_smoke "$(next_step)" "$TOTAL" "Codegen/tests/i10_inherit_smoke.cpp $COMMON" "llvm_i10_smoke"
+build_smoke "$(next_step)" "$TOTAL" "Codegen/tests/i11_is_as_smoke.cpp $COMMON" "llvm_i11_smoke"
 
 run_smoke "$(next_step)" "$TOTAL" "llvm_i0_smoke"
 run_smoke "$(next_step)" "$TOTAL" "llvm_i1_smoke"
@@ -59,5 +60,6 @@ run_smoke "$(next_step)" "$TOTAL" "llvm_i7_smoke"
 run_smoke "$(next_step)" "$TOTAL" "llvm_i8_smoke"
 run_smoke "$(next_step)" "$TOTAL" "llvm_i9_smoke"
 run_smoke "$(next_step)" "$TOTAL" "llvm_i10_smoke"
+run_smoke "$(next_step)" "$TOTAL" "llvm_i11_smoke"
 
-echo "[test_llvm] I0–I10 OK" >&2
+echo "[test_llvm] I0–I11 OK" >&2

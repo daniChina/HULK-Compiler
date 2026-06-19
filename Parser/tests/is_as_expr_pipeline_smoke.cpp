@@ -164,11 +164,14 @@ int main() {
             "})\n"
             ")");
 
-        ok &= expect_parse_failure(
-            "pipeline rejects bare is identifier as binary operator",
+        ok &= expect_program_ast(
+            "pipeline parses is type check at comparison level",
             grammar,
             ll1_table,
-            "x is Person;");
+            "x is Person;",
+            "Program(\n"
+            "  ExprStmt(Is(Identifier(x), Person))\n"
+            ")");
 
         return ok ? 0 : 1;
     } catch (const std::exception& error) {

@@ -154,8 +154,8 @@ IDENT       {ALPHA}{ALNUM_}*
 "new"         { UPD(NEW);        }
 "inherits"    { UPD(INHERITS);   }
 "self"        { UPD(SELF);       }
-"base"("      { UPD(BASE);       }
 "as"          { UPD(AS);         }
+"is"          { UPD(IS);         }
 "and"         { UPD(AND);        }
 "or"          { UPD(OR);         }
 "repeat"      { UPD(REPEAT);     }

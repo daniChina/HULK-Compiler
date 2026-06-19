@@ -334,6 +334,16 @@ void AsExpr::accept(ExprVisitor* visitor) {
     visitor->visit(this);
 }
 
+IsExpr::IsExpr(ExprPtr object, Token is_keyword, Token type_name)
+    : Expr(ExprKind::IS_EXPR),
+      object(std::move(object)),
+      is_keyword(std::move(is_keyword)),
+      type_name(std::move(type_name)) {}
+
+void IsExpr::accept(ExprVisitor* visitor) {
+    visitor->visit(this);
+}
+
 AssignExpr::AssignExpr(ExprPtr lhs, Token op, ExprPtr rhs)
     : Expr(ExprKind::ASSIGN_EXPR),
       lhs(std::move(lhs)),
@@ -546,6 +556,10 @@ std::string expr_to_string(const Expr& expr) {
         case ExprKind::AS_EXPR: {
             const auto& as_expr = static_cast<const AsExpr&>(expr);
             return "As(" + expr_to_string(*as_expr.object) + ", " + as_expr.type_name.lexeme + ")";
+        }
+        case ExprKind::IS_EXPR: {
+            const auto& is_expr = static_cast<const IsExpr&>(expr);
+            return "Is(" + expr_to_string(*is_expr.object) + ", " + is_expr.type_name.lexeme + ")";
         }
         case ExprKind::ASSIGN_EXPR: {
             const auto& assign_expr = static_cast<const AssignExpr&>(expr);

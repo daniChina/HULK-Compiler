@@ -196,6 +196,7 @@ CmpExprTail     -> LESS ConcatExpr CmpExprTail
                 | GREATER_EQUAL ConcatExpr CmpExprTail
                 | EQUAL_EQUAL ConcatExpr CmpExprTail
                 | BANG_EQUAL ConcatExpr CmpExprTail
+                | IS IDENTIFIER CmpExprTail
                 | ε
 
 ConcatExpr      -> AddExpr ConcatExprTail

@@ -67,6 +67,8 @@ void LLVMCodeGenerator::initialize(const std::string& module_name) {
     class_info_.clear();
     class_methods_.clear();
     method_mangled_names_.clear();
+    class_name_globals_.clear();
+    value_instance_types_.clear();
     current_self_alloca_ = nullptr;
     current_self_class_ = nullptr;
     current_method_name_.clear();
@@ -209,10 +211,34 @@ std::string LLVMCodeGenerator::mangleMethodName(const std::string& class_name,
 }
 
 llvm::Type* LLVMCodeGenerator::llvmTypeForHulkType(const std::optional<parser::Token>& declared_type) {
-    if (isStringHulkType(declared_type)) {
+    if (!declared_type.has_value()) {
+        return llvm::Type::getDoubleTy(*context_);
+    }
+    const std::string& name = declared_type->lexeme;
+    if (name == "String") {
+        return opaquePtr();
+    }
+    if (name == "Boolean") {
+        return llvm::Type::getInt1Ty(*context_);
+    }
+    if (class_decls_.find(name) != class_decls_.end()) {
         return opaquePtr();
     }
     return llvm::Type::getDoubleTy(*context_);
+}
+
+llvm::Type* LLVMCodeGenerator::semanticTypeForHulkType(const std::optional<parser::Token>& declared_type) {
+    if (declared_type.has_value()) {
+        const std::string& name = declared_type->lexeme;
+        if (name == "String") {
+            return getBoxedValueType();
+        }
+        llvm::StructType* inst_ty = getInstanceStructType(name);
+        if (inst_ty != nullptr) {
+            return inst_ty;
+        }
+    }
+    return llvmTypeForHulkType(declared_type);
 }
 
 bool LLVMCodeGenerator::isStringHulkType(const std::optional<parser::Token>& declared_type) {
@@ -263,6 +289,9 @@ void LLVMCodeGenerator::buildClassStructType(parser::ClassDecl* decl) {
                 seen.insert(field_name);
             }
         }
+    } else {
+        info.field_names.push_back("__hulk_rt_type__");
+        info.field_llvm_types.push_back(opaquePtr());
     }
 
     for (const auto& param : decl->params) {
@@ -318,6 +347,9 @@ llvm::Value* LLVMCodeGenerator::expectFieldValue(llvm::Value* value, llvm::Type*
     }
     if (field_ty->isDoubleTy()) {
         return expectDoubleValue(value, op);
+    }
+    if (field_ty->isIntegerTy(1)) {
+        return expectBoolValue(value, op);
     }
     if (field_ty == opaquePtr()) {
         if (!value->getType()->isPointerTy()) {
@@ -463,6 +495,11 @@ llvm::Value* LLVMCodeGenerator::resolveInstancePtr(parser::Expr* object_expr,
         return nullptr;
     }
     llvm::Type* semantic_type = classifySemanticType(current_value_);
+    llvm::StructType* tracked_struct = resolveInstanceStructType(current_value_);
+    if (tracked_struct != nullptr) {
+        *out_struct = tracked_struct;
+        return current_value_;
+    }
     if (!isInstanceSemanticType(semantic_type)) {
         fail("codegen: no se puede acceder a atributos de un valor no instancia");
         return nullptr;
@@ -523,6 +560,102 @@ bool LLVMCodeGenerator::instanceConformsTo(parser::ClassDecl* dynamic_type,
     return false;
 }
 
+llvm::GlobalVariable* LLVMCodeGenerator::getClassNameGlobal(const std::string& class_name) {
+    const auto it = class_name_globals_.find(class_name);
+    if (it != class_name_globals_.end()) {
+        return it->second;
+    }
+    llvm::GlobalVariable* global = registerStringConstant(class_name);
+    class_name_globals_[class_name] = global;
+    return global;
+}
+
+llvm::Value* LLVMCodeGenerator::loadInstanceRuntimeType(llvm::Value* instance_ptr,
+                                                        llvm::StructType* struct_ty) {
+    llvm::Value* field_ptr = builder_->CreateStructGEP(struct_ty, instance_ptr, 0);
+    return builder_->CreateLoad(opaquePtr(), field_ptr);
+}
+
+void LLVMCodeGenerator::storeInstanceRuntimeType(llvm::Value* instance_ptr,
+                                                 llvm::StructType* struct_ty,
+                                                 const std::string& class_name) {
+    llvm::Value* type_name_ptr =
+        builder_->CreateBitCast(getClassNameGlobal(class_name), opaquePtr());
+    llvm::Value* field_ptr = builder_->CreateStructGEP(struct_ty, instance_ptr, 0);
+    builder_->CreateStore(type_name_ptr, field_ptr);
+}
+
+llvm::Value* LLVMCodeGenerator::emitRuntimeTypeConforms(llvm::Value* runtime_type_ptr,
+                                                         const std::string& target_type) {
+    llvm::Value* result = llvm::ConstantInt::getFalse(*context_);
+    for (const auto& [class_name, decl] : class_decls_) {
+        (void)class_name;
+        if (!instanceConformsTo(decl, target_type)) {
+            continue;
+        }
+        llvm::Value* class_name_ptr =
+            builder_->CreateBitCast(getClassNameGlobal(decl->name.lexeme), opaquePtr());
+        llvm::Value* matches = builder_->CreateICmpEQ(runtime_type_ptr, class_name_ptr);
+        result = builder_->CreateOr(result, matches);
+    }
+    return result;
+}
+
+llvm::Value* LLVMCodeGenerator::emitScalarIsCheck(llvm::Value* value, const std::string& target_type) {
+    llvm::Type* bool_ty = llvm::Type::getInt1Ty(*context_);
+    if (target_type == "Null") {
+        return builder_->CreateICmpEQ(value, llvm::ConstantPointerNull::get(opaquePtr()));
+    }
+    if (target_type == "Number") {
+        return llvm::ConstantInt::get(bool_ty, value->getType()->isDoubleTy());
+    }
+    if (target_type == "Boolean") {
+        return llvm::ConstantInt::get(bool_ty, value->getType()->isIntegerTy(1));
+    }
+    if (target_type == "String") {
+        return llvm::ConstantInt::get(bool_ty, isBoxedValue(value));
+    }
+    return llvm::ConstantInt::getFalse(*context_);
+}
+
+bool LLVMCodeGenerator::isInstanceValue(llvm::Value* value) {
+    if (value == nullptr || !value->getType()->isPointerTy()) {
+        return false;
+    }
+    if (llvm::isa<llvm::ConstantPointerNull>(value)) {
+        return false;
+    }
+    return isInstanceSemanticType(classifySemanticType(value));
+}
+
+llvm::StructType* LLVMCodeGenerator::resolveInstanceStructType(llvm::Value* value) {
+    if (auto it = value_instance_types_.find(value); it != value_instance_types_.end()) {
+        return it->second;
+    }
+    llvm::Type* semantic_type = classifySemanticType(value);
+    if (!isInstanceSemanticType(semantic_type)) {
+        return nullptr;
+    }
+    return llvm::cast<llvm::StructType>(semantic_type);
+}
+
+void LLVMCodeGenerator::trackInstanceType(llvm::Value* value, llvm::StructType* struct_ty) {
+    if (value != nullptr && struct_ty != nullptr) {
+        value_instance_types_[value] = struct_ty;
+    }
+}
+
+void LLVMCodeGenerator::emitCastFailure() {
+    llvm::Function* fail_fn = module_->getFunction("hulk_runtime_cast_error");
+    if (fail_fn == nullptr) {
+        llvm::FunctionType* fail_ty = llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), false);
+        fail_fn = llvm::Function::Create(fail_ty, llvm::Function::ExternalLinkage,
+                                         "hulk_runtime_cast_error", module_.get());
+    }
+    builder_->CreateCall(fail_fn, {});
+    builder_->CreateUnreachable();
+}
+
 llvm::Function* LLVMCodeGenerator::lookupMethod(const std::string& class_name,
                                                 const std::string& method_name,
                                                 std::size_t arity) {
@@ -540,14 +673,15 @@ llvm::Function* LLVMCodeGenerator::lookupMethod(const std::string& class_name,
 
 void LLVMCodeGenerator::declareClassMethods(parser::ClassDecl* decl) {
     const std::string& class_name = decl->name.lexeme;
-    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
     llvm::Type* self_ty = opaquePtr();
 
     for (const auto& method : decl->methods) {
         const std::size_t arity = method.params.size();
         std::vector<llvm::Type*> param_types;
         param_types.push_back(self_ty);
-        param_types.insert(param_types.end(), arity, double_ty);
+        for (const auto& param : method.params) {
+            param_types.push_back(llvmTypeForHulkType(param.second));
+        }
         llvm::FunctionType* fn_type = llvm::FunctionType::get(opaquePtr(), param_types, false);
         const std::string mangled = mangleMethodName(class_name, method.name.lexeme, arity);
         method_mangled_names_.push_back(mangled);
@@ -583,7 +717,6 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
     scopes_.push_back(std::make_unique<LLVMScope>());
     current_scope_ = scopes_.back().get();
 
-    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
     llvm::Function::arg_iterator arg_it = fn->arg_begin();
     llvm::Value* self_arg = &*arg_it;
     ++arg_it;
@@ -594,10 +727,11 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
     current_method_name_ = method.name.lexeme;
 
     for (const auto& param : method.params) {
-        llvm::AllocaInst* alloca = builder_->CreateAlloca(double_ty, nullptr, "");
+        llvm::Type* param_ty = llvmTypeForHulkType(param.second);
+        llvm::AllocaInst* alloca = builder_->CreateAlloca(param_ty, nullptr, "");
         builder_->CreateStore(&*arg_it, alloca);
         current_scope_->variables[param.first.lexeme] = alloca;
-        current_scope_->variable_types[param.first.lexeme] = double_ty;
+        current_scope_->variable_types[param.first.lexeme] = semanticTypeForHulkType(param.second);
         ++arg_it;
     }
 
@@ -664,40 +798,93 @@ void LLVMCodeGenerator::emitMethodCall(parser::Expr* object_expr, const std::str
         return;
     }
 
-    const MethodResolution resolution = resolveMethod(info->decl, method_name);
-    if (resolution.method == nullptr || resolution.declaring_class == nullptr) {
+    const MethodResolution static_resolution = resolveMethod(info->decl, method_name);
+    if (static_resolution.method == nullptr) {
         fail("Metodo no definido: " + method_name);
         return;
     }
-    if (resolution.method->params.size() != args.size()) {
-        fail("El metodo '" + method_name + "' espera " + std::to_string(resolution.method->params.size()) +
-             " argumento(s)");
+    if (static_resolution.method->params.size() != args.size()) {
+        fail("El metodo '" + method_name + "' espera " +
+             std::to_string(static_resolution.method->params.size()) + " argumento(s)");
         return;
     }
 
-    llvm::Function* fn =
-        lookupMethod(resolution.declaring_class->name.lexeme, method_name, args.size());
-    if (fn == nullptr) {
-        fail("Metodo interno '" + method_name + "' no declarado");
+    std::vector<parser::ClassDecl*> dispatch_classes;
+    dispatch_classes.reserve(class_decls_.size());
+    for (const auto& [class_name, decl] : class_decls_) {
+        (void)class_name;
+        const MethodResolution candidate = resolveMethod(decl, method_name);
+        if (candidate.method != nullptr && candidate.method->params.size() == args.size()) {
+            dispatch_classes.push_back(decl);
+        }
+    }
+    if (dispatch_classes.empty()) {
+        fail("Metodo no definido: " + method_name);
         return;
     }
 
     std::vector<llvm::Value*> arg_values;
-    arg_values.reserve(args.size() + 1);
-    arg_values.push_back(instance_ptr);
-    for (const auto& arg : args) {
-        arg->accept(this);
+    arg_values.reserve(args.size());
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        args[i]->accept(this);
         if (had_error_) {
             return;
         }
-        llvm::Value* value = expectDoubleValue(current_value_, method_name);
+        llvm::Type* param_ty = llvmTypeForHulkType(static_resolution.method->params[i].second);
+        llvm::Value* value = expectFieldValue(current_value_, param_ty, method_name);
         if (value == nullptr) {
             return;
         }
         arg_values.push_back(value);
     }
 
-    current_value_ = builder_->CreateCall(fn, arg_values);
+    llvm::Value* runtime_type = loadInstanceRuntimeType(instance_ptr, struct_ty);
+
+    llvm::Function* parent_fn = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "meth.merge", parent_fn);
+    llvm::BasicBlock* next_check = builder_->GetInsertBlock();
+
+    builder_->SetInsertPoint(merge_bb);
+    llvm::PHINode* result_phi =
+        builder_->CreatePHI(opaquePtr(), dispatch_classes.size(), "meth.result");
+
+    for (parser::ClassDecl* decl : dispatch_classes) {
+        const std::string& class_name = decl->name.lexeme;
+        llvm::BasicBlock* call_bb =
+            llvm::BasicBlock::Create(*context_, "meth.call." + class_name, parent_fn);
+        llvm::BasicBlock* cont_bb =
+            llvm::BasicBlock::Create(*context_, "meth.cont." + class_name, parent_fn);
+
+        builder_->SetInsertPoint(next_check);
+        llvm::Value* class_name_ptr =
+            builder_->CreateBitCast(getClassNameGlobal(class_name), opaquePtr());
+        llvm::Value* matches = builder_->CreateICmpEQ(runtime_type, class_name_ptr);
+        builder_->CreateCondBr(matches, call_bb, cont_bb);
+
+        builder_->SetInsertPoint(call_bb);
+        const MethodResolution resolution = resolveMethod(decl, method_name);
+        llvm::Function* fn = lookupMethod(resolution.declaring_class->name.lexeme, method_name,
+                                           args.size());
+        if (fn == nullptr) {
+            fail("Metodo interno '" + method_name + "' no declarado");
+            return;
+        }
+
+        std::vector<llvm::Value*> call_args;
+        call_args.push_back(instance_ptr);
+        call_args.insert(call_args.end(), arg_values.begin(), arg_values.end());
+        llvm::Value* call_result = builder_->CreateCall(fn, call_args);
+        result_phi->addIncoming(call_result, call_bb);
+        builder_->CreateBr(merge_bb);
+
+        next_check = cont_bb;
+    }
+
+    builder_->SetInsertPoint(next_check);
+    emitCastFailure();
+
+    builder_->SetInsertPoint(merge_bb);
+    current_value_ = result_phi;
 }
 
 void LLVMCodeGenerator::registerPrintDeclarations() {
@@ -722,6 +909,11 @@ void LLVMCodeGenerator::registerPrintDeclarations() {
     llvm::FunctionType* concat_ty = llvm::FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
     module_->getOrInsertFunction("hulk_string_concat", concat_ty);
     module_->getOrInsertFunction("hulk_string_concat_ws", concat_ty);
+
+    llvm::FunctionType* string_eq_ty =
+        llvm::FunctionType::get(llvm::Type::getInt32Ty(*context_), {ptr_ty, ptr_ty}, false);
+    module_->getOrInsertFunction("hulk_string_equals", string_eq_ty);
+    module_->getOrInsertFunction("hulk_boxed_equals", string_eq_ty);
 }
 
 void LLVMCodeGenerator::enterScope() {
@@ -1020,6 +1212,70 @@ llvm::Value* LLVMCodeGenerator::expectDoubleValue(llvm::Value* value, const std:
     return value;
 }
 
+llvm::Value* LLVMCodeGenerator::unboxDoubleValue(llvm::Value* value, const std::string& op) {
+    if (value == nullptr) {
+        fail("codegen: valor nulo en " + op);
+        return nullptr;
+    }
+    if (value->getType()->isDoubleTy()) {
+        return value;
+    }
+    if (isBoxedValue(value)) {
+        llvm::StructType* boxed_ty = getBoxedValueType();
+        llvm::Value* struct_ptr =
+            builder_->CreateBitCast(value, boxed_ty->getPointerTo(), "boxed_num_ptr");
+        llvm::Value* data_gep = builder_->CreateStructGEP(boxed_ty, struct_ptr, 1, "boxed_num_data");
+        return builder_->CreateLoad(llvm::Type::getDoubleTy(*context_), data_gep, "unboxed_num");
+    }
+    fail("Operador '" + op + "' requiere operandos numericos");
+    return nullptr;
+}
+
+llvm::Value* LLVMCodeGenerator::unboxBoolValue(llvm::Value* value, const std::string& op) {
+    if (value == nullptr) {
+        fail("codegen: valor nulo en " + op);
+        return nullptr;
+    }
+    if (value->getType()->isIntegerTy(1)) {
+        return value;
+    }
+    if (isBoxedValue(value)) {
+        llvm::StructType* boxed_ty = getBoxedValueType();
+        llvm::Value* struct_ptr =
+            builder_->CreateBitCast(value, boxed_ty->getPointerTo(), "boxed_bool_ptr");
+        llvm::Value* data_gep = builder_->CreateStructGEP(boxed_ty, struct_ptr, 1, "boxed_bool_data");
+        return builder_->CreateLoad(llvm::Type::getInt1Ty(*context_), data_gep, "unboxed_bool");
+    }
+    fail("Operador '" + op + "' requiere operandos booleanos");
+    return nullptr;
+}
+
+llvm::Value* LLVMCodeGenerator::coerceStringBoxed(llvm::Value* value, const std::string& op) {
+    if (value == nullptr) {
+        fail("codegen: valor nulo en " + op);
+        return nullptr;
+    }
+    if (isBoxedValue(value)) {
+        return value;
+    }
+    if (value->getType()->isPointerTy()) {
+        return createBoxedFromString(value);
+    }
+    fail("Operador '" + op + "' requiere operandos string");
+    return nullptr;
+}
+
+llvm::Value* LLVMCodeGenerator::emitBoxedEquality(llvm::Value* left, llvm::Value* right, bool equal) {
+    llvm::Function* fn = module_->getFunction("hulk_boxed_equals");
+    llvm::Value* cmp_i32 = builder_->CreateCall(fn, {left, right}, "boxed_eq");
+    llvm::Value* cmp_bool = builder_->CreateICmpNE(
+        cmp_i32, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), 0), "boxed_eq_bool");
+    if (equal) {
+        return cmp_bool;
+    }
+    return builder_->CreateNot(cmp_bool, "boxed_ne");
+}
+
 llvm::Value* LLVMCodeGenerator::defaultValueForType(llvm::Type* type) {
     if (type == nullptr) {
         return llvm::ConstantFP::get(llvm::Type::getDoubleTy(*context_), 0.0);
@@ -1149,14 +1405,25 @@ void LLVMCodeGenerator::visit(parser::LetExpr* expr) {
 
     llvm::Value* init_value = current_value_;
     llvm::Type* var_type = nullptr;
-    if (expr->initializer->kind == parser::ExprKind::NEW_OBJ) {
+    if (expr->declared_type.has_value()) {
+        const std::string& declared = expr->declared_type->lexeme;
+        if (class_decls_.find(declared) != class_decls_.end()) {
+            var_type = getInstanceStructType(declared);
+            if (var_type == nullptr) {
+                fail("codegen: tipo de instancia no registrado para let");
+                return;
+            }
+        }
+    }
+    if (var_type == nullptr && expr->initializer->kind == parser::ExprKind::NEW_OBJ) {
         const auto* new_expr = static_cast<const parser::NewExpr*>(expr->initializer.get());
         var_type = getInstanceStructType(new_expr->type_name.lexeme);
         if (var_type == nullptr) {
             fail("codegen: tipo de instancia no registrado para let");
             return;
         }
-    } else {
+    }
+    if (var_type == nullptr) {
         var_type = classifySemanticType(init_value);
     }
     llvm::Type* storage_ty = init_value->getType();
@@ -1238,6 +1505,10 @@ llvm::Type* LLVMCodeGenerator::classifySemanticType(llvm::Value* value) {
                 return getBoxedValueType();
             }
         }
+    }
+
+    if (auto it = value_instance_types_.find(value); it != value_instance_types_.end()) {
+        return it->second;
     }
 
     if (auto* cast = llvm::dyn_cast<llvm::BitCastInst>(value)) {
@@ -1529,31 +1800,63 @@ void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
     }
 
     if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "==" || op == "!=") {
-        if (left->getType()->isDoubleTy() && right->getType()->isDoubleTy()) {
-            llvm::CmpInst::Predicate pred = llvm::CmpInst::FCMP_OEQ;
-            if (op == "<") {
-                pred = llvm::CmpInst::FCMP_OLT;
-            } else if (op == "<=") {
+        if (op == "==" || op == "!=") {
+            if (left->getType()->isIntegerTy(1) && right->getType()->isIntegerTy(1)) {
+                if (op == "==") {
+                    current_value_ = builder_->CreateICmpEQ(left, right, "cmp");
+                } else {
+                    current_value_ = builder_->CreateICmpNE(left, right, "cmp");
+                }
+                return;
+            }
+
+            if (isBoxedValue(left) && isBoxedValue(right)) {
+                current_value_ = emitBoxedEquality(left, right, op == "==");
+                return;
+            }
+
+            const bool left_numeric =
+                left->getType()->isDoubleTy() || (left->getType()->isPointerTy() && isBoxedValue(left));
+            const bool right_numeric =
+                right->getType()->isDoubleTy() || (right->getType()->isPointerTy() && isBoxedValue(right));
+            if (left_numeric && right_numeric) {
+                left = unboxDoubleValue(left, op);
+                right = unboxDoubleValue(right, op);
+                if (left == nullptr || right == nullptr) {
+                    return;
+                }
+                if (op == "==") {
+                    current_value_ = builder_->CreateFCmpOEQ(left, right, "cmp");
+                } else {
+                    current_value_ = builder_->CreateFCmpONE(left, right, "cmp");
+                }
+                return;
+            }
+
+            fail("Operador binario no soportado: " + op);
+            return;
+        }
+
+        const bool left_numeric =
+            left->getType()->isDoubleTy() || (left->getType()->isPointerTy() && isBoxedValue(left));
+        const bool right_numeric =
+            right->getType()->isDoubleTy() || (right->getType()->isPointerTy() && isBoxedValue(right));
+        if (left_numeric && right_numeric) {
+            left = unboxDoubleValue(left, op);
+            right = unboxDoubleValue(right, op);
+            if (left == nullptr || right == nullptr) {
+                return;
+            }
+
+            llvm::CmpInst::Predicate pred = llvm::CmpInst::FCMP_OLT;
+            if (op == "<=") {
                 pred = llvm::CmpInst::FCMP_OLE;
             } else if (op == ">") {
                 pred = llvm::CmpInst::FCMP_OGT;
             } else if (op == ">=") {
                 pred = llvm::CmpInst::FCMP_OGE;
-            } else if (op == "!=") {
-                pred = llvm::CmpInst::FCMP_ONE;
             }
             current_value_ = builder_->CreateFCmp(pred, left, right, "cmp");
-            return;
-        }
-
-        if (left->getType()->isIntegerTy(1) && right->getType()->isIntegerTy(1)) {
-            if (op == "==") {
-                current_value_ = builder_->CreateICmpEQ(left, right, "cmp");
-            } else if (op == "!=") {
-                current_value_ = builder_->CreateICmpNE(left, right, "cmp");
-            } else {
-                fail("Operador binario no soportado: " + op);
-            }
             return;
         }
 
@@ -1562,8 +1865,9 @@ void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
     }
 
     if (op == "@" || op == "@@") {
-        if (!isBoxedValue(left) || !isBoxedValue(right)) {
-            fail("Operador '" + op + "' requiere operandos string");
+        left = coerceStringBoxed(left, op);
+        right = coerceStringBoxed(right, op);
+        if (left == nullptr || right == nullptr) {
             return;
         }
         const char* fn_name = op == "@" ? "hulk_string_concat" : "hulk_string_concat_ws";
@@ -1977,6 +2281,31 @@ void LLVMCodeGenerator::visit(parser::GetAttrExpr* expr) {
     }
 
     current_value_ = loadInstanceField(instance_ptr, struct_ty, info->decl, expr->name.lexeme);
+    if (had_error_) {
+        return;
+    }
+
+    const std::string& field_name = expr->name.lexeme;
+    for (const auto& attr : info->decl->attributes) {
+        if (attr.name.lexeme != field_name || !attr.declared_type.has_value()) {
+            continue;
+        }
+        llvm::StructType* field_struct = getInstanceStructType(attr.declared_type->lexeme);
+        if (field_struct != nullptr) {
+            trackInstanceType(current_value_, field_struct);
+        }
+        break;
+    }
+    for (const auto& param : info->decl->params) {
+        if (param.first.lexeme != field_name || !param.second.has_value()) {
+            continue;
+        }
+        llvm::StructType* field_struct = getInstanceStructType(param.second->lexeme);
+        if (field_struct != nullptr) {
+            trackInstanceType(current_value_, field_struct);
+        }
+        break;
+    }
 }
 
 void LLVMCodeGenerator::visit(parser::NewExpr* expr) {
@@ -2026,6 +2355,8 @@ void LLVMCodeGenerator::visit(parser::NewExpr* expr) {
     llvm::Value* raw_ptr = builder_->CreateCall(malloc_fn, {size});
     llvm::Value* instance_ptr = builder_->CreateBitCast(raw_ptr, opaquePtr());
 
+    storeInstanceRuntimeType(instance_ptr, info->struct_ty, type_name);
+
     for (std::size_t i = 0; i < type_def->params.size(); ++i) {
         storeInstanceField(instance_ptr, info->struct_ty, type_def, type_def->params[i].first.lexeme,
                            ctor_args[i]);
@@ -2070,6 +2401,7 @@ void LLVMCodeGenerator::visit(parser::NewExpr* expr) {
 
     std::string inst_name = "inst_" + type_name;
     current_value_ = builder_->CreateBitCast(instance_ptr, opaquePtr(), inst_name);
+    trackInstanceType(current_value_, info->struct_ty);
 }
 
 void LLVMCodeGenerator::visit(parser::BaseCallExpr* expr) {
@@ -2103,27 +2435,55 @@ void LLVMCodeGenerator::visit(parser::BaseCallExpr* expr) {
     current_value_ = builder_->CreateCall(fn, {self_ptr});
 }
 
+void LLVMCodeGenerator::visit(parser::IsExpr* expr) {
+    expr->object->accept(this);
+    if (had_error_) {
+        return;
+    }
+
+    const std::string& target = expr->type_name.lexeme;
+    if (class_decls_.find(target) == class_decls_.end() &&
+        target != "Number" && target != "String" && target != "Boolean" && target != "Null") {
+        fail("Tipo no registrado: " + target);
+        return;
+    }
+
+    if (isInstanceValue(current_value_)) {
+        llvm::StructType* struct_ty = resolveInstanceStructType(current_value_);
+        if (struct_ty == nullptr) {
+            fail("codegen: tipo de instancia desconocido en 'is'");
+            return;
+        }
+        llvm::Value* runtime_type = loadInstanceRuntimeType(current_value_, struct_ty);
+        current_value_ = emitRuntimeTypeConforms(runtime_type, target);
+        return;
+    }
+
+    current_value_ = emitScalarIsCheck(current_value_, target);
+}
+
 void LLVMCodeGenerator::visit(parser::AsExpr* expr) {
     expr->object->accept(this);
     if (had_error_) {
         return;
     }
 
-    llvm::Type* semantic_type = classifySemanticType(current_value_);
-    if (!isInstanceSemanticType(semantic_type)) {
-        fail("codegen: 'as' requiere instancia en I10");
-        return;
-    }
-
-    ClassInfo* info = lookupClassInfoByStruct(llvm::cast<llvm::StructType>(semantic_type));
-    if (info == nullptr || info->decl == nullptr) {
-        fail("codegen: tipo de instancia desconocido en 'as'");
-        return;
-    }
-
     const std::string& target = expr->type_name.lexeme;
-    if (!instanceConformsTo(info->decl, target)) {
-        fail("No se puede convertir de " + info->decl->name.lexeme + " a " + target);
+
+    if (!isInstanceValue(current_value_)) {
+        if (target == "Null" && llvm::isa<llvm::ConstantPointerNull>(current_value_)) {
+            return;
+        }
+        if (target == "Number" && current_value_->getType()->isDoubleTy()) {
+            return;
+        }
+        if (target == "Boolean" && current_value_->getType()->isIntegerTy(1)) {
+            return;
+        }
+        if (target == "String" && isBoxedValue(current_value_)) {
+            return;
+        }
+        fail("No se puede convertir valor a " + target);
         return;
     }
 
@@ -2132,7 +2492,30 @@ void LLVMCodeGenerator::visit(parser::AsExpr* expr) {
         return;
     }
 
-    current_value_ = builder_->CreateBitCast(current_value_, opaquePtr(), "inst_" + target);
+    llvm::StructType* struct_ty = resolveInstanceStructType(current_value_);
+    if (struct_ty == nullptr) {
+        fail("codegen: tipo de instancia desconocido en 'as'");
+        return;
+    }
+
+    llvm::Value* runtime_type = loadInstanceRuntimeType(current_value_, struct_ty);
+    llvm::Value* conforms = emitRuntimeTypeConforms(runtime_type, target);
+
+    llvm::Function* parent_fn = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* ok_bb = llvm::BasicBlock::Create(*context_, "as.ok", parent_fn);
+    llvm::BasicBlock* fail_bb = llvm::BasicBlock::Create(*context_, "as.fail", parent_fn);
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "as.end", parent_fn);
+
+    builder_->CreateCondBr(conforms, ok_bb, fail_bb);
+    builder_->SetInsertPoint(fail_bb);
+    emitCastFailure();
+    builder_->SetInsertPoint(ok_bb);
+    llvm::StructType* target_struct = getInstanceStructType(target);
+    llvm::Value* casted = builder_->CreateBitCast(current_value_, opaquePtr(), "inst_" + target);
+    trackInstanceType(casted, target_struct);
+    builder_->CreateBr(merge_bb);
+    builder_->SetInsertPoint(merge_bb);
+    current_value_ = casted;
 }
 
 void LLVMCodeGenerator::visit(parser::MethodCallExpr* expr) {
@@ -2169,11 +2552,44 @@ void LLVMCodeGenerator::visit(parser::SetAttrExpr* expr) {
     current_value_ = value;
 }
 
+void LLVMCodeGenerator::visit(parser::UnaryExpr* expr) {
+    expr->right->accept(this);
+    if (had_error_) {
+        return;
+    }
+
+    const std::string& op = expr->op.lexeme;
+    if (op == "-") {
+        llvm::Value* val = current_value_;
+        if (!val->getType()->isDoubleTy()) {
+            val = unboxDoubleValue(val, op);
+        }
+        if (val == nullptr) {
+            return;
+        }
+        current_value_ = builder_->CreateFNeg(val, "neg");
+        return;
+    }
+
+    if (op == "!" || op == "not") {
+        llvm::Value* val = current_value_;
+        if (!val->getType()->isIntegerTy(1)) {
+            val = unboxBoolValue(val, op);
+        }
+        if (val == nullptr) {
+            return;
+        }
+        current_value_ = builder_->CreateNot(val, "not");
+        return;
+    }
+
+    fail("Operador unario no soportado: " + op);
+}
+
 void LLVMCodeGenerator::visit(parser::GroupedExpr* expr) {
     expr->expression->accept(this);
 }
 
-HULK_VISIT_STUB(UnaryExpr)
 HULK_VISIT_STUB(WithExpr)
 HULK_VISIT_STUB(CaseExpr)
 HULK_VISIT_STUB(UnlessExpr)

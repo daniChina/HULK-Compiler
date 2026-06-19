@@ -1019,6 +1019,15 @@ void Phase2Analyzer::visit(parser::CaseExpr* expr) {
     current_type_ = TypeInfo::getLowestCommonAncestor(branch_types);
 }
 
+void Phase2Analyzer::visit(parser::IsExpr* expr) {
+    visitExpr(expr->object.get());
+    if (!validateTypeExists(expr->type_name)) {
+        current_type_ = TypeInfo(TypeInfo::Kind::Boolean);
+        return;
+    }
+    current_type_ = TypeInfo::Boolean();
+}
+
 void Phase2Analyzer::visit(parser::AsExpr* expr) {
     visitExpr(expr->object.get());
     TypeInfo obj_type = current_type_;

@@ -504,6 +504,13 @@ ExprPtr build_cmp_tail(ExprPtr left, const CstNode& node) {
     }
 
     const auto& op_node = child(node, 0);
+    if (op_node.token.type == TokenType::IS) {
+        Token is_keyword = op_node.token;
+        Token type_name = child(node, 1).token;
+        auto is_expr = std::make_unique<IsExpr>(std::move(left), std::move(is_keyword), std::move(type_name));
+        return build_cmp_tail(std::move(is_expr), child(node, 2));
+    }
+
     Token op = op_node.token;
     ExprPtr right = build_concat_expr(child(node, 1));
     auto new_left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));

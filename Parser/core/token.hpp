@@ -35,6 +35,7 @@ enum class TokenType {
     SELF,
     BASE,
     AS,
+    IS,
     AND,
     OR,
     REPEAT,
@@ -113,6 +114,7 @@ inline const char* token_name(TokenType type) {
         case TokenType::SELF: return "SELF";
         case TokenType::BASE: return "BASE";
         case TokenType::AS: return "AS";
+        case TokenType::IS: return "IS";
         case TokenType::AND: return "AND";
         case TokenType::OR: return "OR";
         case TokenType::REPEAT: return "REPEAT";

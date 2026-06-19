@@ -46,3 +46,7 @@ valid/04_method_call.hulk    llvm_ok    @hulk_meth_Counter_inc_0
 # I10 — herencia / base / as (oracle E2E en Codegen/tests/i10_inherit_smoke.cpp)
 valid/05_inherit_base.hulk   llvm_ok    @hulk_meth_Person_greet_0
 valid/06_as_method.hulk      llvm_ok    @hulk_meth_Sub_twice_0
+
+# I11 — is / as completo (oracle E2E en Codegen/tests/i11_is_as_smoke.cpp)
+valid/07_is_sub.hulk         llvm_ok    icmp
+valid/08_as_polymorphic.hulk llvm_ok    as.ok
