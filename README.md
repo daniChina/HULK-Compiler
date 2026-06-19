@@ -4,59 +4,172 @@ Compilador del lenguaje **HULK** (lexer, parser LL(1), analisis semantico, inter
 
 ---
 
+
+
+##Correr mi propio codigo HULK
+cd ~/Documents/3er\ Ano/2do\ SEMESTRE/COMPILACION/compiler/HULK-Compiler
+export PATH=/usr/lib/llvm-21/bin:$PATH
+
+nano playground/mi_programa.hulk
+# (pega el ejemplo greet + print)
+
+./hulk playground/mi_programa.hulk --interpret    # ver salida rápido
+./hulk playground/mi_programa.hulk && ./output    # compilar y ejecutar nativo
+
 ## Ejecutar un programa `.hulk`
+
 
 ### 1. Compilar el compilador (una vez)
 
-Desde la raiz del repo, con `g++`, `flex++` y `make` disponibles (MSYS2 en Windows):
+**Ubuntu (LLVM 21 — Fase 4):**
 
 ```bash
-make compile
+cd ~/Documents/3er\ Ano/2do\ SEMESTRE/COMPILACION/compiler/HULK-Compiler
+# o: cd ~/HULK-Compiler   (symlink sin espacios, opcional)
+
+export LLVM_CONFIG=llvm-config-21
+export PATH=/usr/lib/llvm-21/bin:$PATH
+# opcional permanente: source scripts/setup_ubuntu_env.sh --persist
+# opcional esta sesión: source scripts/setup_ubuntu_env.sh
+
+make compile    # ~1–2 min → hulk_c.exe
+make build      # → ./hulk (Linux: compila con -O2)
 ```
 
-Genera `hulk_c.exe` en la raiz.
+Sin `clang` en PATH, `./hulk` falla al generar `./output` (`clang no está en PATH`). Tras `apt install clang-21`, añade `/usr/lib/llvm-21/bin` al PATH como arriba.
 
-**Contrato matcom (CI):**
+**Windows (MSYS2 UCRT64):**
 
 ```bash
-make build          # → ./hulk en raíz
-./hulk programa.hulk   # sin flags: genera ./output o stderr (line,col) TYPE: msg
+make compile    # → hulk_c.exe
+make build      # copia a ./hulk
 ```
 
 
-### 2. Escribir codigo
+### 2. Escribir tu código HULK
 
-Crea un archivo `.hulk` en la carpeta **`playground/`** (o en cualquier ruta). Ejemplo incluido: `playground/hello.hulk`.
+Crea un archivo en **`playground/`** (o cualquier ruta):
 
-### 3. Ejecutarlo
+```bash
+nano playground/mi_programa.hulk
+```
 
-Por defecto corre **semantica + evaluador** y muestra la salida o los errores.
+Ejemplo:
 
-**Windows (PowerShell)** — desde la raiz del repo:
+```hulk
+function greet(name: String): String {
+    "Hola, " @ name @ "!";
+}
+
+print(greet("mundo"));
+```
+
+También hay ejemplo en `playground/hello.hulk`.
+
+### 3. Modos de uso (Linux)
+
+| Objetivo | Comando | Qué hace |
+|----------|---------|----------|
+| **Ver errores** (lex / sintaxis / semántica) | `./hulk mi_programa.hulk` | Modo matcom: compila a `./output` o muestra errores en stderr |
+| **Ejecutar rápido** (sin binario nativo) | `./hulk mi_programa.hulk --interpret` | Intérprete: imprime la salida en stdout |
+| **Solo semántica** | `./hulk mi_programa.hulk --semantic` | `Semantic OK` o lista de errores |
+| **Depuración** (tokens / AST) | `./hulk mi_programa.hulk --tokens --ast` | Modo desarrollo |
+
+**Script cómodo** (desde la raíz):
+
+```bash
+./scripts/run_hulk.sh playground/mi_programa.hulk              # intérprete
+./scripts/run_hulk.sh --semantic-only playground/mi_programa.hulk
+./scripts/run_hulk.sh --pipeline playground/mi_programa.hulk   # lexer → parser → sem → eval
+```
+
+**Windows (PowerShell):**
 
 ```powershell
 .\scripts\run_hulk.ps1 playground\hello.hulk
+.\scripts\run_hulk.ps1 -Pipeline playground\hello.hulk
 ```
 
-Sin argumentos usa el ejemplo por defecto:
-
-```powershell
-.\scripts\run_hulk.ps1
-```
-
-**Linux / macOS / MSYS:**
+**Make (intérprete):**
 
 ```bash
-chmod +x scripts/run_hulk.sh
-./scripts/run_hulk.sh playground/hello.hulk
-```
-
-O con Make:
-
-```bash
-make run                           # playground/hello.hulk
-make run FILE=playground/mi_app.hulk
+make run FILE=playground/mi_programa.hulk
 make run-pipeline FILE=playground/hello.hulk
+```
+
+### 4. Código válido → binario nativo `./output`
+
+```bash
+./hulk playground/mi_programa.hulk
+```
+
+- **Exit 0** → se generó `./output` (ejecutable Linux x86_64).
+- **Exit 1 / 2 / 3** → error en stderr, formato matcom:
+
+```
+(line,col) LEXICAL: ...
+(line,col) SYNTACTIC: ...
+(line,col) SEMANTIC: ...
+```
+
+Ejemplo de error léxico:
+
+```bash
+printf 'let x = $bad in print(x);\n' > /tmp/malo.hulk
+./hulk /tmp/malo.hulk
+# stderr: (1,9) LEXICAL: unexpected character '$'
+# exit: 1
+```
+
+### 5. Ver la salida del programa compilado
+
+```bash
+./hulk playground/mi_programa.hulk   # genera ./output si no hay errores
+./output                             # stdout del programa
+echo $?                              # exit del programa (no del compilador)
+```
+
+Comparar intérprete vs binario (deben coincidir):
+
+```bash
+./hulk playground/mi_programa.hulk --interpret
+./hulk playground/mi_programa.hulk && ./output
+```
+
+### 6. Qué es `./output`
+
+`./hulk` **no ejecuta** el programa directamente: genera un ejecutable nativo `./output` en el directorio actual.
+
+Pipeline interno:
+
+```
+tu.hulk → análisis → LLVM IR (.hulk_out.ll) → clang + Codegen/runtime.c → ./output
+```
+
+| Archivo | Rol |
+|---------|-----|
+| `./output` | Ejecutable final (ELF 64-bit en Linux) |
+| `.hulk_out.ll` | IR LLVM (depuración) |
+
+Qué puedes hacer con `./output`: ejecutarlo (`./output`), depurarlo (`gdb ./output`), copiarlo a otra máquina Linux x86_64.
+
+### 7. Resumen rápido (Ubuntu)
+
+```bash
+cd ~/Documents/3er\ Ano/2do\ SEMESTRE/COMPILACION/compiler/HULK-Compiler
+export LLVM_CONFIG=llvm-config-21
+export PATH=/usr/lib/llvm-21/bin:$PATH
+
+make build
+
+# Errores de compilación
+./hulk playground/mi_programa.hulk 2>&1
+
+# Ejecutar rápido (intérprete)
+./hulk playground/mi_programa.hulk --interpret
+
+# Compilar y ver salida nativa
+./hulk playground/mi_programa.hulk && ./output
 ```
 
 ---
@@ -155,4 +268,4 @@ Resumen mínimo:
 - C++17 (`g++`)
 - Flex++ (`flex++` → `Lexer/hulk_lexer.cpp`; ver `make lexer`)
 - Make (`mingw32-make` en Windows MinGW)
-- Fase 4 (`make test_llvm`): `llvm-config`, libLLVM-14, `clang` en PATH
+- Fase 4 (`make test_llvm`): LLVM **21.1.x** (`llvm-config-21`), `clang-21` en PATH — ver [`REQUIREMENTS.md`](REQUIREMENTS.md) § Ubuntu

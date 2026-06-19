@@ -1,6 +1,6 @@
-#line 1 "Lexer/hulk_lexer.cpp"
+#line 2 "Lexer/hulk_lexer.cpp"
 
-#line 3 "Lexer/hulk_lexer.cpp"
+#line 4 "Lexer/hulk_lexer.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -523,9 +523,9 @@ static const flex_int16_t yy_chk[191] =
 /* Macro interna: marca posición inicial, avanza columna y devuelve token. */
 #define UPD(t) do { MARK_TOKEN(); SET_LEXEME(); column_ += yyleng; \
                     return static_cast<int>(TokenType::t); } while(0)
-#line 526 "Lexer/hulk_lexer.cpp"
+#line 527 "Lexer/hulk_lexer.cpp"
 /* ── Macros de patrones ──────────────────────────────────── */
-#line 528 "Lexer/hulk_lexer.cpp"
+#line 529 "Lexer/hulk_lexer.cpp"
 
 #define INITIAL 0
 
@@ -662,7 +662,7 @@ YY_DECL
 
 #line 58 "Lexer/hulk_lexer.l"
  /* ── 1. Espacios ────────────────────────────────────────── */
-#line 665 "Lexer/hulk_lexer.cpp"
+#line 666 "Lexer/hulk_lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1160,20 +1160,16 @@ YY_RULE_SETUP
                 if (yytext[0] == '%') {
                     return static_cast<int>(TokenType::PERCENT);
                 }
-                std::cerr << "[Lexer] linea " << line_
-                          << ", columna " << token_col_
-                          << ": caracter desconocido '"
-                          << yytext[0] << "'\n";
                 sem.str_val = yytext;
                 return static_cast<int>(TokenType::UNKNOWN);
               }
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 265 "Lexer/hulk_lexer.l"
+#line 261 "Lexer/hulk_lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1176 "Lexer/hulk_lexer.cpp"
+#line 1173 "Lexer/hulk_lexer.cpp"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2135,7 +2131,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 265 "Lexer/hulk_lexer.l"
+#line 261 "Lexer/hulk_lexer.l"
 
 
 /* ================================================================

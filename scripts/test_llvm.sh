@@ -4,6 +4,7 @@ set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+export PATH="$ROOT:$PATH"
 
 CXX="${CXX:-g++}"
 CXXFLAGS="${CXXFLAGS:?CXXFLAGS requerido}"
@@ -33,7 +34,8 @@ N=0
 
 next_step() { N=$((N + 1)); echo "$N"; }
 
-S="$ROOT/Codegen/llvm_codegen.cpp $ROOT/Codegen/llvm_aux.cpp $ROOT/Codegen/output_build.cpp $ROOT/Parser/ast/expr.cpp"
+# Rutas relativas (ya estamos en $ROOT): evita rotura si el path del repo tiene espacios.
+S="Codegen/llvm_codegen.cpp Codegen/llvm_aux.cpp Codegen/output_build.cpp Parser/ast/expr.cpp"
 COMMON="$S"
 
 build_smoke "$(next_step)" "$TOTAL" "Codegen/tests/i0_module_smoke.cpp $COMMON" "llvm_i0_smoke"

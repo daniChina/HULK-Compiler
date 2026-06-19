@@ -18,6 +18,12 @@ LLVM_CXXFLAGS := $(filter-out -stdlib=libc++,$(LLVM_CXXFLAGS_RAW))
 LLVM_CXXFLAGS := $(filter-out -std=c++14,$(LLVM_CXXFLAGS))
 LLVM_CXXFLAGS := $(filter-out -std=gnu++14,$(LLVM_CXXFLAGS))
 # Mantener -fno-exceptions/-fno-rtti en test_llvm; hulk usa LLVM_CXXFLAGS_HULK_ALL.
+LLVM_BINDIR := $(shell "$(LLVM_CONFIG)" --bindir 2>/dev/null)
+ifneq ($(LLVM_BINDIR),)
+LLVM_PATH_EXPORT = PATH="$(LLVM_BINDIR):$(PATH)"
+else
+LLVM_PATH_EXPORT =
+endif
 
 ifeq ($(OS),Windows_NT)
 RUN_TIMER = C:/msys64/usr/bin/bash.exe scripts/run_with_timer.sh
@@ -227,6 +233,7 @@ else
 	CXXFLAGS='$(CXXFLAGS)' \
 	LLVM_CXXFLAGS_ALL='$(LLVM_CXXFLAGS_ALL)' \
 	LLVM_LDFLAGS='$(LLVM_LDFLAGS)' \
+	$(LLVM_PATH_EXPORT) \
 	$(RUN_TIMER) --label test_llvm bash scripts/test_llvm.sh
 endif
 
@@ -235,6 +242,7 @@ ifeq ($(LLVM_AVAILABLE),)
 	@echo "LLVM no encontrado: instala llvm-21 (MSYS2 UCRT64 / apt.llvm.org) y pon llvm-config en PATH, o define LLVM_CONFIG=..."
 	@exit 1
 else
+	$(LLVM_PATH_EXPORT) \
 	$(RUN_TIMER) --label test_llvm_fixtures bash scripts/test_llvm_fixtures.sh
 endif
 

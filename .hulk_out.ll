@@ -48,8 +48,18 @@ declare ptr @hulk_range_create(double, double)
 
 define i32 @main() {
 entry:
-  call void @hulk_print_bool(i32 1)
+  br i1 true, label %if.then, label %if.else
+
+if.then:                                          ; preds = %entry
+  br label %if.end
+
+if.end:                                           ; preds = %if.else, %if.then
+  %if.result = phi double [ 1.000000e+00, %if.then ], [ 2.000000e+00, %if.else ]
+  call void @hulk_print_double(double %if.result)
   %expr_tmp = alloca double, align 8
   store double 0.000000e+00, ptr %expr_tmp, align 8
   ret i32 0
+
+if.else:                                          ; preds = %entry
+  br label %if.end
 }

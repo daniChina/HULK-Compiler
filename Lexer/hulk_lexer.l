@@ -253,10 +253,6 @@ IDENT       {ALPHA}{ALNUM_}*
                 if (yytext[0] == '%') {
                     return static_cast<int>(TokenType::PERCENT);
                 }
-                std::cerr << "[Lexer] linea " << line_
-                          << ", columna " << token_col_
-                          << ": caracter desconocido '"
-                          << yytext[0] << "'\n";
                 sem.str_val = yytext;
                 return static_cast<int>(TokenType::UNKNOWN);
               }

@@ -1,5 +1,6 @@
 #include "pipeline.hpp"
 
+#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 
@@ -53,10 +54,16 @@ CompileDiagnostic fail_semantic(const std::vector<SemanticError>& errors) {
     CompileDiagnostic result;
     result.phase = CompilePhase::Semantic;
     result.exit_code = 3;
+    std::vector<std::string> seen;
     for (const auto& error : errors) {
         const int line = error.line > 0 ? error.line : 0;
         const int col = error.column > 0 ? error.column : 0;
-        result.lines.push_back(format_semantic(line, col, error.message));
+        const std::string formatted = format_semantic(line, col, error.message);
+        if (std::find(seen.begin(), seen.end(), formatted) != seen.end()) {
+            continue;
+        }
+        seen.push_back(formatted);
+        result.lines.push_back(formatted);
     }
     if (result.lines.empty()) {
         result.lines.push_back(format_semantic(0, 0, "semantic analysis failed"));

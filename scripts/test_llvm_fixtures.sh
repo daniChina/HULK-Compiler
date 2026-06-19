@@ -6,7 +6,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-HULK="${HULK:-$ROOT/hulk_c.exe}"
+if [[ -x "$ROOT/hulk" ]]; then
+    HULK="${HULK:-$ROOT/hulk}"
+else
+    HULK="${HULK:-$ROOT/hulk_c.exe}"
+fi
 MANIFEST="$ROOT/tests/llvm/manifest.tsv"
 LLVM_VALID="$ROOT/tests/llvm/valid"
 MATCOM_OOP="$ROOT/tests/matcom/oop"
