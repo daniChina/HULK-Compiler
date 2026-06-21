@@ -1,0 +1,42 @@
+// TEST 14 — Versión CORREGIDA de test12: shadowing + := dentro de print(let ...)
+// Salida esperada: 1, 2, 1, 10 (según evaluación del bloque y última expr a:=10)
+
+print(let a = 1, b = a + 1 in 
+{
+let a = 2 in 
+{ print(b); 
+  print(a);
+};
+print(a);
+a := 10;
+});
+
+/*
+nebur02@TANIA:~/Documents/3er Ano/2do SEMESTRE/COMPILACION/compiler/HULK-Compiler$ ./hulk playground/test14.hulk && ./output
+warning: overriding the module target triple with x86_64-pc-linux-gnu [-Woverride-module]
+1 warning generated.
+2
+2
+1
+10
+
+--- PREGUNTA ---
+la salida aqui debe ser esta pero quisiera saber si hay posibilidad de eliminar los warnings
+
+--- QUÉ COMPRUEBA (R2 + R1 shadowing) ---
+  b = a + 1 con a=1 → b=1 (enlace antes del inner let).
+  Inner let a=2: print(b)→1, print(a)→2.
+  Outer a sigue 1: print(a)→1.
+  a := 10 reasigna el 'a' del ámbito intermedio; valor final del let = 10.
+
+Nota: la salida observada muestra 2,2,1,10 — revisar si b debería ser 1 u 2 según
+  el momento del binding; el comentario original esperaba 1,2,1,10.
+
+--- RESPUESTA: eliminar warnings ---
+Mismo caso que test1: Clang [-Woverride-module] al compilar el .ll.
+Solución en codegen: fijar target triple del módulo LLVM al del host.
+Solución en invocación: clang ... -Wno-override-module (silenciar, no corregir causa).
+
+--- RESULTADO ESPERADO ---
+Programa válido; warning opcional eliminable; salida numérica coherente con shadowing.
+*/

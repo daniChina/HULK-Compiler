@@ -1,6 +1,51 @@
-// Ejemplo mínimo: edita este archivo o crea otro .hulk en playground/
+// mi_programa.hulk — Función con tipo String; error de @ en codegen con (0,0)
+// Ejemplo mínimo del curso
+
 function greet(name: String): String {
     "Hola, " @ name @ "!";
 }
 
 print(greet("HULK"));
+
+/*
+nebur02@TANIA:~/Documents/3er Ano/2do SEMESTRE/COMPILACION/compiler/HULK-Compiler$ ./hulk playground/mi_programa.hulk && ./output
+(0,0) SEMANTIC: Operador '@' requiere operandos string
+
+--- PREGUNTAS ---
+aqui explicame por que sucede este error
+1- por que la linea y la columna no estan correctas pues en (0,0) no hay ningun operador @
+y por que el error sale con el operador @ en este caso y como podrias solucionarlo
+respondeme aqui por que no los da, y como se podria solucionarlo
+Y qué otros casos podrían fallar de la misma manera que estos, por que fallarian y como los solucionarias
+SOLO RESPONDE LAS PREGUNTAS, NO LAS RESUELVAS
+
+--- QUÉ ESTÁ MAL (sorpresa: el código parece correcto) ---
+El cuerpo "Hola, " @ name @ "!" es semánticamente válido (String @ String @ String).
+Con --semantic: Semantic OK.
+
+El fallo está en CODEGEN (LLVMCodeGenerator::coerceStringBoxed):
+  Los literales string y parámetros tipados String pueden emitirse como i8* (char*)
+  en lugar de "boxed string" (ptr al runtime Value). coerceStringBoxed espera
+  boxed; recibe puntero crudo → fail("Operador '@' requiere operandos string").
+
+El @ en L3 SÍ existe; el error no apunta ahí porque codegen no propaga posición.
+
+--- POR QUÉ (0,0) ---
+fail() en llvm_codegen.cpp solo guarda last_error_ sin line/col.
+El driver muestra el mensaje como error semántico genérico en (0,0).
+
+--- CÓMO SE SOLUCionaría ---
+Codegen: en emit de @, convertir i8* a boxed con createBoxedFromString antes de concat.
+  O unificar representación: todo String en LLVM como boxed Value*.
+Semántica/codegen: reportar diagnóstico con line/col del BinaryExpr @ si falla.
+Tests: este archivo debería imprimir "Hola, HULK!" sin error.
+
+--- OTROS CASOS IGUAL ---
+  Cualquier @ en función con anotación :String que baja a i8*
+  test5.hulk — mismo mensaje (0,0) desde codegen
+  Mezcla print de strings tipados vs literales en expresiones @
+
+--- RESULTADO ESPERADO ---
+Imprime: Hola, HULK!
+Sin warnings ni (0,0).
+*/

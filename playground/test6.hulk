@@ -1,0 +1,44 @@
+// TEST 6 — if sin paréntesis en la condición (sintaxis HULK)
+// Intencionalmente mal: `if true 1 else 2` — falta ( ) alrededor de la condición
+
+if true 1 else 2;
+
+/*
+(1,4) SYNTACTIC: Se esperaba el terminal LPAREN pero se encontro TRUE
+
+--- PREGUNTAS ---
+Aqui en vez de poner LPAREN no sería posible poner se esperaba ( ?
+recuerdame comprobar como es la sintaxis del if else y si es necesario poner aqui lo del parentesis
+respondeme aqui por que no los da, y como se podria solucionarlo
+Y qué otros casos podrían fallar de la misma manera que estos, por que fallarian y como los solucionarias
+SOLO RESPONDE LAS PREGUNTAS, NO LAS RESUELVAS
+
+--- SINTAXIS CORRECTA DE if EN HULK ---
+La condición SIEMPRE va entre paréntesis:
+  if (condición) expr_else_elif else expr
+  if (condición) { ... } else { ... }
+Igual que while: while (condición) cuerpo
+
+Forma correcta de este test: if (true) 1 else 2;
+
+--- QUÉ ESTÁ MAL ---
+Tras `if` la gramática exige LPAREN; el lexer ya emitió TRUE como inicio de expresión
+pero el parser esperaba '(' → error en (1,4).
+
+--- POR QUÉ DICE LPAREN Y NO '(' ---
+match_terminal() en ll1_parser.cpp concatena el nombre interno del token ("LPAREN")
+no el lexema humano ("("). Es el mismo problema que con EOF_TOKEN, SEMICOLON, etc.
+
+Solución conceptual: mapa token_name → lexema legible en mensajes de ParseError:
+  LPAREN → '(', RPAREN → ')', SEMICOLON → ';', TRUE → 'true' (o "palabra reservada true").
+
+--- OTROS CASOS SIMILARES ---
+  while x > 0 { ... }     → se esperaba '(' tras while
+  unless cond expr        → idem si unless exige paréntesis
+  print 1                 → se esperaba '(' tras print (llamada)
+  Cualquier error "Se esperaba el terminal X" puede humanizarse igual.
+
+--- RESULTADO ESPERADO ---
+Error sintáctico claro: "(1,4) SYNTACTIC: se esperaba '(' después de 'if'"
+Con sintaxis corregida: expresión válida, valor 1 (rama then).
+*/

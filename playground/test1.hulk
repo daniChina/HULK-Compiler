@@ -1,0 +1,38 @@
+// TEST 1 — Compilación básica exitosa + warning de Clang
+// Ejecutar: ./hulk playground/test1.hulk && ./output
+// Salida esperada del programa: 3
+// Salida observada extra: warning de Clang sobre target triple
+
+print(1+2);
+
+/*
+nebur02@TANIA:~/Documents/3er Ano/2do SEMESTRE/COMPILACION/compiler/HULK-Compiler$ ./hulk playground/test1.hulk && ./output
+warning: overriding the module target triple with
+      x86_64-pc-linux-gnu [-Woverride-module]
+1 warning generated.
+3
+
+--- PREGUNTA ---
+por que me sale todo esto cuando genero el codigo,
+dime cual es el warning que se genera y si hay alguna manera de evitar que se genere
+NO RESUELVAS NADA SOLO RESPONDEME LAS DUDAS
+
+--- RESPUESTA ---
+El programa compila y ejecuta bien (imprime 3). Lo extra no es un error del compilador HULK
+sino un WARNING de Clang al enlazar el .ll generado:
+
+  "warning: overriding the module target triple with x86_64-pc-linux-gnu [-Woverride-module]"
+
+Significa: el IR LLVM emitido declara un "target triple" (arquitectura SO) distinto o incompleto
+respecto al que Clang usaría por defecto en tu máquina; Clang lo sobrescribe y avisa.
+
+Por qué aparece: el codegen (llvm_codegen) crea el módulo sin fijar el triple del host, o lo
+fija de forma genérica; al invocar `clang ... file.ll -o output`, Clang detecta la discrepancia.
+
+Cómo se podría evitar (sin implementarlo aquí):
+  1. En codegen: llamar module.setTargetTriple(...) con el triple del host (llvm::sys::getDefaultTargetTriple()).
+  2. Al invocar Clang: añadir -Wno-override-module para silenciar el aviso (menos ideal).
+  3. Alinear el triple del .ll con el de la máquina donde se compila (Linux x86_64 en tu caso).
+
+Este warning NO impide la ejecución; es ruido en la salida al generar el binario.
+*/

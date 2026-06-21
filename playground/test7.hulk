@@ -1,0 +1,35 @@
+// TEST 7 — Condiciones de if con tipos no booleanos
+// L1 válido | L2 Number como condición | L3 String como condición
+
+print(if (true) 1 else 2);
+
+print(if (4) 1 else 2);
+
+print(if ("hola") 1 else 2);
+
+/*
+nebur02@TANIA:~/Documents/3er Ano/2do SEMESTRE/COMPILACION/compiler/HULK-Compiler$ ./hulk playground/test7.hulk && ./output
+(0,0) SEMANTIC: La condición de 'if' debe ser de tipo Boolean, se obtuvo 'Number'
+(0,0) SEMANTIC: La condición de 'if' debe ser de tipo Boolean, se obtuvo 'String'
+
+--- QUÉ ESTÁ MAL ---
+L2: if (4) — en HULK la condición debe ser Boolean, no Number (a diferencia de C).
+L3: if ("hola") — idem, String no es Boolean.
+
+--- POR QUÉ (0,0) Y NO LA LÍNEA REAL ---
+En phase2_checker.cpp visit(IfExpr) el report() usa línea 0 y columna 0 hardcodeados:
+  report(..., "La condición de 'if' debe ser...", 0, 0, "expresión if");
+No se pasa expr->condition->token ni el token del if.
+
+Solución: usar la posición del nodo condición (p.ej. literal 4 en L2 col ~8, "hola" en L3).
+
+--- CÓMO SE SOLUCionaría ---
+Cambiar el report a algo como:
+  report(..., msg, expr->condition->getLine(), expr->condition->getCol(), ...);
+requiere que las exprs expongan span (muchos ya tienen token en literales).
+
+--- RESULTADO ESPERADO ---
+L1: imprime 1
+L2: (3,10) SEMANTIC: condición de if debe ser Boolean, se obtuvo Number
+L3: (5,10) SEMANTIC: condición de if debe ser Boolean, se obtuvo String
+*/

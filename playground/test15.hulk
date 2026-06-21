@@ -1,0 +1,802 @@
+// NOTA SUITE test15: Copiada del manual HULK "completo"; NO es compatible tal cual
+// con este compilador. Primer fallo observado: ./hulk playground/test15.hulk
+//   → (160,31) LEXICAL: unexpected character '|'
+// Causa: L160 usa `n == 0 | n == 1` pero el lexer NO define '|' como token;
+//   el OR lógico aquí es la palabra reservada `or` (token OR), no el carácter '|'.
+// Solución (en el .hulk, no en el compilador): reescribir como
+//   if (n == 0 or n == 1) o if (n == 0 | n == 1) solo si el lexer añade regla '|'.
+// Muchos tests siguientes usan sintaxis no implementada (protocol, vectores [ ],
+// lambdas, etc.) y fallarán más adelante aunque se corrija L160.
+
+// ============================================================
+// HULK LANGUAGE - SUITE DE CASOS DE PRUEBA
+// Cubre: expresiones, funciones, variables, control de flujo,
+//        OOP, tipos, protocolos, iterables, vectores, functores
+// ============================================================
+
+
+// ============================================================
+// NIVEL 1: EXPRESIONES ARITMÉTICAS BÁSICAS
+// ============================================================
+
+// TEST 01 - Aritmética básica con precedencia y paréntesis
+print((((1 + 2) ^ 3) * 4) / 5);
+// Esperado: 21.6
+
+// TEST 02 - Operador potencia y expresiones anidadas
+print(2 ^ 10);
+// Esperado: 1024
+
+// TEST 03 - Uso de constantes matemáticas PI y E
+print(PI);
+print(E);
+// Esperado: ~3.14159...  ~2.71828...
+
+// TEST 04 - Funciones matemáticas builtin
+print(sqrt(144));
+print(sin(PI / 2));
+print(cos(0));
+print(exp(1));
+print(log(2, 8));
+// Esperados: 12, 1, 1, ~2.718, 3
+
+// TEST 05 - Expresiones aritméticas mixtas con funciones
+print(sin(2 * PI) ^ 2 + cos(3 * PI / log(4, 64)));
+// Esperado: resultado numérico valido
+
+// TEST 06 - Número random (verificar que está en [0,1])
+print(rand());
+// Esperado: número en [0.0, 1.0]
+
+
+// ============================================================
+// NIVEL 1: STRINGS
+// ============================================================
+
+// TEST 07 - String literal y concatenación con @
+print("Hello" @ " " @ "World");
+// Esperado: Hello World
+
+// TEST 08 - Concatenación string con número (@ convierte)
+print("La respuesta es " @ 42);
+// Esperado: La respuesta es 42
+
+// TEST 09 - Doble arroba @@ (inserta espacio automático)
+print("Hello" @@ "World");
+// Esperado: Hello World
+
+// TEST 10 - Caracteres de escape en strings
+print("Línea 1\nLínea 2");
+print("Col1\tCol2");
+// Esperados: salto de línea y tabulación
+
+
+// ============================================================
+// NIVEL 1: BLOQUES DE EXPRESIÓN
+// ============================================================
+
+// TEST 11 - Bloque de expresiones múltiple como cuerpo de programa
+{
+    print(42);
+    print(sin(PI / 2));
+    print("Hello World");
+}
+// Esperados: 42, 1, Hello World
+
+
+// ============================================================
+// NIVEL 2: VARIABLES Y BINDING
+// ============================================================
+
+// TEST 12 - Variable simple con let...in
+let msg = "Hello World" in print(msg);
+// Esperado: Hello World
+
+// TEST 13 - Múltiples variables en un solo let
+let number = 42, text = "El significado de la vida es " in
+    print(text @ number);
+// Esperado: El significado de la vida es 42
+
+// TEST 14 - Scoping: variable interna oculta la externa
+let a = 20 in {
+    let a = 42 in print(a);
+    print(a);
+}
+// Esperado: 42, luego 20
+
+// TEST 15 - Uso de una variable para definir la siguiente
+let a = 6, b = a * 7 in print(b);
+// Esperado: 42
+
+// TEST 16 - let como expresión con valor de retorno
+print(let b = 6 in b * 7);
+// Esperado: 42
+
+// TEST 17 - let anidado
+let a = (let b = 5 in b * 2) in print(a);
+// Esperado: 10
+
+// TEST 18 - Asignación destructiva :=
+let a = 0 in {
+    print(a);
+    a := 1;
+    print(a);
+}
+// Esperado: 0, luego 1
+
+// TEST 19 - := retorna el valor asignado
+let a = 0 in
+let b = (a := 99) in {
+    print(a);
+    print(b);
+}
+// Esperado: 99, 99
+
+// TEST 20 - Redefinición de símbolo en mismo let (equivale a let anidado)
+let a = 7, a = a * 6 in print(a);
+// Esperado: 42
+
+
+// ============================================================
+// NIVEL 2: FUNCIONES
+// ============================================================
+
+// TEST 21 - Función inline básica
+function tan(x) => sin(x) / cos(x);
+print(tan(PI / 4));
+// Esperado: ~1.0
+
+// TEST 22 - Función que usa otra definida después (orden libre)
+function cot(x) => 1 / tan(x);
+print(cot(PI / 4));
+// Esperado: ~1.0
+
+// TEST 23 - Función con cuerpo de bloque (full-form)
+function operate(x, y) {
+    print(x + y);
+    print(x - y);
+    print(x * y);
+    print(x / y);
+}
+operate(10, 2);
+// Esperados: 12, 8, 20, 5
+
+// TEST 24 - Función recursiva: factorial
+function fact(n) => if (n == 0) 1 else n * fact(n - 1);
+print(fact(10));
+// Esperado: 3628800
+
+// TEST 25 - Función recursiva: Fibonacci
+function fib(n) => if (n == 0 | n == 1) 1 else fib(n - 1) + fib(n - 2);
+print(fib(10));
+// Esperado: 89
+
+// TEST 26 - Función con let interno y recursión de cola simulada
+function sum_up_to(n) =>
+    let acc = 0, i = n in
+    while (i > 0) {
+        acc := acc + i;
+        i := i - 1;
+    };
+// Nota: retorna el último valor de while (el de i después de decrementar)
+print(sum_up_to(100));
+// La suma real requiere leer acc; este test verifica que compila y corre
+
+
+// ============================================================
+// NIVEL 2: CONTROL DE FLUJO
+// ============================================================
+
+// TEST 27 - if-else como expresión
+let a = 42 in print(if (a % 2 == 0) "Par" else "Impar");
+// Esperado: Par
+
+// TEST 28 - Operadores booleanos &, |, !
+print(if (true & false) "and" else "no and");
+print(if (true | false) "or" else "no or");
+print(if (!false) "not false" else "false");
+// Esperados: no and, or, not false
+
+// TEST 29 - elif (ramas múltiples)
+let a = 42, mod = a % 3 in
+    print(
+        if (mod == 0) "Magic"
+        elif (mod == 1) "Woke"
+        else "Dumb"
+    );
+// Esperado: Magic (42 % 3 == 0)
+
+// TEST 30 - Bloque en ramas del if
+let a = 15 in
+    if (a % 2 == 0) {
+        print(a);
+        print("Par");
+    }
+    else {
+        print(a);
+        print("Impar");
+    };
+// Esperado: 15, Impar
+
+
+// ============================================================
+// NIVEL 2: BUCLES
+// ============================================================
+
+// TEST 31 - while básico con contador
+let i = 0 in while (i < 5) {
+    print(i);
+    i := i + 1;
+};
+// Esperado: 0, 1, 2, 3, 4
+
+// TEST 32 - while que retorna valor (GCD)
+function gcd(a, b) => while (a > 0) {
+    let m = a % b in {
+        b := a;
+        a := m;
+    };
+};
+print(gcd(48, 18));
+// Esperado: 6
+
+// TEST 33 - for con range
+for (x in range(0, 5)) print(x);
+// Esperado: 0, 1, 2, 3, 4
+
+// TEST 34 - for sobre range con operación interna
+let suma = 0 in {
+    for (i in range(1, 11)) suma := suma + i;
+    print(suma);
+}
+// Esperado: 55 (suma de 1 a 10)
+
+
+// ============================================================
+// NIVEL 3: TIPOS Y CLASES
+// ============================================================
+
+// TEST 35 - Definición e instanciación básica de tipo
+type Point {
+    x = 0;
+    y = 0;
+    getX() => self.x;
+    getY() => self.y;
+    setX(x) => self.x := x;
+    setY(y) => self.y := y;
+}
+
+let pt = new Point() in {
+    pt.setX(3);
+    pt.setY(4);
+    print("x: " @ pt.getX() @ "; y: " @ pt.getY());
+}
+// Esperado: x: 3; y: 4
+
+// TEST 36 - Tipo con argumentos (constructor simulado)
+type Point2(x, y) {
+    x = x;
+    y = y;
+    getX() => self.x;
+    getY() => self.y;
+    toString() => "(" @ self.x @ ", " @ self.y @ ")";
+}
+
+let p = new Point2(3, 4) in print(p.toString());
+// Esperado: (3, 4)
+
+// TEST 37 - Herencia básica
+type PolarPoint(x, y) inherits Point2(x, y) {
+    rho() => sqrt(self.getX() ^ 2 + self.getY() ^ 2);
+    theta() => log(self.getY() / self.getX(), E);
+}
+
+let pp = new PolarPoint(3, 4) in
+    print("rho: " @ pp.rho());
+// Esperado: rho: 5
+
+// TEST 38 - Polimorfismo: override de método
+type Person(firstname, lastname) {
+    firstname = firstname;
+    lastname = lastname;
+    name() => self.firstname @@ self.lastname;
+}
+
+type Knight inherits Person {
+    name() => "Sir" @@ base();
+}
+
+let p = new Knight("Phil", "Collins") in print(p.name());
+// Esperado: Sir Phil Collins
+
+// TEST 39 - Uso de base() en cadena de herencia
+type Animal(name) {
+    name = name;
+    speak() => self.name @ " hace un sonido";
+}
+
+type Dog inherits Animal {
+    speak() => base() @ " (ladra: Woof!)";
+}
+
+type GoldenRetriever inherits Dog {
+    speak() => base() @ " [amigablemente]";
+}
+
+let g = new GoldenRetriever("Buddy") in print(g.speak());
+// Esperado: Buddy hace un sonido (ladra: Woof!) [amigablemente]
+
+// TEST 40 - Operador is (testing de tipo dinámico)
+type Bird { fly() => "flap flap"; }
+type Plane { fly() => "whoooosh"; }
+type Superman { }
+
+let x = new Superman() in
+    print(
+        if (x is Bird) "Es un pájaro!"
+        elif (x is Plane) "Es un avión!"
+        else "No, es Superman!"
+    );
+// Esperado: No, es Superman!
+
+// TEST 41 - Downcasting con as
+type Shape(color) {
+    color = color;
+    area() => 0;
+    describe() => "Forma de color " @ self.color @ ", area=" @ self.area();
+}
+
+type Circle(color, radius) inherits Shape(color) {
+    radius = radius;
+    area() => PI * self.radius ^ 2;
+}
+
+type Rectangle(color, width, height) inherits Shape(color) {
+    width = width;
+    height = height;
+    area() => self.width * self.height;
+}
+
+let s : Shape = if (rand() < 0.5) new Circle("rojo", 5) else new Rectangle("azul", 3, 4) in {
+    print(s.describe());
+    if (s is Circle) {
+        let c = s as Circle in
+            print("Radio del círculo: " @ c.radius);
+    }
+    elif (s is Rectangle) {
+        let r = s as Rectangle in
+            print("Ancho x Alto: " @ r.width @ "x" @ r.height);
+    };
+}
+// Esperado: descripción con área correcta + detalle del tipo concreto
+
+
+// ============================================================
+// NIVEL 3: ANOTACIONES DE TIPO Y TYPE CHECKING
+// ============================================================
+
+// TEST 42 - Variables con anotación de tipo explícita
+let x: Number = 42 in print(x);
+// Esperado: 42
+
+// TEST 43 - Función con tipos explícitos en argumentos y retorno
+function add(a: Number, b: Number): Number => a + b;
+print(add(3, 4));
+// Esperado: 7
+
+// TEST 44 - Atributos con tipos explícitos
+type TypedPoint(x: Number, y: Number) {
+    x: Number = x;
+    y: Number = y;
+    distanceTo(other: TypedPoint): Number =>
+        sqrt((self.x - other.x) ^ 2 + (self.y - other.y) ^ 2);
+}
+
+let p1 = new TypedPoint(0, 0), p2 = new TypedPoint(3, 4) in
+    print(p1.distanceTo(p2));
+// Esperado: 5
+
+
+// ============================================================
+// NIVEL 3: TYPE INFERENCE
+// ============================================================
+
+// TEST 45 - Inferencia en let: tipo de x inferido como Number
+let x = 42 in print(x @ " es un número");
+// Esperado: 42 es un número
+
+// TEST 46 - Inferencia en función: n inferido como Number por uso aritmético
+function triple(n) => n * 3;
+print(triple(7));
+// Esperado: 21
+
+// TEST 47 - Inferencia con operador @@: tipos de retorno inferidos como String
+function greet(name) => "Hola" @@ name @ "!";
+print(greet("Mundo"));
+// Esperado: Hola Mundo!
+
+
+// ============================================================
+// NIVEL 4: PROTOCOLOS
+// ============================================================
+
+// TEST 48 - Definición y uso de protocolo
+protocol Describable {
+    describe(): String;
+}
+
+type Car(brand, model, year) {
+    brand = brand;
+    model = model;
+    year = year;
+    describe(): String => self.year @ " " @ self.brand @@ self.model;
+}
+
+let car: Describable = new Car("Toyota", "Corolla", 2023) in
+    print(car.describe());
+// Esperado: 2023 Toyota Corolla
+
+// TEST 49 - Protocolo extendido
+protocol Hashable {
+    hash(): Number;
+}
+
+protocol Equatable extends Hashable {
+    equals(other: Object): Boolean;
+}
+
+type MyInt(val: Number) {
+    val = val;
+    hash(): Number => self.val;
+    equals(other: Object): Boolean =>
+        if (other is MyInt)
+            (other as MyInt).val == self.val
+        else false;
+}
+
+let a = new MyInt(42), b = new MyInt(42) in
+    print(if (a.equals(b)) "Iguales" else "Distintos");
+// Esperado: Iguales
+
+// TEST 50 - Covarianza en protocolo: Range implementa Iterable
+// (Iterable ya está definido en builtins; range(0,5) lo implementa)
+let it = range(0, 3) in {
+    while (it.next()) print(it.current());
+}
+// Esperado: 0, 1, 2
+
+
+// ============================================================
+// NIVEL 4: ITERABLES
+// ============================================================
+
+// TEST 51 - for loop con iterable builtin range
+for (x in range(1, 6)) print(x ^ 2);
+// Esperado: 1, 4, 9, 16, 25
+
+// TEST 52 - Iterable personalizado: cuenta regresiva
+type Countdown(from: Number) {
+    current = from + 1;
+    next(): Boolean => (self.current := self.current - 1) > 0;
+    current(): Number => self.current;
+}
+
+for (n in new Countdown(5)) print(n);
+// Esperado: 5, 4, 3, 2, 1
+
+// TEST 53 - Función que recibe iterable tipado T*
+function sum_iter(nums: Number*): Number {
+    let total = 0 in {
+        for (x in nums) total := total + x;
+        total;
+    }
+}
+
+print(sum_iter(range(1, 11)));
+// Esperado: 55
+
+
+// ============================================================
+// NIVEL 4: VECTORES
+// ============================================================
+
+// TEST 54 - Vector explícito e iteración
+let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] in {
+    for (x in numbers) print(x);
+}
+// Esperado: 1 al 10
+
+// TEST 55 - Indexación de vector con []
+let v = [10, 20, 30, 40, 50] in {
+    print(v[0]);
+    print(v[2]);
+    print(v[4]);
+}
+// Esperado: 10, 30, 50
+
+// TEST 56 - size() de vector
+let v = [1, 2, 3, 4, 5] in print(v.size());
+// Esperado: 5
+
+// TEST 57 - Vector implícito (generador)
+let squares = [x ^ 2 | x in range(1, 6)] in
+    for (s in squares) print(s);
+// Esperado: 1, 4, 9, 16, 25
+
+// TEST 58 - Función que recibe vector tipado T[]
+function mean(numbers: Number[]): Number {
+    let total = 0 in {
+        for (x in numbers) total := total + x;
+        total / numbers.size();
+    }
+}
+
+let data = [2, 4, 6, 8, 10] in print(mean(data));
+// Esperado: 6
+
+// TEST 59 - Vector de strings
+let names = ["Alice", "Bob", "Charlie", "Diana"] in {
+    for (n in names) print("Hola" @@ n);
+}
+// Esperado: Hola Alice, Hola Bob, Hola Charlie, Hola Diana
+
+// TEST 60 - Vector generado con condición (filter manual)
+let evens = [x | x in range(0, 20)] in {
+    for (x in evens)
+        if (x % 2 == 0) print(x);
+}
+// Esperado: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18
+
+
+// ============================================================
+// NIVEL 4: FUNCTORES Y LAMBDAS
+// ============================================================
+
+// TEST 61 - Protocolo functor explícito
+protocol NumberFilter {
+    invoke(x: Number): Boolean;
+}
+
+function count_when(numbers: Number*, filter: NumberFilter): Number {
+    let total = 0 in {
+        for (x in numbers) total := total + if (filter(x)) 1 else 0;
+        total;
+    }
+}
+
+type IsEven {
+    invoke(x: Number): Boolean => x % 2 == 0;
+}
+
+print(count_when(range(0, 100), new IsEven()));
+// Esperado: 50
+
+// TEST 62 - Functor con función nombrada (wrapper implícito)
+function is_positive(x: Number): Boolean => x > 0;
+
+print(count_when([-3, -1, 0, 2, 5, 7], is_positive));
+// Esperado: 3
+
+// TEST 63 - Lambda expression
+let numbers = range(0, 10) in
+    print(count_when(numbers, (x) => x % 3 == 0));
+// Esperado: 4  (0,3,6,9)
+
+// TEST 64 - Lambda con tipo explícito
+let filter: NumberFilter = (x: Number): Boolean => x > 50 in
+    print(count_when(range(0, 101), filter));
+// Esperado: 50
+
+// TEST 65 - Functor con sintaxis (T) -> U
+function apply_all(nums: Number*, transform: (Number) -> Number): Number[] =>
+    [transform(x) | x in nums];
+
+let doubled = apply_all(range(1, 6), (x) => x * 2) in
+    for (n in doubled) print(n);
+// Esperado: 2, 4, 6, 8, 10
+
+
+// ============================================================
+// NIVEL 5: CASOS COMPLEJOS E INTEGRACIÓN
+// ============================================================
+
+// TEST 66 - Ordenamiento burbuja sobre vector
+function bubble_sort(arr: Number[]): Number[] {
+    let n = arr.size(), i = 0 in {
+        while (i < n) {
+            let j = 0 in
+                while (j < n - i - 1) {
+                    if (arr[j] > arr[j + 1]) {
+                        let tmp = arr[j] in {
+                            arr[j] := arr[j + 1];
+                            arr[j + 1] := tmp;
+                        };
+                    };
+                    j := j + 1;
+                };
+            i := i + 1;
+        };
+        arr;
+    }
+}
+
+let sorted = bubble_sort([5, 3, 8, 1, 9, 2, 7, 4, 6]) in
+    for (x in sorted) print(x);
+// Esperado: 1, 2, 3, 4, 5, 6, 7, 8, 9
+
+// TEST 67 - Árbol binario de búsqueda
+type BST {
+    value = 0;
+    left: Object = false;
+    right: Object = false;
+    insert(v: Number): BST {
+        if (v < self.value) {
+            if (self.left is BST)
+                (self.left as BST).insert(v)
+            else
+                let node = new BST() in {
+                    node.value := v;
+                    self.left := node;
+                };
+        }
+        elif (v > self.value) {
+            if (self.right is BST)
+                (self.right as BST).insert(v)
+            else
+                let node = new BST() in {
+                    node.value := v;
+                    self.right := node;
+                };
+        };
+        self;
+    }
+    inorder() {
+        if (self.left is BST) (self.left as BST).inorder();
+        print(self.value);
+        if (self.right is BST) (self.right as BST).inorder();
+    }
+}
+
+let root = new BST() in {
+    root.value := 5;
+    root.insert(3);
+    root.insert(7);
+    root.insert(1);
+    root.insert(4);
+    root.insert(6);
+    root.insert(8);
+    root.inorder();
+}
+// Esperado: 1, 3, 4, 5, 6, 7, 8 (inorder)
+
+// TEST 68 - Composición de funciones de alto orden
+function compose(f: (Number) -> Number, g: (Number) -> Number): (Number) -> Number =>
+    (x) => f(g(x));
+
+let double_then_inc = compose((x) => x + 1, (x) => x * 2) in
+    print(double_then_inc(5));
+// Esperado: 11  (5*2 = 10, 10+1 = 11)
+
+// TEST 69 - Acumulador funcional: map sobre vector
+function map_vec(arr: Number[], f: (Number) -> Number): Number[] =>
+    [f(x) | x in arr];
+
+let cubed = map_vec([1, 2, 3, 4, 5], (x) => x ^ 3) in
+    for (n in cubed) print(n);
+// Esperado: 1, 8, 27, 64, 125
+
+// TEST 70 - reduce manual sobre vector
+function reduce(arr: Number[], f: (Number, Number) -> Number, init: Number): Number {
+    let acc = init in {
+        for (x in arr) acc := f(acc, x);
+        acc;
+    }
+}
+
+// Suma
+print(reduce([1, 2, 3, 4, 5], (a, b) => a + b, 0));
+// Esperado: 15
+
+// Producto
+print(reduce([1, 2, 3, 4, 5], (a, b) => a * b, 1));
+// Esperado: 120
+
+// Máximo
+print(reduce([3, 1, 4, 1, 5, 9, 2, 6], (a, b) => if (a > b) a else b, 0));
+// Esperado: 9
+
+// TEST 71 - Torre de Hanoi
+function hanoi(n: Number, from: String, to: String, via: String) {
+    if (n > 0) {
+        hanoi(n - 1, from, via, to);
+        print("Mover disco " @ n @ " de " @ from @ " a " @ to);
+        hanoi(n - 1, via, to, from);
+    };
+}
+
+hanoi(3, "A", "C", "B");
+// Esperado: 7 movimientos impresos
+
+// TEST 72 - Números primos con criba parcial usando vectores
+function is_prime(n: Number): Boolean {
+    if (n < 2) false
+    elif (n == 2) true
+    else {
+        let result = true, i = 2 in {
+            while (i * i <= n & result) {
+                if (n % i == 0) result := false;
+                i := i + 1;
+            };
+            result;
+        }
+    }
+}
+
+for (n in range(2, 30))
+    if (is_prime(n)) print(n);
+// Esperado: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29
+
+// TEST 73 - Clase Stack con vector interno
+type Stack {
+    data: Number[] = [];
+    size: Number = 0;
+    push(val: Number) {
+        // Reconstruimos el vector con el nuevo elemento al final
+        let new_data = [if (i < self.size) self.data[i] else val | i in range(0, self.size + 1)] in {
+            self.data := new_data;
+            self.size := self.size + 1;
+        };
+    }
+    pop(): Number {
+        let val = self.data[self.size - 1] in {
+            self.size := self.size - 1;
+            val;
+        };
+    }
+    peek(): Number => self.data[self.size - 1];
+    isEmpty(): Boolean => self.size == 0;
+}
+
+let s = new Stack() in {
+    s.push(1);
+    s.push(2);
+    s.push(3);
+    print(s.peek());   // 3
+    print(s.pop());    // 3
+    print(s.pop());    // 2
+    print(s.isEmpty()); // false
+    print(s.pop());    // 1
+    print(s.isEmpty()); // true
+}
+// Esperado: 3, 3, 2, false, 1, true
+
+// TEST 74 - Patrón Iterator con Enumerable personalizado
+protocol Enumerable {
+    iter(): Iterable;
+}
+
+type Range2(min: Number, max: Number, step: Number) {
+    min = min;
+    max = max;
+    step = step;
+    iter(): Iterable => range(self.min, self.max);
+    // Simplificado: usa range interno para demostrar el protocolo
+}
+
+let r2 = new Range2(0, 10, 2) in
+    for (x in r2.iter()) if (x % 2 == 0) print(x);
+// Esperado: 0, 2, 4, 6, 8
+
+// TEST 75 - Cálculo de π con serie de Leibniz
+function pi_leibniz(terms: Number): Number {
+    let sum = 0, i = 0 in {
+        while (i < terms) {
+            sum := sum + (if (i % 2 == 0) 1 else -1) / (2 * i + 1);
+            i := i + 1;
+        };
+        sum * 4;
+    }
+}
+
+print(pi_leibniz(10000));
+// Esperado: ~3.1415 (aproximación)

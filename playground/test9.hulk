@@ -1,0 +1,20 @@
+// TEST 9 — R1: duplicado en mismo let (REDEFINED_VARIABLE)
+// Debe dar error: 'a' declarada dos veces en la misma lista de bindings
+
+let a=2, b=3,a=2 in a+b; //esto debe dar error, funciona bien
+
+/*
+--- QUÉ COMPRUEBA ---
+Regla R1: un nombre solo puede definirse una vez en el mismo ámbito let.
+let a=2, b=3, a=2 → segundo 'a' es REDEFINED_VARIABLE.
+
+--- ERROR OBSERVADO (correcto) ---
+(1,14) SEMANTIC: Variable 'a' ya está definida en este ámbito
+
+--- POR QUÉ FUNCIONA BIEN ---
+binding_list.cpp / Phase2Analyzer rechaza duplicados antes de desugar a lets anidados.
+No confundir con let a=7, a=a*6 que el parser convierte en shadow anidado (válido).
+
+--- RESULTADO ESPERADO ---
+Error semántico, exit code ≠ 0. No debe ejecutarse a+b.
+*/

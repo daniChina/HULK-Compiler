@@ -1,0 +1,67 @@
+// TEST 5 — Errores de @ dentro de bloques; múltiples errores en un mismo let
+// Bloque L6-L13: x es Number; x@"a", x@@true, x@@2 son inválidos para @
+
+print(let x = 0 in { x := 3; x; });
+print(let x = 0 in { x := 3; });
+
+let x = 0 in { x := 3; x; };
+
+let x=0 in
+{
+    x+2;
+    x@"a";
+    x@@true;
+    x@@2;
+};
+
+let x=0 in
+let y=2 in
+let x=3 in x+2;
+
+/*
+nebur02@TANIA:~/Documents/3er Ano/2do SEMESTRE/COMPILACION/compiler/HULK-Compiler$ ./hulk playground/test5.hulk && ./output
+(0,0) SEMANTIC: Operador '@' requiere operandos string
+
+--- PREGUNTAS ---
+1 - solo encuentra el primer error y no muestra el resto de los errores semanticos que da el Operador
+2 - no muestra correctamente la linea y columna del error
+respondeme aqui por que no los da, y como se podria solucionarlo
+Y qué otros casos podrían fallar de la misma manera que estos, por que fallarian y como los solucionarias
+SOLO RESPONDE LAS PREGUNTAS, NO LAS RESUELVAS
+
+--- QUÉ ESTÁ MAL ---
+En el bloque (L9-L13), x es Number (let x=0). Las expresiones:
+  x@"a"   → Number @ String: semántica lo acepta (String a la derecha).
+  x@@true → Number @@ Boolean: debería ser inválido.
+  x@@2    → Number @@ Number: inválido (mismo hueco que test4).
+
+Con --semantic el archivo pasa "Semantic OK" porque el checker no rechaza esos @.
+El fallo aparece en CODEGEN al emitir @ sobre valores numéricos boxed.
+
+--- PROBLEMA 1: solo un error ---
+./hulk para en codegen tras el primer fail() en LLVMCodeGenerator; no acumula el resto.
+Además semántica no lista los @ inválidos, así que ni siquiera hay múltiples errores semánticos.
+
+Solución conceptual:
+  - Semántica: reportar TODOS los @ inválidos en el bloque (visit continúa tras report).
+  - Codegen: no abortar en primer fail en modo desarrollo, o mover checks a semántica.
+
+--- PROBLEMA 2: (0,0) sin posición ---
+El mensaje viene de Codegen/llvm_codegen.cpp coerceStringBoxed → fail("Operador '@'...").
+fail() solo guarda el texto, sin line/col. pipeline.cpp formatea como (0,0) SEMANTIC cuando
+column es 0 (fail_semantic usa 0,0 por defecto).
+
+Solución: report() en semántica con expr->op.line/col ANTES de codegen; o pasar SourceLocation
+  al fail() del codegen desde el nodo BinaryExpr.
+
+--- OTROS CASOS SIMILARES ---
+  mi_programa.hulk — mismo (0,0) por @ en codegen
+  Cualquier TYPE_ERROR hardcodeado con 0,0 (p.ej. IfExpr en phase2_checker.cpp L942)
+  Primer error de codegen oculta errores posteriores en el mismo archivo
+
+--- RESULTADO ESPERADO (comportamiento deseado) ---
+(11,5) TYPE_ERROR: '@' inválido entre Number y ...
+(12,5) TYPE_ERROR: '@@' inválido entre Number y Boolean
+(13,5) TYPE_ERROR: '@@' inválido entre Number y Number
+(múltiples líneas listadas, no un solo (0,0))
+*/
