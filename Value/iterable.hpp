@@ -18,7 +18,7 @@ struct RangeValue {
     std::shared_ptr<RangeIterator> beginIterator() const;
 };
 
-// Iterador con protocolo next/current (para for-in).
+// Iterador con protocolo next/current para for-in.
 struct RangeIterator {
     std::shared_ptr<RangeValue> range;
     double current = 0.0;

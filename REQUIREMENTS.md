@@ -244,22 +244,11 @@ make test_llvm LLVM_CONFIG=llvm-config-21
 
 ---
 
-## Workspace (dos repos)
+## Workspace (documentación local)
 
-Además de las herramientas anteriores, hace falta **Git** para el layout documentado:
 
-```bash
-git clone 
-cd HULK-Compiler
-mkdir -p docs && cd docs
-git clone  .
-cd ..
-```
-
-| Repo | Ruta | Contenido |
-|------|------|-----------|
-| Código | `HULK-Compiler/` | Compilador, tests, Makefile |
-
+| Ruta | Contenido |
+|------|-----------|
 
 ---
 

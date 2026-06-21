@@ -251,7 +251,6 @@ export LLVM_CONFIG=llvm-config-21
 export PATH=/usr/lib/llvm-21/bin:$PATH
 
 # 2. Build
-git clone 
 cd HULK-Compiler
 make compile && make build
 
