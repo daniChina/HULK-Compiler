@@ -32,6 +32,39 @@ TypeInfo inferForElementType(SymbolTable& table, parser::Expr* iterable,
     return TypeInfo(TypeInfo::Kind::Unknown);
 }
 
+std::pair<int, int> expr_location(const parser::Expr* expr) {
+    if (expr == nullptr) {
+        return {0, 0};
+    }
+    if (const auto* number = dynamic_cast<const parser::NumberExpr*>(expr)) {
+        return {number->token.line, number->token.col};
+    }
+    if (const auto* string = dynamic_cast<const parser::StringExpr*>(expr)) {
+        return {string->token.line, string->token.col};
+    }
+    if (const auto* boolean = dynamic_cast<const parser::BoolExpr*>(expr)) {
+        return {boolean->token.line, boolean->token.col};
+    }
+    if (const auto* identifier = dynamic_cast<const parser::IdentifierExpr*>(expr)) {
+        return {identifier->token.line, identifier->token.col};
+    }
+    if (const auto* unary = dynamic_cast<const parser::UnaryExpr*>(expr)) {
+        return {unary->op.line, unary->op.col};
+    }
+    if (const auto* binary = dynamic_cast<const parser::BinaryExpr*>(expr)) {
+        return {binary->op.line, binary->op.col};
+    }
+    if (const auto* grouped = dynamic_cast<const parser::GroupedExpr*>(expr)) {
+        return expr_location(grouped->expression.get());
+    }
+    if (const auto* call = dynamic_cast<const parser::CallExpr*>(expr)) {
+        if (const auto* callee = dynamic_cast<const parser::IdentifierExpr*>(call->callee.get())) {
+            return {callee->token.line, callee->token.col};
+        }
+    }
+    return {0, 0};
+}
+
 }  // namespace
 
 void Phase2Analyzer::report(ErrorType type, const std::string& message, int line, int col,
@@ -824,6 +857,16 @@ void Phase2Analyzer::visit(parser::BinaryExpr* expr) {
         propagateStringPair(expr->left.get(), expr->right.get(), left_type, right_type);
         if (left_type.isObject() || right_type.isObject()) {
             report(ErrorType::TYPE_ERROR, "Concatenación inválida entre '" + left_type.toString() + "' y '" + right_type.toString() + "'", expr->op.line, expr->op.col, "expresión binaria");
+        } else if (!left_type.isUnknown() && !left_type.isString()) {
+            report(ErrorType::TYPE_ERROR,
+                   "Operador '" + op + "' solo admite operandos string; se obtuvo '" +
+                       left_type.toString() + "'",
+                   expr->op.line, expr->op.col, "expresión binaria");
+        } else if (!right_type.isUnknown() && !right_type.isString()) {
+            report(ErrorType::TYPE_ERROR,
+                   "Operador '" + op + "' solo admite operandos string; se obtuvo '" +
+                       right_type.toString() + "'",
+                   expr->op.line, expr->op.col, "expresión binaria");
         }
     }
 
@@ -939,7 +982,10 @@ void Phase2Analyzer::visit(parser::GetAttrExpr* expr) {
 void Phase2Analyzer::visit(parser::IfExpr* expr) {
     visitExpr(expr->condition.get());
     if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
-        report(ErrorType::TYPE_ERROR, "La condición de 'if' debe ser de tipo Boolean, se obtuvo '" + current_type_.toString() + "'", 0, 0, "expresión if");
+        const auto [line, col] = expr_location(expr->condition.get());
+        report(ErrorType::TYPE_ERROR,
+               "La condición de 'if' debe ser de tipo Boolean, se obtuvo '" + current_type_.toString() + "'",
+               line, col, "expresión if");
     }
     visitExpr(expr->then_branch.get());
     TypeInfo then_type = current_type_;
@@ -951,7 +997,10 @@ void Phase2Analyzer::visit(parser::IfExpr* expr) {
 void Phase2Analyzer::visit(parser::WhileExpr* expr) {
     visitExpr(expr->condition.get());
     if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
-        report(ErrorType::TYPE_ERROR, "La condición de 'while' debe ser de tipo Boolean, se obtuvo '" + current_type_.toString() + "'", 0, 0, "expresión while");
+        const auto [line, col] = expr_location(expr->condition.get());
+        report(ErrorType::TYPE_ERROR,
+               "La condición de 'while' debe ser de tipo Boolean, se obtuvo '" + current_type_.toString() + "'",
+               line, col, "expresión while");
     }
     visitExpr(expr->body.get());
     if (expr->else_branch) {
@@ -1210,7 +1259,10 @@ void Phase2Analyzer::visit(parser::MethodCallExpr* expr) {
 void Phase2Analyzer::visit(parser::UnlessExpr* expr) {
     visitExpr(expr->condition.get());
     if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
-        report(ErrorType::TYPE_ERROR, "La condición de 'unless' debe ser de tipo Boolean", 0, 0, "unless");
+        const auto [line, col] = expr_location(expr->condition.get());
+        report(ErrorType::TYPE_ERROR,
+               "La condición de 'unless' debe ser de tipo Boolean, se obtuvo '" + current_type_.toString() + "'",
+               line, col, "unless");
     }
     visitExpr(expr->then_branch.get());
     TypeInfo then_type = current_type_;
@@ -1222,7 +1274,10 @@ void Phase2Analyzer::visit(parser::UnlessExpr* expr) {
 void Phase2Analyzer::visit(parser::RepeatExpr* expr) {
     visitExpr(expr->count.get());
     if (!current_type_.isNumeric() && !current_type_.isUnknown()) {
-        report(ErrorType::TYPE_ERROR, "La cantidad de repeticiones debe ser de tipo Number", 0, 0, "repeat");
+        const auto [line, col] = expr_location(expr->count.get());
+        report(ErrorType::TYPE_ERROR,
+               "La cantidad de repeticiones debe ser de tipo Number, se obtuvo '" + current_type_.toString() + "'",
+               line, col, "repeat");
     }
     visitExpr(expr->body.get());
     current_type_ = TypeInfo(TypeInfo::Kind::Void);
@@ -1232,7 +1287,11 @@ void Phase2Analyzer::visit(parser::LoopWhileExpr* expr) {
     visitExpr(expr->body.get());
     visitExpr(expr->condition.get());
     if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
-        report(ErrorType::TYPE_ERROR, "La condición de 'loop-while' debe ser de tipo Boolean", 0, 0, "loop-while");
+        const auto [line, col] = expr_location(expr->condition.get());
+        report(ErrorType::TYPE_ERROR,
+               "La condición de 'loop-while' debe ser de tipo Boolean, se obtuvo '" +
+                   current_type_.toString() + "'",
+               line, col, "loop-while");
     }
     current_type_ = TypeInfo(TypeInfo::Kind::Void);
 }

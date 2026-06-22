@@ -178,7 +178,7 @@ El generador (`Parser/generator/`) comprende tres componentes:
 
 ### 4.6 El parser predictivo y el CST
 
-El parser LL(1) (`Parser/syntax/ll1_parser.*`) mantiene una pila inicializada con el símbolo inicial `Program`. En cada paso empareja un terminal con el token actual de entrada o expande un no terminal usando la entrada de tabla para el anticipación actual. El CST se construye simultáneamente: los nodos internos corresponden a no terminales y las hojas a terminales consumidos.
+El parser LL(1) (`Parser/syntax/ll1_parser.*`) mantiene una pila inicializada con el símbolo inicial `Program`. En cada paso empareja un terminal con el token actual de entrada o expande un no terminal usando la entrada de tabla para el próximo token, sin haberlo consumido aún. El CST se construye simultáneamente: los nodos internos corresponden a no terminales y las hojas a terminales consumidos.
 
 Se generan mensajes de error sensibles al contexto analizando el estado del parseo — por ejemplo, reportando que un operador no es aplicable a una expresión de cierto tipo en lugar de un genérico «token inesperado».
 
@@ -237,7 +237,27 @@ HULK permite omitir anotaciones de tipo en varias posiciones: variables locales 
 
 ### 5.6 Reporte de errores
 
-Los errores semánticos se recogen en un `ErrorManager` y se reportan como `(línea,col) SEMANTIC: mensaje` en la salida de error estándar con código de salida 3. Los diagnósticos idénticos duplicados se colapsan antes de la salida. El modo desarrollo puede listar todos los errores semánticos en una sola ejecución; el pipeline de producción reporta errores solo de la primera fase que falla (los léxicos tienen prioridad sobre los sintácticos, y estos sobre los semánticos).
+El compilador distingue dos modos de reporte:
+
+| Modo | Activación | Comportamiento |
+|------|------------|----------------|
+| **multi-fase** (por defecto) | `./hulk archivo.hulk` | Acumula diagnósticos de todas las fases alcanzables. El parser usa recuperación a nivel de sentencia para construir un AST parcial; la semántica se ejecuta sobre las sentencias válidas. Los mensajes se ordenan por `(línea, columna)` y se deduplican. |
+| **primera fase** | `./hulk --first-phase archivo.hulk` | Se detiene en la primera fase que falla: léxico (exit 1) → sintáctico (exit 2) → semántico (exit 3). Solo se muestran diagnósticos de esa fase. |
+
+Formato de salida: `(línea,col) FASE: mensaje` en stderr (`LEXICAL`, `SYNTACTIC`, `SEMANTIC`). Con errores sintácticos presentes el código de salida es 2 aunque también haya semánticos; sin sintaxis pero con semánticos, exit 3. El AST parcial sirve solo para diagnósticos: no se genera `./output` si la compilación falla. Los errores léxicos irrecuperables (`UNKNOWN`, cadena sin cerrar) siguen abortando antes del parseo.
+
+Ejemplo (`playground/test2.hulk`):
+
+```
+$ ./hulk playground/test2.hulk
+(4,7) SEMANTIC: Variable 'a' no está definida
+(5,10) SYNTACTIC: se esperaba ';' al final de la sentencia
+
+$ ./hulk --first-phase playground/test2.hulk
+(5,10) SYNTACTIC: se esperaba ';' al final de la sentencia
+```
+
+La infraestructura vive en `Compiler/diagnostic.*` y `Compiler/pipeline.cpp`; la recuperación sintáctica en `Parser/syntax/ll1_parser.cpp` (`parse_with_recovery`). Tests: `make test_multi_phase`, `tests/run_multi_phase.sh`.
 
 ---
 

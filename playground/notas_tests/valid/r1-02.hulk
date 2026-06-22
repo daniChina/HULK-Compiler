@@ -1,0 +1,4 @@
+let a=2, b=3 in let c=5 in {
+    let a=3 in print(a+b);
+    print(a);
+};

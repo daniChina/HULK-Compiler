@@ -1,0 +1,3 @@
+function b() => 1;
+function a() => b();
+a();

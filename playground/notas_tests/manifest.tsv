@@ -1,0 +1,119 @@
+# id	path	kind	exit	expect
+blk-01	invalid/blk-01.hulk	invalid	2	El operador '+' solo combina expresiones multiplicativas; un bloque '{ ... }' no
+blk-02b	invalid/blk-02b.hulk	invalid	2	Un bloque '{ ... }' no es una expresion; solo puede usarse como cuerpo de let, i
+blk-04	invalid/blk-04.hulk	invalid	2	Un bloque '{ ... }' no es una expresion; solo puede usarse como cuerpo de let, i
+bool-02	invalid/bool-02.hulk	invalid	3	La condición de 'if' debe ser de tipo Boolean, se obtuvo 'Number'
+bool-03	invalid/bool-03.hulk	invalid	3	Operación aritmética inválida entre 'Boolean' y 'Number'
+bool-05	invalid/bool-05.hulk	invalid	3	Comparación de igualdad inválida entre 'String' y 'Number'
+bool-06	invalid/bool-06.hulk	invalid	3	Operación unaria '!' inválida para el tipo 'Number'
+chain-01	invalid/chain-01.hulk	invalid	3	Variable 'innermost' no está definida
+char-01	invalid/char-01.hulk	invalid	1	unexpected character '$'
+char-04	invalid/char-04.hulk	invalid	2	se esperaba una expresion; el operador '@' requiere un operando a la izquierda (
+cmt-01	invalid/cmt-01.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+cmt-02	invalid/cmt-02.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+cmt-03	invalid/cmt-03.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+func-01	invalid/func-01.hulk	invalid	2	'function' solo puede declararse como sentencia a nivel global, no dentro de una
+glob-01	invalid/glob-01.hulk	invalid	3	Variable 'PI' ya está definida en este ámbito
+glob-02	invalid/glob-02.hulk	invalid	3	Variable 'E' ya está definida en este ámbito
+glob-03	invalid/glob-03.hulk	invalid	3	Función 'sin' ya está definida
+glob-05	invalid/glob-05.hulk	invalid	3	codegen: variable 'PI' no definida para asignacion
+glob-06	invalid/glob-06.hulk	invalid	3	Variable 'PI' ya está definida en este ámbito
+inf-03	invalid/inf-03.hulk	invalid	3	El tipo de la expresión no conforma al tipo declarado: esperado 'Number', obteni
+inf-08	invalid/inf-08.hulk	invalid	3	Operación aritmética inválida entre 'Unknown' y 'String'
+inh-01	invalid/inh-01.hulk	invalid	3	Herencia ciclica detectada en el tipo 'A'
+inh-02	invalid/inh-02.hulk	invalid	3	Herencia ciclica detectada en el tipo 'A'
+inh-03	invalid/inh-03.hulk	invalid	3	Herencia ciclica detectada en el tipo 'A'
+mix-01	invalid/mix-01.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+mix-03	invalid/mix-03.hulk	invalid	3	Operador '@' solo admite operandos string; se obtuvo 'Boolean'
+mix-04	invalid/mix-04.hulk	invalid	3	Comparación de igualdad inválida entre 'Number' y 'String'
+new-02	invalid/new-02.hulk	invalid	3	El argumento 1 del constructor de 'Leaf' tiene tipo 'String' pero se esperaba 'N
+num-04	invalid/num-04.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+pos-01	invalid/pos-01.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+pos-02	invalid/pos-02.hulk	invalid	3	Variable 'zzz' no está definida
+pos-03	invalid/pos-03.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+pos-04	invalid/pos-04.hulk	invalid	3	Variable 'bad' no está definida
+pos-05	invalid/pos-05.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'String'
+pos-06	invalid/pos-06.hulk	invalid	3	Variable 'z' no está definida
+pos-07	invalid/pos-07.hulk	invalid	2	en un let los bindings se separan con ',' y el cuerpo sigue a 'in'; no use ';' e
+pos-08	invalid/pos-08.hulk	invalid	3	El argumento 1 de la función 'sin' tiene tipo 'String' pero se esperaba 'Number'
+pos-09	invalid/pos-09.hulk	invalid	3	Operador '@' solo admite operandos string; se obtuvo 'Boolean'
+print-nest-03	invalid/print-nest-03.hulk	invalid	3	Operación aritmética inválida entre 'Number' y 'Void'
+r1-01	invalid/r1-01.hulk	invalid	3	Variable 'a' ya está definida en este ámbito
+r1-04	invalid/r1-04.hulk	invalid	3	Variable 'PI' ya está definida en este ámbito
+r1-06	invalid/r1-06.hulk	invalid	2	se esperaba ';' pero se encontro ','
+r2-03	invalid/r2-03.hulk	invalid	3	Variable 'x' no está definida
+r2-04	invalid/r2-04.hulk	invalid	3	Variable 'x' no está definida
+r2-06	invalid/r2-06.hulk	invalid	2	'function' solo puede declararse como sentencia a nivel global, no dentro de una
+r2-07	invalid/r2-07.hulk	invalid	3	Variable 'outer' no está definida
+r3-01	invalid/r3-01.hulk	invalid	3	Variable 'x' ya está definida en este ámbito
+r3-04	invalid/r3-04.hulk	invalid	3	Función 'f' ya está definida
+r3-05	invalid/r3-05.hulk	invalid	3	Variable 'x' ya está definida en este ámbito
+r4-01	invalid/r4-01.hulk	invalid	3	Función 'noExiste' no está definida
+r4-02	invalid/r4-02.hulk	invalid	3	Función 'prnt' no está definida
+r4-05	invalid/r4-05.hulk	invalid	3	Función 'print' ya está definida
+r4-06b	invalid/r4-06b.hulk	invalid	0	
+syn-arg-empty	invalid/syn-arg-empty.hulk	invalid	2	se esperaba una expresion antes de ',' en la lista de argumentos
+syn-assign-equal-rhs	invalid/syn-assign-equal-rhs.hulk	invalid	2	se esperaba una expresion despues de ':='; use '=' solo en bindings de 'let', no
+syn-assign-no-rhs	invalid/syn-assign-no-rhs.hulk	invalid	2	se esperaba una expresion despues de ':='
+syn-at-dup	invalid/syn-at-dup.hulk	invalid	2	operador '@' inesperado: falta un operando o hay '@' duplicado (ej. escriba 'a @
+syn-block-extra-semicolon	invalid/syn-block-extra-semicolon.hulk	invalid	2	un bloque usado como sentencia no lleva ';' adicional despues de '}'
+syn-caret-dup	invalid/syn-caret-dup.hulk	invalid	2	operador '^' inesperado: falta un operando o hay '^' duplicado
+syn-class-keyword	invalid/syn-class-keyword.hulk	invalid	2	HULK usa 'type' para declarar clases, no 'class'; escriba 'type Nombre { ... }'
+syn-for-no-collection	invalid/syn-for-no-collection.hulk	invalid	2	se esperaba una expresion (coleccion o iterable) despues de 'in' en el 'for'
+syn-for-no-in	invalid/syn-for-no-in.hulk	invalid	2	se esperaba 'in' despues del nombre de la variable en el 'for'
+syn-func-no-body	invalid/syn-func-no-body.hulk	invalid	2	se esperaba una expresion despues de '=>' en la declaracion de funcion
+syn-if-elseif	invalid/syn-if-elseif.hulk	invalid	2	se esperaba 'elif' o 'else'; HULK no admite la palabra clave 'elseif'
+syn-if-no-else-body	invalid/syn-if-no-else-body.hulk	invalid	2	se esperaba el cuerpo del 'else' antes de ';'
+syn-if-no-then	invalid/syn-if-no-then.hulk	invalid	2	se esperaba el cuerpo del 'if' (expresion o bloque) antes de 'else'
+syn-let-at-init	invalid/syn-let-at-init.hulk	invalid	2	se esperaba una expresion; el operador '@' requiere un operando a la izquierda (
+syn-let-no-init	invalid/syn-let-no-init.hulk	invalid	2	se esperaba una expresion despues de '=' en el binding de 'let'
+syn-let-no-name	invalid/syn-let-no-name.hulk	invalid	2	se esperaba un nombre de variable despues de 'let'
+syn-let-trailing-comma	invalid/syn-let-trailing-comma.hulk	invalid	2	se esperaba otro binding o 'in' despues de la coma en el 'let'
+syn-let-type-no-name	invalid/syn-let-type-no-name.hulk	invalid	2	se esperaba el nombre del tipo despues de ':' en el binding de 'let'
+syn-star-dup	invalid/syn-star-dup.hulk	invalid	2	operador '*' inesperado: falta un operando o hay '*' duplicado
+syn-type-attr-after-method	invalid/syn-type-attr-after-method.hulk	invalid	2	los atributos deben declararse antes que los metodos en un 'type'
+syn-type-attr-no-init	invalid/syn-type-attr-no-init.hulk	invalid	2	todo atributo debe tener valor inicial: 'nombre: Tipo = expresion;'
+syn-type-missing-colon	invalid/syn-type-missing-colon.hulk	invalid	2	se esperaba ':' despues del nombre del atributo (ej. 'x: Number = 0')
+syn-type-no-init-value	invalid/syn-type-no-init-value.hulk	invalid	2	se esperaba una expresion despues de '=' en el atributo del 'type'
+syn-while-no-body	invalid/syn-while-no-body.hulk	invalid	2	se esperaba el cuerpo del 'while' antes de 'else'
+syn-while-no-else-body	invalid/syn-while-no-else-body.hulk	invalid	2	se esperaba el cuerpo del 'else' del 'while' antes de ';'
+type-02	invalid/type-02.hulk	invalid	3	Tipo 'Ghost' no está definido
+type-04	invalid/type-04.hulk	invalid	3	Casteo inválido: no se puede convertir de 'Number' a 'String'
+blk-02	valid/blk-02.hulk	valid	0	
+blk-03	valid/blk-03.hulk	valid	0	
+blk-05	valid/blk-05.hulk	valid	0	
+bool-01	valid/bool-01.hulk	valid	0	
+bool-04	valid/bool-04.hulk	valid	0	
+char-02	valid/char-02.hulk	valid	0	
+char-03	valid/char-03.hulk	valid	0	
+glob-04	valid/glob-04.hulk	valid	0	
+inf-01	valid/inf-01.hulk	valid	0	
+inf-02	valid/inf-02.hulk	valid	0	
+inf-04	valid/inf-04.hulk	valid	0	
+inf-05	valid/inf-05.hulk	valid	0	
+inf-06	valid/inf-06.hulk	valid	0	
+inf-07	valid/inf-07.hulk	valid	0	
+mix-02	valid/mix-02.hulk	valid	0	
+new-01	valid/new-01.hulk	valid	0	
+num-01	valid/num-01.hulk	valid	0	
+num-02	valid/num-02.hulk	valid	0	
+num-03	valid/num-03.hulk	valid	0	
+num-05	valid/num-05.hulk	valid	0	
+num-06	valid/num-06.hulk	valid	0	
+print-nest-01	valid/print-nest-01.hulk	valid	0	
+print-nest-02	valid/print-nest-02.hulk	valid	0	
+r1-02	valid/r1-02.hulk	valid	0	
+r1-03	valid/r1-03.hulk	valid	0	
+r1-05	valid/r1-05.hulk	valid	0	
+r2-01	valid/r2-01.hulk	valid	0	
+r2-02	valid/r2-02.hulk	valid	0	
+r2-05	valid/r2-05.hulk	valid	0	
+r3-02	valid/r3-02.hulk	valid	0	
+r3-03	valid/r3-03.hulk	valid	0	
+r4-03	valid/r4-03.hulk	valid	0	
+r4-04	valid/r4-04.hulk	valid	0	
+r4-06	valid/r4-06.hulk	valid	0	
+type-01	valid/type-01.hulk	valid	0	
+type-03	valid/type-03.hulk	valid	0	
+type-05	valid/type-05.hulk	valid	0	
+type-06	valid/type-06.hulk	valid	0	

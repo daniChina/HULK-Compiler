@@ -1,0 +1,4 @@
+type Base() {}
+type Mid() inherits Base() {}
+type Leaf() inherits Mid() {}
+print(new Leaf());

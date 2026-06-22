@@ -1,6 +1,6 @@
 MATCOM_OOP_PARSE_TARGET = matcom_oop_parse_smoke
 
-.PHONY: all compile compile_nollvm build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm test_llvm_fixtures
+.PHONY: all compile compile_nollvm build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm test_llvm_fixtures test_diagnostic test_ll1_recovery test_multi_phase
 
 # --- LLVM (Fase 4): compile enlaza libLLVM si llvm-config está en PATH (Fase D) ---
 LLVM_CONFIG ?= llvm-config
@@ -85,6 +85,7 @@ SOURCES = Lexer/hulk_lexer.cpp \
           Value/value.cpp \
           Evaluator/evaluator.cpp \
           Compiler/pipeline.cpp \
+          Compiler/diagnostic.cpp \
           Compiler/output_gen.cpp \
           Compiler/main.cpp
 
@@ -105,6 +106,7 @@ OUTPUT_SOURCES = Lexer/hulk_lexer.cpp \
           Value/value.cpp \
           Evaluator/evaluator.cpp \
           Compiler/pipeline.cpp \
+          Compiler/diagnostic.cpp \
           Compiler/output_main.cpp
 
 HULK_BIN = hulk
@@ -140,6 +142,9 @@ EVAL_WITH_TEST_TARGET = eval_with_smoke
 EVAL_OO_TEST_TARGET = eval_oo_smoke
 EVAL_LITERALS_TEST_TARGET = eval_literals_smoke
 IS_AS_SMOKE_TARGET = is_as_smoke
+DIAGNOSTIC_TEST_TARGET = diagnostic_smoke
+LL1_RECOVERY_TEST_TARGET = ll1_recovery_smoke
+MULTI_PHASE_TEST_TARGET = multi_phase_diagnostic_smoke
 
 TARGET = hulk_c.exe
 TYPE_TEST_TARGET = type_info_smoke
@@ -215,6 +220,19 @@ test_type_map:
 	./$(TYPE_MAP_TEST_TARGET)
 
 test_semantic: test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map
+
+test_diagnostic:
+	$(CXX) $(CXXFLAGS) Compiler/tests/diagnostic_smoke.cpp Compiler/diagnostic.cpp -o $(DIAGNOSTIC_TEST_TARGET)
+	./$(DIAGNOSTIC_TEST_TARGET)
+
+test_ll1_recovery:
+	$(CXX) $(CXXFLAGS) Parser/tests/ll1_recovery_smoke.cpp $(PARSER_TEST_COMMON) -o $(LL1_RECOVERY_TEST_TARGET)
+	./$(LL1_RECOVERY_TEST_TARGET)
+
+test_multi_phase: compile
+	$(CXX) $(CXXFLAGS) Compiler/tests/multi_phase_diagnostic_smoke.cpp Compiler/pipeline.cpp Compiler/diagnostic.cpp $(PARSER_TEST_COMMON) SemanticCheck/phase2_checker.cpp Value/value.cpp Evaluator/evaluator.cpp -o $(MULTI_PHASE_TEST_TARGET)
+	./$(MULTI_PHASE_TEST_TARGET)
+	bash tests/run_multi_phase.sh
 
 test_is_as_smoke:
 	$(CXX) $(CXXFLAGS) Parser/tests/is_as_expr_pipeline_smoke.cpp $(PARSER_TEST_COMMON) -o $(IS_AS_SMOKE_TARGET)

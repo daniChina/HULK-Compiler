@@ -1,0 +1,4 @@
+print(1);
+// COMENTARIO DE LINEA
+// OTRO COMENTARIO
+print(2 + "x");

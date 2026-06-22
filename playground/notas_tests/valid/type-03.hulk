@@ -1,0 +1,3 @@
+type A() {}
+type B() inherits A() {}
+let a:A = new B() in { let b:B = a as B in print(1); };

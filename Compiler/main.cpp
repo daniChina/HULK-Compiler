@@ -31,6 +31,7 @@ struct Options {
     bool run_semantic = false;
     bool run_interpret = false;
     bool matcom_mode = false;
+    bool all_errors = true;
     std::string input_path;
 };
 
@@ -39,7 +40,8 @@ void print_usage(const char* program_name) {
         << "Uso: " << program_name << " <archivo.hulk>\n"
         << "     " << program_name
         << " [--tokens] [--cst] [--ast] [--symbols] [--semantic] [--interpret] [archivo.hulk]\n"
-        << "  Modo matcom (sin flags): compila a ./output\n"
+        << "  Modo matcom (sin flags): compila a ./output; reporta todos los errores\n"
+        << "  --first-phase         Solo errores de la primera fase que falla (lex/syn/sem)\n"
         << "  Modo desarrollo: flags de depuracion; --interpret ejecuta el evaluador\n";
 }
 
@@ -71,6 +73,14 @@ Options parse_options(int argc, char* argv[]) {
         }
         if (arg == "--interpret") {
             options.run_interpret = true;
+            continue;
+        }
+        if (arg == "--first-phase") {
+            options.all_errors = false;
+            continue;
+        }
+        if (arg == "--all-errors") {
+            options.all_errors = true;
             continue;
         }
         if (arg == "--help" || arg == "-h") {
@@ -109,9 +119,11 @@ void print_tokens(const parser::TokenList& tokens) {
     }
 }
 
-int run_matcom(const std::string& input_path) {
+int run_matcom(const std::string& input_path, bool all_errors) {
     const std::string source = read_file(input_path);
-    const auto compiled = hulk::compile_program(source);
+    hulk::CompileOptions options;
+    options.all_errors = all_errors;
+    const auto compiled = hulk::compile_program(source, "Parser/grammar/grammar.ll1", options);
     if (compiled.diagnostic.exit_code != 0) {
         for (const auto& line : compiled.diagnostic.lines) {
             std::cerr << line << '\n';
@@ -225,7 +237,7 @@ int main(int argc, char* argv[]) {
     try {
         const auto options = parse_options(argc, argv);
         if (options.matcom_mode) {
-            return run_matcom(options.input_path);
+            return run_matcom(options.input_path, options.all_errors);
         }
         return run_development(options);
     } catch (const parser::ParseError& error) {

@@ -762,3 +762,60 @@ PI := 3;
 // Esperado: REDEFINED_VARIABLE
 let x = 1 in let PI = 2 in print(PI);
 ```
+
+---
+
+## Fixtures en el repo
+
+Los casos anteriores están implementados como archivos `.hulk` en [`playground/notas_tests/`](notas_tests/) (93 fixtures en `valid/` e `invalid/`).
+
+Verificación:
+
+```bash
+bash playground/verify_notas_tests.sh
+```
+
+Regenerar expectativas del manifest tras cambiar el compilador:
+
+```bash
+python3 scripts/gen_notas_manifest.py
+```
+
+
+
+
+
+
+
+
+
+
+
+1. **`function` solo como sentencia global** — no puedes escribir `let x = 1 in function f() => x + 1 in ...` (error **sintáctico**: `function` no es expresión).
+
+
+
+hay que hacer un caso que me compruebe que no se permita esto
+
+
+
+
+para este caso
+
+| Detectar ciclos | `A inherits B inherits A` o `A inherits A` | `validateInheritanceChain`: recorre padres con un `set` de visitados |
+
+
+probar con ciclos mas grandes y complejos a ver si los encuentra bien
+
+
+
+para este otro caso 
+
+**`new` — validación**
+
+**Uso en el lenguaje:** `new NombreTipo(arg1, arg2, ...)` crea una instancia.
+
+
+crear casos en el que se creen nuevos tipos
+
+y comprobar creacion de elementos que hereden de otros que hereden de otros y poner un error de codigo en el 3ero del que hereden

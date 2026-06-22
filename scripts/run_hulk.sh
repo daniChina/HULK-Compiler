@@ -17,12 +17,16 @@ NO_BUILD=""
 NO_AST=""
 NO_CST=""
 
+ALL_ERRORS=""
+FIRST_PHASE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --lexer)          MODE="lexer"; shift ;;
     --parse)          MODE="parse"; shift ;;
     --semantic-only)  MODE="semantic"; shift ;;
     --pipeline)       MODE="pipeline"; shift ;;
+    --all-errors)     ALL_ERRORS="--all-errors"; shift ;;
+    --first-phase)    FIRST_PHASE="--first-phase"; shift ;;
     --no-build)       NO_BUILD=1; shift ;;
     --no-ast)         NO_AST=1; shift ;;
     --no-cst)         NO_CST=1; shift ;;
@@ -35,6 +39,8 @@ Uso: run_hulk.sh [opciones] [archivo.hulk]
   --parse           CST + AST (Fase 1)
   --semantic-only   Solo analisis semantico (Fase 2)
   --pipeline        Las cuatro fases en orden
+  --first-phase     Solo errores de la primera fase que falla (lex/syn/sem)
+  --all-errors      Equivalente al modo por defecto (todos los errores)
   --no-ast          En --parse / --pipeline, omitir AST
   --no-cst          En --parse / --pipeline, omitir CST
 EOF
@@ -88,7 +94,7 @@ run_stage() {
   OUT="$(mktemp)"
   ERR="$(mktemp)"
   set +e
-  "$HULK" "${args[@]}" >"$OUT" 2>"$ERR"
+  "$HULK" $ALL_ERRORS $FIRST_PHASE "${args[@]}" >"$OUT" 2>"$ERR"
   local code=$?
   set -e
 

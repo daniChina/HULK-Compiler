@@ -57,4 +57,54 @@ bool TokenStream::at_end() const {
     return current().type == TokenType::EOF_TOKEN;
 }
 
+int TokenStream::unclosed_lparen_count() const {
+    int depth = 0;
+    const std::size_t limit = std::min(index_, tokens_.size());
+    for (std::size_t i = 0; i < limit; ++i) {
+        switch (tokens_[i].type) {
+        case TokenType::LPAREN:
+            ++depth;
+            break;
+        case TokenType::RPAREN:
+            if (depth > 0) {
+                --depth;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    return depth;
+}
+
+int TokenStream::unclosed_lbrace_count() const {
+    int depth = 0;
+    const std::size_t limit = std::min(index_, tokens_.size());
+    for (std::size_t i = 0; i < limit; ++i) {
+        switch (tokens_[i].type) {
+        case TokenType::LBRACE:
+            ++depth;
+            break;
+        case TokenType::RBRACE:
+            if (depth > 0) {
+                --depth;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    return depth;
+}
+
+bool TokenStream::has_scanned_token(TokenType type) const {
+    const std::size_t limit = std::min(index_, tokens_.size());
+    for (std::size_t i = 0; i < limit; ++i) {
+        if (tokens_[i].type == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace parser

@@ -1,0 +1,4 @@
+// TEST 17 — Grupo 1: falta ';' al final de sentencia (EOF)
+// Esperado: (1,8) SYNTACTIC: se esperaba ';' al final de la sentencia
+
+print(1)

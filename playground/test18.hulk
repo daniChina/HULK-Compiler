@@ -1,0 +1,4 @@
+// TEST 18 — Grupo 2: parentesis abierto sin cerrar (EOF)
+// Esperado: (1,7) SYNTACTIC: falta ')' para cerrar la expresion o la llamada a funcion
+
+print(1

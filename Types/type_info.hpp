@@ -206,10 +206,10 @@ public:
             return TypeInfo(Kind::Number);
         }
 
-        // String concatenation
+        // String concatenation: ambos operandos deben ser string.
         if (op == "@" || op == "@@")
         {
-            if (left.isString() || right.isString())
+            if (left.isString() && right.isString())
             {
                 return TypeInfo(Kind::String);
             }

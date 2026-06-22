@@ -1,0 +1,4 @@
+type Bird() {}
+type Plane() {}
+type Superman() {}
+let x = new Superman() in print(if (x is Bird) "bird" else "super");

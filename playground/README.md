@@ -20,3 +20,11 @@ Desde la **raiz del repo**:
 ```
 
 Instrucciones completas: [`README.md`](../README.md).
+
+## Fixtures de notas (`notas_tests.md`)
+
+Casos catalogados en [`notas_tests.md`](notas_tests.md) → archivos en [`notas_tests/`](notas_tests/).
+
+```bash
+bash playground/verify_notas_tests.sh   # 93 casos valid/ + invalid/
+```

@@ -1,0 +1,3 @@
+type A inherits C {}
+type B inherits A {}
+type C inherits B {}

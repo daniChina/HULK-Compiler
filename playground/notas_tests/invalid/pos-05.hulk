@@ -1,0 +1,4 @@
+/*
+comentario largo
+*/
+print(1 + "x");

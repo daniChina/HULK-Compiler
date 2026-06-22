@@ -13,6 +13,7 @@
 #include "../Parser/syntax/ll1_parser.hpp"
 #include "../SemanticCheck/error.hpp"
 #include "../SemanticCheck/phase2_checker.hpp"
+#include "diagnostic.hpp"
 #include "matcom_diagnostic.hpp"
 
 namespace hulk {
@@ -34,40 +35,39 @@ parser::TokenList tokenize_source_string(const std::string& source) {
     return parser::tokenize_stream(input);
 }
 
-CompileDiagnostic fail_lexical(int line, int col, const std::string& message) {
+CompileDiagnostic fail_lexical(int line, int col, const std::string& message, bool all_errors) {
     CompileDiagnostic result;
-    result.phase = CompilePhase::Lexical;
-    result.exit_code = 1;
-    result.lines.push_back(format_lexical(line, col, message));
+  std::vector<Diagnostic> items = {
+        Diagnostic{line, col, DiagnosticKind::Lexical, message},
+    };
+    finalize_compile_diagnostic(result.phase, result.exit_code, items, result.lines, all_errors);
+    result.items = std::move(items);
     return result;
 }
 
-CompileDiagnostic fail_syntactic(int line, int col, const std::string& message) {
+CompileDiagnostic fail_syntactic(int line, int col, const std::string& message, bool all_errors) {
     CompileDiagnostic result;
-    result.phase = CompilePhase::Syntactic;
-    result.exit_code = 2;
-    result.lines.push_back(format_syntactic(line, col, message));
+    std::vector<Diagnostic> items = {
+        Diagnostic{line, col, DiagnosticKind::Syntactic, message},
+    };
+    finalize_compile_diagnostic(result.phase, result.exit_code, items, result.lines, all_errors);
+    result.items = std::move(items);
     return result;
 }
 
-CompileDiagnostic fail_semantic(const std::vector<SemanticError>& errors) {
+CompileDiagnostic fail_semantic(const std::vector<SemanticError>& errors, bool all_errors) {
     CompileDiagnostic result;
-    result.phase = CompilePhase::Semantic;
-    result.exit_code = 3;
-    std::vector<std::string> seen;
+    std::vector<Diagnostic> items;
     for (const auto& error : errors) {
         const int line = error.line > 0 ? error.line : 0;
         const int col = error.column > 0 ? error.column : 0;
-        const std::string formatted = format_semantic(line, col, error.message);
-        if (std::find(seen.begin(), seen.end(), formatted) != seen.end()) {
-            continue;
-        }
-        seen.push_back(formatted);
-        result.lines.push_back(formatted);
+        items.push_back(Diagnostic{line, col, DiagnosticKind::Semantic, error.message});
     }
-    if (result.lines.empty()) {
-        result.lines.push_back(format_semantic(0, 0, "semantic analysis failed"));
+    if (items.empty()) {
+        items.push_back(Diagnostic{0, 0, DiagnosticKind::Semantic, "semantic analysis failed"});
     }
+    finalize_compile_diagnostic(result.phase, result.exit_code, items, result.lines, all_errors);
+    result.items = std::move(items);
     return result;
 }
 
@@ -77,7 +77,9 @@ CompileDiagnostic compile_source(const std::string& source, const std::string& g
     return compile_program(source, grammar_path).diagnostic;
 }
 
-CompiledProgram compile_program(const std::string& source, const std::string& grammar_path) {
+CompiledProgram compile_program(const std::string& source,
+                                const std::string& grammar_path,
+                                CompileOptions options) {
     CompiledProgram result;
 
     const auto grammar = parser::generator::read_grammar_file(grammar_path);
@@ -87,22 +89,84 @@ CompiledProgram compile_program(const std::string& source, const std::string& gr
     parser::TokenList tokens = tokenize_source_string(source);
     for (const auto& token : tokens) {
         if (token.type == parser::TokenType::UNKNOWN) {
-            const std::string ch = token.lexeme.empty() ? "?" : token.lexeme;
+            const std::string message =
+                token.lexeme == "unclosed string"
+                    ? "cadena sin cerrar"
+                    : "unexpected character '" +
+                          (token.lexeme.empty() ? "?" : token.lexeme) + "'";
+            result.diagnostic = fail_lexical(token.line, token.col, message, options.all_errors);
+            return result;
+        }
+        if (token.type == parser::TokenType::STRING_LITERAL && !token.lexeme.empty() &&
+            token.lexeme.front() == '"' && token.lexeme.back() != '"') {
             result.diagnostic = fail_lexical(token.line, token.col,
-                                             "unexpected character '" + ch + "'");
+                                             "cadena sin cerrar",
+                                             options.all_errors);
             return result;
         }
     }
 
     try {
-        parser::Ll1Parser parser_engine(std::move(tokens), grammar, table);
-        const auto parse_result = parser_engine.parse();
-        auto program = parser::cst_to_ast(*parse_result.cst_root);
+        const auto& stmt_first = first_follow.first_sets.at("Stmt");
+        parser::Ll1Parser parser_engine(std::move(tokens), grammar, table, &stmt_first);
 
-        semantic::Phase2Analyzer analyzer;
-        analyzer.analyze(program.get());
-        if (analyzer.hasErrors()) {
-            result.diagnostic = fail_semantic(analyzer.getErrors());
+        parser::Ll1ParseResult parse_result;
+        std::vector<Diagnostic> syntactic_items;
+
+        if (options.all_errors) {
+            parse_result = parser_engine.parse_with_recovery();
+            for (const auto& error : parse_result.errors) {
+                syntactic_items.push_back(
+                    Diagnostic{error.line, error.col, DiagnosticKind::Syntactic, error.message});
+            }
+        } else {
+            parse_result = parser_engine.parse();
+        }
+
+        parser::ProgramPtr program;
+        try {
+            program = parser::cst_to_ast(*parse_result.cst_root);
+        } catch (const std::exception& conversion_error) {
+            if (!options.all_errors) {
+                result.diagnostic = fail_syntactic(0, 0, conversion_error.what(), false);
+                return result;
+            }
+            syntactic_items.push_back(
+                Diagnostic{0, 0, DiagnosticKind::Syntactic, conversion_error.what()});
+        }
+
+        if (program) {
+            semantic::Phase2Analyzer analyzer;
+            analyzer.analyze(program.get());
+            if (analyzer.hasErrors()) {
+                const auto semantic_diag = fail_semantic(analyzer.getErrors(), options.all_errors);
+                if (options.all_errors) {
+                    result.diagnostic.items =
+                        merge_diagnostics(std::move(syntactic_items), semantic_diag.items);
+                    finalize_compile_diagnostic(result.diagnostic.phase,
+                                                result.diagnostic.exit_code,
+                                                result.diagnostic.items,
+                                                result.diagnostic.lines,
+                                                true);
+                    return result;
+                }
+                result.diagnostic = semantic_diag;
+                return result;
+            }
+        }
+
+        if (!syntactic_items.empty()) {
+            result.diagnostic.items = std::move(syntactic_items);
+            finalize_compile_diagnostic(result.diagnostic.phase,
+                                        result.diagnostic.exit_code,
+                                        result.diagnostic.items,
+                                        result.diagnostic.lines,
+                                        options.all_errors);
+            return result;
+        }
+
+        if (!program) {
+            result.diagnostic = fail_syntactic(0, 0, "syntax analysis failed", options.all_errors);
             return result;
         }
 
@@ -112,10 +176,11 @@ CompiledProgram compile_program(const std::string& source, const std::string& gr
         return result;
     } catch (const parser::ParseError& error) {
         const auto& token = error.found();
-        result.diagnostic = fail_syntactic(token.line, token.col, error.user_message());
+        result.diagnostic = fail_syntactic(token.line, token.col, error.user_message(),
+                                           options.all_errors);
         return result;
     } catch (const std::exception& error) {
-        result.diagnostic = fail_syntactic(0, 0, error.what());
+        result.diagnostic = fail_syntactic(0, 0, error.what(), options.all_errors);
         return result;
     }
 }

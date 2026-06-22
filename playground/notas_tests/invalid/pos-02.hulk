@@ -1,0 +1,3 @@
+function outer() => inner(1);
+function inner(x) => x + zzz;
+outer();

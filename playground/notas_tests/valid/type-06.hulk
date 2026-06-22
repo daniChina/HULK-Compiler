@@ -1,0 +1,3 @@
+type Shape() { area() => 0; }
+type Circle(r) inherits Shape() { r = r; area() => PI * self.r ^ 2; }
+let s:Shape = new Circle(5) in if (s is Circle) print((s as Circle).r);

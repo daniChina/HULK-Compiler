@@ -1,0 +1,4 @@
+type Base() {}
+type Mid() inherits Base() {}
+type Leaf(x:Number) inherits Mid() {}
+print(new Leaf("bad"));

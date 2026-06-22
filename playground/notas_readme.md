@@ -212,6 +212,10 @@ Podrías decir:
 
 > “Expande el no terminal consultando la **tabla LL(1)**: fila = no terminal en la cima de la pila, columna = **token de lookahead** (el siguiente token sin consumir). La celda indica qué producción aplicar.”
 
+
+Arregla este nuevo cambio en el reporte
+
+
 **Anticipación (lookahead)** = el **próximo token real** del stream, sin haberlo consumido aún. En código: `current_terminal()` → nombre del token actual (`PLUS`, `LET`, …). La tabla responde: “viendo `PLUS`, ¿cómo expando `AddExprTail`?”.
 
 ---

@@ -1,0 +1,2 @@
+function triple(n) => n * 3;
+print(triple(7));

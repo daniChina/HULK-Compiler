@@ -1,0 +1,5 @@
+// Bloque como cuerpo de let (BlockExpr en LetBody, no en el binding)
+let x = 1 in {
+    print(1);
+    print(x);
+};

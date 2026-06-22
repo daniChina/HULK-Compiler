@@ -1,0 +1,6 @@
+# id	path	mode	exit	expect_substrings (| separated)
+M1	invalid/01_semantic_then_syntax.hulk	default	2	SEMANTIC: Variable 'a' no está definida|SYNTACTIC: se esperaba ';'
+M2	invalid/01_semantic_then_syntax.hulk	first-phase	2	SYNTACTIC:
+M3	invalid/02_two_syntax_errors.hulk	default	2	SYNTACTIC:
+M4	valid/01_ok.hulk	default	0	
+M5	valid/01_ok.hulk	first-phase	0	

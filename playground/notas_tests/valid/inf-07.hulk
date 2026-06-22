@@ -1,0 +1,2 @@
+type T(x) { x = x; getX() => self.x; }
+print(new T(5).getX());

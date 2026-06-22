@@ -768,8 +768,6 @@ YY_RULE_SETUP
                 while (true) {
                     ch = yyinput();
                     if (ch == 0 || ch == '\n') {
-                        std::cerr << "[Lexer] linea " << line_
-                                  << ": cadena sin cerrar\n";
                         break;
                     }
                     ++column_;

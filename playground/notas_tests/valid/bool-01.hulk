@@ -1,0 +1,3 @@
+print(if (true and false) "and" else "no and");
+print(if (true or false) "or" else "no or");
+print(if (!false) "not false" else "false");

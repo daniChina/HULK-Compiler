@@ -1,0 +1,1 @@
+let outer = 1 in function f() => outer + 1 in f();
