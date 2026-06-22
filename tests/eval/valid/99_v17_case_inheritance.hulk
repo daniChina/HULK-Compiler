@@ -1,0 +1,10 @@
+type A() { }
+type B() inherits A() { }
+type C() inherits B() { }
+type D() inherits A() { }
+
+let o: Object = new C() in case o of {
+    a:A -> print("A");
+    b:B -> print("B");
+    d:D -> print("D");
+};

@@ -1,0 +1,1 @@
+print(let n = 0 in { repeat (3) n := n + 1; n; });

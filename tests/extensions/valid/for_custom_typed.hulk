@@ -1,0 +1,7 @@
+type TimesTen() {
+    n: Number = 0;
+    next() { self.n := self.n + 1; self.n <= 3; }
+    current() => self.n * 10;
+}
+
+for (x: Number in new TimesTen()) print(x);

@@ -13,6 +13,7 @@ No se encontró FlexLexer.h en:
   $FlexHeader
 
 Instala WinFlexBison (winget install WinFlexBison.win_flex_bison) o ajusta FLEX_WIN en el Makefile.
+Ver REQUIREMENTS.md.
 "@
 }
 

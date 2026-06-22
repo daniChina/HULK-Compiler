@@ -1,3 +1,4 @@
+// Fase 0.3: valida que el AST postfix coincide con el contrato del parser (§10.2).
 
 #include <exception>
 #include <iostream>

@@ -1,3 +1,4 @@
+# Verifica toolchain HULK (Windows) — Gate A (LLVM 21.1.x)
 # Uso: . .\scripts\setup_build_env.ps1; .\scripts\check_toolchain.ps1
 
 $ErrorActionPreference = "Stop"
@@ -26,6 +27,7 @@ Require-Command "llvm-config" {
     $ver = llvm-config --version
     Write-Host "     llvm-config --version = $ver"
     if ($ver -notmatch "^21\.1\.") {
+        Write-Host "FAIL: se espera LLVM 21.1.x (REQUIREMENTS.md)" -ForegroundColor Red
         $script:fail = $true
     }
 }
@@ -38,6 +40,7 @@ if ($llvmPaths.Count -gt 1) {
 }
 
 if ($fail) {
+    Write-Host "`nToolchain incompleto. Ver REQUIREMENTS.md." -ForegroundColor Red
     exit 1
 }
 

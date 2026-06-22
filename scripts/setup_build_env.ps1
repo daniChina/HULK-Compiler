@@ -2,6 +2,7 @@
 # Uso: . .\scripts\setup_build_env.ps1
 #
 # Requiere MSYS2 UCRT64 con llvm-21, clang y gcc del mismo prefix.
+# Ver REQUIREMENTS.md.
 
 $ErrorActionPreference = "Stop"
 
@@ -55,6 +56,7 @@ foreach ($tool in @("g++", "mingw32-make", "llvm-config", "clang")) {
             $ver = & llvm-config --version 2>$null
             Write-Host "  llvm-config --version = $ver"
             if ($ver -notmatch "^21\.1\.") {
+                Write-Warning "Se espera LLVM 21.1.x (REQUIREMENTS.md). Encontrado: $ver"
             }
         }
     }

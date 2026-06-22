@@ -1,0 +1,8 @@
+type A() { }
+type B() inherits A() { }
+type C() inherits B() { }
+
+case new C() of {
+    a:A -> print("A");
+    b:B -> print("B");
+};

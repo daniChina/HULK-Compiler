@@ -1,0 +1,4 @@
+type A() { }
+type B() inherits A() { }
+
+case new B() of b:B -> print("compact");

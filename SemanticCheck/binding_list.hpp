@@ -18,6 +18,7 @@ using LetBindingEntry = std::tuple<parser::Token, std::optional<parser::Token>, 
 // Devuelve el error con la posición del binding duplicado (segunda aparición).
 std::optional<SemanticError> findDuplicateLetBinding(const std::vector<LetBindingEntry>& bindings);
 
+// Registra duplicados para reportarlos en --semantic (R1: binding duplicado en let).
 void enqueueDuplicateLetBindingErrors(const std::vector<LetBindingEntry>& bindings);
 
 void drainPendingLetBindingErrors(ErrorManager& into);

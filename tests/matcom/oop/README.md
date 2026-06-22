@@ -7,6 +7,7 @@ Copias locales de los 11 tests obligatorios de OOP del CI de [matcom/compilers](
 | `*.hulk` | Fuente **matcom** (`type` / `inherits` / métodos con `{ }`) — **usar estos** |
 | `dialect/*.hulk` | ~~Traducción `class`/`is`~~ **obsoleta** (jun 2026) |
 
+**Dialecto matcom:** `type` / `inherits` / métodos con `{ }` — ver [`REPORT.md`](../../../REPORT.md) § matcom.
 
 **Ejecución:**
 

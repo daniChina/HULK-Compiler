@@ -1,0 +1,2 @@
+print(with (1 as a) a);
+print(with (Null as x) x else 42);

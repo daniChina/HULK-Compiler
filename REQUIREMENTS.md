@@ -27,6 +27,7 @@ El proyecto separa dos niveles: **build base** (lexer → evaluador) y **codegen
 
 > **Nota:** el parser es **LL(1) manual**; no se usa Bison en el build habitual.
 
+> **Versión LLVM:** el proyecto usa **LLVM 21.1.x** única en Windows y Ubuntu (descubrimiento vía `PATH`). Instalación: secciones Windows/Ubuntu abajo.
 
 ---
 
@@ -244,14 +245,6 @@ make test_llvm LLVM_CONFIG=llvm-config-21
 
 ---
 
-## Workspace (documentación local)
-
-
-| Ruta | Contenido |
-|------|-----------|
-
----
-
 ## Verificación rápida (cheatsheet)
 
 ### Windows (PowerShell)
@@ -260,6 +253,7 @@ make test_llvm LLVM_CONFIG=llvm-config-21
 . .\scripts\setup_build_env.ps1
 .\scripts\check_toolchain.ps1    # base + Fase 4
 mingw32-make compile && mingw32-make test_semantic && mingw32-make test_eval
+mingw32-make test_llvm          # Fase 4 (tras migración API LLVM)
 ```
 
 ### Ubuntu
@@ -285,3 +279,4 @@ make test_llvm                   # Fase 4 (tras migración API)
 - [`README.md`](README.md) — uso diario y scripts `run_hulk`
 - [`scripts/setup_build_env.ps1`](scripts/setup_build_env.ps1) — PATH Windows (UCRT64 + LLVM 21)
 - [`scripts/check_toolchain.ps1`](scripts/check_toolchain.ps1) — verificación Gate A (opcional)
+- [`REPORT.md`](REPORT.md) — informe de arquitectura y fases del compilador

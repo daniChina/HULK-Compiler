@@ -1,0 +1,7 @@
+type SimpleIter() {
+    n: Number = -1;
+    next() { self.n := self.n + 1; self.n < 3; }
+    current() => self.n;
+}
+
+for (x in new SimpleIter()) print(x);

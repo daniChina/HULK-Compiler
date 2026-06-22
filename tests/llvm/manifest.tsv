@@ -3,7 +3,6 @@
 # Formato:
 #   valid/<nombre.hulk>    llvm_ok    <subcadena en .ll o nota>
 #
-
 # I0 — infra (@main vacío verificado por Codegen/tests/i0_module_smoke.cpp)
 # valid/01_l0_module_smoke.hulk    llvm_ok    @main    (runner hulk pendiente I4)
 

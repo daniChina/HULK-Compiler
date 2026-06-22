@@ -1,6 +1,7 @@
 # HULK-Compiler
 
 Compilador del lenguaje **HULK** (lexer, parser LL(1), analisis semantico, interprete).  
+En desarrollo: **Fase 4** — codegen LLVM incremental; alineacion CI [matcom/compilers](https://github.com/matcom/compilers).
 
 ---
 
@@ -18,6 +19,7 @@ nano playground/mi_programa.hulk
 
 ## Ejecutar un programa `.hulk`
 
+> **Importante:** todos los comandos `make` y `./hulk` se ejecutan desde la **raíz del repo** (donde está el `Makefile`), no desde subcarpetas.
 
 ### 1. Compilar el compilador (una vez)
 
@@ -45,6 +47,7 @@ make compile    # → hulk_c.exe
 make build      # copia a ./hulk
 ```
 
+Desarrollo local usa flags (`--interpret`, etc.); modo matcom: `./hulk archivo.hulk` → `./output`.
 
 ### 2. Escribir tu código HULK
 
@@ -253,7 +256,7 @@ make test_eval_fixtures     # todos los .hulk en tests/eval/
 
 ---
 
-## Documentacion de planificacion
+## Playground
 
 - [`playground/README.md`](playground/README.md) — atajo para probar programas
 

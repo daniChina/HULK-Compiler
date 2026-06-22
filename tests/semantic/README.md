@@ -1,5 +1,6 @@
 # Tests semánticos — Fase 2
 
+Fixtures `.hulk` para reglas R1–R4. Convenciones y expectativas en `manifest.tsv` y este README.
 
 ## Convenciones
 
@@ -42,3 +43,4 @@ Válidos con bloque anidado correcto: `17_r1_block_nested_let_manual.hulk`, `04_
 
 ## Parser (no en esta carpeta)
 
+Casos **SYN.1–SYN.4** cerrados; ver fixtures `invalid/` con prefijo `syn-` en `tests/semantic/` y `playground/notas_tests/`.

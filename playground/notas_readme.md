@@ -603,6 +603,7 @@ Pueden surgir si **dos rutas del analizador** reportan el mismo problema. En `Co
 
 **¿Es correcto “solo la primera fase que falla”?**
 
+**Sí, para modo matcom/producción** (`./hulk archivo.hulk` sin flags). Contrato: `./hulk` → `./output` o errores en stderr (ver `REPORT.md`).
 
 > Prioridad: léxico > sintáctico > semántico (**solo se reporta la primera fase que falla**).
 

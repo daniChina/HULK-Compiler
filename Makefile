@@ -3,6 +3,7 @@ MATCOM_OOP_PARSE_TARGET = matcom_oop_parse_smoke
 .PHONY: all compile compile_nollvm build lexer clean execute run run-pipeline run-lexer run-parse run-semantic test_types test_symbols test_semantic test_semantic_fixtures test_r1_semantic test_r2_semantic test_r3_r4_semantic test_a4_builtins test_type_map test_eval test_eval_fixtures test_is_as_smoke test_matcom_oop_parse test_llvm test_llvm_fixtures test_diagnostic test_ll1_recovery test_multi_phase
 
 # --- LLVM (Fase 4): compile enlaza libLLVM si llvm-config está en PATH (Fase D) ---
+# Descubrimiento vía PATH (MSYS2 UCRT64 / apt llvm-21). Ver REQUIREMENTS.md.
 LLVM_CONFIG ?= llvm-config
 ifeq ($(OS),Windows_NT)
 # MSYS make usa sh: 2>NUL crea un archivo literal "NUL" (nombre reservado Windows).
