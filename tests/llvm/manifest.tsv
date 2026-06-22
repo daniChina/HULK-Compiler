@@ -36,6 +36,18 @@ valid/71_l7_recursion.hulk   llvm_ok    call double @hulk_fn_fact_1
 # I8 — builtins math / range (oracle E2E en Codegen/tests/i8_builtins_smoke.cpp)
 valid/80_l8_sin.hulk         llvm_ok    call double @sin
 valid/81_l8_range_for.hulk   llvm_ok    for.cond
+valid/82_l8_for_custom_iter.hulk   llvm_ok    for.next
+valid/89_l9_for_countdown.hulk     llvm_ok    for.next
+
+valid/83_l8_unless.hulk            llvm_ok    unless.then
+valid/84_l8_repeat.hulk            llvm_ok    repeat.body
+valid/85_l8_loop_while.hulk        llvm_ok    loopwhile.body
+valid/90_l9_unless_branches.hulk   llvm_ok    unless.then
+valid/91_l9_repeat_edges.hulk      llvm_ok    repeat.body
+valid/92_l9_loop_while_multi.hulk  llvm_ok    loopwhile.body
+
+valid/86_l8_with.hulk              llvm_ok    with.body
+valid/87_l8_case.hulk              llvm_ok    case.body
 
 # I9 — OOP type/new/attrs/methods (oracle E2E en Codegen/tests/i9_oo_smoke.cpp)
 valid/02_new_attr.hulk       llvm_ok    HulkInstance_Point

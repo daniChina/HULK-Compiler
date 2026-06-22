@@ -14,14 +14,37 @@ bool typesDiffer(const TypeInfo& a, const TypeInfo& b) {
     return a.getKind() != b.getKind() || a.getTypeName() != b.getTypeName();
 }
 
-TypeInfo inferForElementType(SymbolTable& table, parser::Expr* iterable,
-                             const TypeInfo& iterable_type) {
+bool isRangeIterable(parser::Expr* iterable) {
     if (auto* call = dynamic_cast<parser::CallExpr*>(iterable)) {
         if (auto* id = dynamic_cast<parser::IdentifierExpr*>(call->callee.get())) {
-            if (id->token.lexeme == "range") {
-                return TypeInfo(TypeInfo::Kind::Number);
-            }
+            return id->token.lexeme == "range";
         }
+    }
+    return false;
+}
+
+bool caseBranchPossiblyMatches(const TypeInfo& value_type, const TypeInfo& branch_type) {
+    if (value_type.getKind() == TypeInfo::Kind::Unknown) {
+        return true;
+    }
+    if (value_type.conformsTo(branch_type)) {
+        return true;
+    }
+    if (value_type.getKind() == TypeInfo::Kind::Object &&
+        (value_type.getTypeName().empty() || value_type.getTypeName() == "Object")) {
+        return branch_type.getKind() == TypeInfo::Kind::Object ||
+               branch_type.getKind() == TypeInfo::Kind::Number ||
+               branch_type.getKind() == TypeInfo::Kind::String ||
+               branch_type.getKind() == TypeInfo::Kind::Boolean ||
+               branch_type.getKind() == TypeInfo::Kind::Null;
+    }
+    return false;
+}
+
+TypeInfo inferForElementType(SymbolTable& table, parser::Expr* iterable,
+                             const TypeInfo& iterable_type) {
+    if (isRangeIterable(iterable)) {
+        return TypeInfo(TypeInfo::Kind::Number);
     }
     if (iterable_type.getKind() == TypeInfo::Kind::Object &&
         !iterable_type.getTypeName().empty()) {
@@ -1014,6 +1037,37 @@ void Phase2Analyzer::visit(parser::ForExpr* expr) {
     const TypeInfo iterable_type = current_type_;
     TypeInfo item_type = inferForElementType(symbol_table_, expr->iterable.get(), iterable_type);
 
+    if (!isRangeIterable(expr->iterable.get())) {
+        if (iterable_type.getKind() == TypeInfo::Kind::Object &&
+            !iterable_type.getTypeName().empty()) {
+            const std::string& type_name = iterable_type.getTypeName();
+            if (!symbol_table_.lookupMethod(type_name, "current")) {
+                report(ErrorType::TYPE_ERROR,
+                       "El iterable de tipo '" + type_name +
+                           "' debe implementar current() para usar 'for'",
+                       expr->variable.line, expr->variable.col, "expresión for");
+            }
+            if (auto next_method = symbol_table_.lookupMethod(type_name, "next")) {
+                if (!next_method->return_type.isBoolean() && !next_method->return_type.isUnknown()) {
+                    report(ErrorType::TYPE_ERROR,
+                           "next() debe devolver Boolean, se obtuvo '" +
+                               next_method->return_type.toString() + "'",
+                           expr->variable.line, expr->variable.col, "expresión for");
+                }
+            } else {
+                report(ErrorType::TYPE_ERROR,
+                       "El iterable de tipo '" + type_name +
+                           "' debe implementar next() para usar 'for'",
+                       expr->variable.line, expr->variable.col, "expresión for");
+            }
+        } else if (item_type.isUnknown()) {
+            const auto [line, col] = expr_location(expr->iterable.get());
+            report(ErrorType::TYPE_ERROR,
+                   "for requiere un iterable (p. ej. range o objeto con next() y current())",
+                   line, col, "expresión for");
+        }
+    }
+
     TypeInfo loop_var_type = item_type;
     if (expr->declared_type.has_value()) {
         validateTypeExists(expr->declared_type);
@@ -1041,7 +1095,7 @@ void Phase2Analyzer::visit(parser::WithExpr* expr) {
 
     if (val_type.getKind() != TypeInfo::Kind::Null) {
         symbol_table_.enterScope();
-        symbol_table_.declareVariable(expr->alias.lexeme, val_type);
+        symbol_table_.declareVariable(expr->alias.lexeme, val_type, false, expr->alias.line);
         visitExpr(expr->body.get());
         body_type = current_type_;
         symbol_table_.exitScope();
@@ -1057,10 +1111,37 @@ void Phase2Analyzer::visit(parser::WithExpr* expr) {
 
 void Phase2Analyzer::visit(parser::CaseExpr* expr) {
     visitExpr(expr->value.get());
+    TypeInfo val_type = current_type_;
     std::vector<TypeInfo> branch_types;
+
+    if (val_type.getKind() != TypeInfo::Kind::Unknown) {
+        bool any_reachable = false;
+        for (const auto& branch : expr->branches) {
+            if (!validateTypeExists(branch.type_name)) {
+                continue;
+            }
+            const TypeInfo branch_type = resolveType(branch.type_name);
+            if (caseBranchPossiblyMatches(val_type, branch_type)) {
+                any_reachable = true;
+            }
+        }
+        if (!any_reachable) {
+            const int line =
+                expr->branches.empty() ? 0 : expr->branches.front().name.line;
+            const int col =
+                expr->branches.empty() ? 0 : expr->branches.front().name.col;
+            report(ErrorType::TYPE_ERROR,
+                   "case: ninguna rama es compatible con el tipo de la expresion",
+                   line, col, "expresion case");
+        }
+    }
+
     for (const auto& branch : expr->branches) {
         symbol_table_.enterScope();
-        symbol_table_.declareVariable(branch.name.lexeme, TypeInfo(TypeInfo::Kind::Object, branch.type_name.lexeme));
+        if (validateTypeExists(branch.type_name)) {
+            symbol_table_.declareVariable(branch.name.lexeme, resolveType(branch.type_name), false,
+                                          branch.name.line);
+        }
         visitExpr(branch.body.get());
         branch_types.push_back(current_type_);
         symbol_table_.exitScope();
@@ -1125,7 +1206,12 @@ void Phase2Analyzer::visit(parser::AssignExpr* expr) {
         resolveVariableUse(lhs_id->token, "asignación");
         auto* sym = symbol_table_.lookupVariable(lhs_id->token.lexeme);
         if (sym) {
-            if (!rhs_type.conformsTo(sym->type)) {
+            if (!sym->is_mutable) {
+                report(ErrorType::TYPE_ERROR,
+                       "No se puede asignar a '" + lhs_id->token.lexeme +
+                           "' - la variable es de solo lectura",
+                       lhs_id->token.line, lhs_id->token.col, "asignacion destructiva");
+            } else if (!rhs_type.conformsTo(sym->type)) {
                 report(ErrorType::TYPE_ERROR, "No se puede asignar un valor de tipo '" + rhs_type.toString() + "' a una variable de tipo '" + sym->type.toString() + "'", lhs_id->token.line, lhs_id->token.col, "asignación");
             }
         }
@@ -1280,11 +1366,11 @@ void Phase2Analyzer::visit(parser::RepeatExpr* expr) {
                line, col, "repeat");
     }
     visitExpr(expr->body.get());
-    current_type_ = TypeInfo(TypeInfo::Kind::Void);
 }
 
 void Phase2Analyzer::visit(parser::LoopWhileExpr* expr) {
     visitExpr(expr->body.get());
+    TypeInfo body_type = current_type_;
     visitExpr(expr->condition.get());
     if (!current_type_.isBoolean() && !current_type_.isUnknown()) {
         const auto [line, col] = expr_location(expr->condition.get());
@@ -1293,7 +1379,7 @@ void Phase2Analyzer::visit(parser::LoopWhileExpr* expr) {
                    current_type_.toString() + "'",
                line, col, "loop-while");
     }
-    current_type_ = TypeInfo(TypeInfo::Kind::Void);
+    current_type_ = body_type;
 }
 
 void Phase2Analyzer::visit(parser::BlockExpr* expr) {

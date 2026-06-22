@@ -1,4 +1,0 @@
-// TEST 19 — Grupo 3: falta ';' antes de '}' en bloque
-// Esperado: (1,12) SYNTACTIC: se esperaba ';' antes de '}'
-
-{ print(1) }

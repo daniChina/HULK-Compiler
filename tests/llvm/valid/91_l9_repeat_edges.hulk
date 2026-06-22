@@ -1,0 +1,2 @@
+print(repeat (0) 1);
+print(repeat (2) 5);

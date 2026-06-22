@@ -311,6 +311,39 @@ bool Evaluator::instanceConformsTo(parser::ClassDecl* dynamic_type,
     return false;
 }
 
+bool Evaluator::valueConformsTo(const value::Value& val, const std::string& target_type) const {
+    if (!val.isInstance()) {
+        if (target_type == "Null" && val.isNull()) {
+            return true;
+        }
+        if (target_type == "Number" && val.isNumber()) {
+            return true;
+        }
+        if (target_type == "String" && val.isString()) {
+            return true;
+        }
+        if (target_type == "Boolean" && val.isBool()) {
+            return true;
+        }
+        return false;
+    }
+
+    const auto instance = val.asInstance();
+    if (!instance || !instance->type_def) {
+        return false;
+    }
+    return instanceConformsTo(instance->type_def, target_type);
+}
+
+bool Evaluator::branchTypeIsMoreSpecific(const std::string& candidate,
+                                         const std::string& current_best) const {
+    const auto cand_it = types_.find(candidate);
+    if (cand_it == types_.end()) {
+        return false;
+    }
+    return instanceConformsTo(cand_it->second, current_best) && candidate != current_best;
+}
+
 void Evaluator::visit(parser::Program* stmt) {
     for (const auto& s : stmt->stmts) {
         if (auto* fn = dynamic_cast<parser::FunctionDecl*>(s.get())) {
@@ -735,27 +768,73 @@ void Evaluator::visit(parser::ForExpr* expr) {
         return;
     }
 
-    std::shared_ptr<value::RangeIterator> iterator;
-    if (current_.isRange()) {
-        iterator = current_.asRange()->beginIterator();
-    } else if (current_.isRangeIterator()) {
-        iterator = current_.asRangeIterator();
-    } else {
-        setError("for requiere un iterable (p. ej. range)");
+    if (current_.isRange() || current_.isRangeIterator()) {
+        std::shared_ptr<value::RangeIterator> iterator;
+        if (current_.isRange()) {
+            iterator = current_.asRange()->beginIterator();
+        } else {
+            iterator = current_.asRangeIterator();
+        }
+
+        while (iterator->next()) {
+            auto frame = std::make_shared<EnvFrame>(global_);
+            frame->define(expr->variable.lexeme, value::Value(iterator->currentValue()));
+            const auto saved = global_;
+            global_ = frame;
+            visitExpr(expr->body.get());
+            global_ = saved;
+            if (had_error_) {
+                break;
+            }
+        }
         return;
     }
 
-    while (iterator->next()) {
-        auto frame = std::make_shared<EnvFrame>(global_);
-        frame->define(expr->variable.lexeme, value::Value(iterator->currentValue()));
-        const auto saved = global_;
-        global_ = frame;
-        visitExpr(expr->body.get());
-        global_ = saved;
-        if (had_error_) {
-            break;
+    if (current_.isInstance()) {
+        const auto instance = current_.asInstance();
+        const parser::MethodDef* next_method = findMethod(instance->type_def, "next");
+        const parser::MethodDef* current_method = findMethod(instance->type_def, "current");
+        if (!next_method || !current_method) {
+            setError("for requiere un iterable (objeto con next() y current())");
+            return;
         }
+        if (next_method->params.size() != 0 || current_method->params.size() != 0) {
+            setError("next() y current() no deben recibir argumentos");
+            return;
+        }
+
+        while (!had_error_) {
+            invokeMethod(instance, *next_method, {});
+            if (had_error_) {
+                return;
+            }
+            if (!current_.isBool()) {
+                setError("next() debe devolver Boolean");
+                return;
+            }
+            if (!current_.asBool()) {
+                break;
+            }
+
+            invokeMethod(instance, *current_method, {});
+            if (had_error_) {
+                return;
+            }
+
+            auto frame = std::make_shared<EnvFrame>(global_);
+            frame->define(expr->variable.lexeme, current_);
+            const auto saved = global_;
+            global_ = frame;
+            visitExpr(expr->body.get());
+            global_ = saved;
+            if (had_error_) {
+                break;
+            }
+        }
+        return;
     }
+
+    setError("for requiere un iterable (p. ej. range o objeto con next() y current())");
 }
 void Evaluator::visit(parser::WithExpr* expr) {
     visitExpr(expr->value.get());
@@ -780,7 +859,40 @@ void Evaluator::visit(parser::WithExpr* expr) {
     visitExpr(expr->body.get());
     global_ = saved;
 }
-void Evaluator::visit(parser::CaseExpr* expr) { (void)expr; setError("case no implementado"); }
+void Evaluator::visit(parser::CaseExpr* expr) {
+    visitExpr(expr->value.get());
+    if (had_error_) {
+        return;
+    }
+
+    const value::Value scrutinee = current_;
+    int best = -1;
+    for (std::size_t i = 0; i < expr->branches.size(); ++i) {
+        const auto& branch = expr->branches[i];
+        if (!valueConformsTo(scrutinee, branch.type_name.lexeme)) {
+            continue;
+        }
+        if (best < 0) {
+            best = static_cast<int>(i);
+        } else if (branchTypeIsMoreSpecific(branch.type_name.lexeme,
+                                            expr->branches[static_cast<std::size_t>(best)].type_name.lexeme)) {
+            best = static_cast<int>(i);
+        }
+    }
+
+    if (best < 0) {
+        setError("case: ninguna rama coincide con el valor");
+        return;
+    }
+
+    const auto& branch = expr->branches[static_cast<std::size_t>(best)];
+    auto frame = std::make_shared<EnvFrame>(global_);
+    frame->define(branch.name.lexeme, scrutinee);
+    const auto saved = global_;
+    global_ = frame;
+    visitExpr(branch.body.get());
+    global_ = saved;
+}
 void Evaluator::visit(parser::IsExpr* expr) {
     visitExpr(expr->object.get());
     if (had_error_) {
@@ -1019,6 +1131,11 @@ void Evaluator::visit(parser::RepeatExpr* expr) {
     }
 
     const int times = static_cast<int>(current_.asNumber());
+    if (times <= 0) {
+        current_ = value::Value::null();
+        return;
+    }
+
     value::Value result(0.0);
     for (int i = 0; i < times && !had_error_; ++i) {
         visitExpr(expr->body.get());

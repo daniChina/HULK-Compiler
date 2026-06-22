@@ -1,0 +1,7 @@
+type Countdown(from: Number) {
+    pos = from + 1;
+    next() { self.pos := self.pos - 1; self.pos > 0; }
+    current() => self.pos;
+}
+
+for (n in new Countdown(3)) print(n);

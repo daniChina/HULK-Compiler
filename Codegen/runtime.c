@@ -30,6 +30,11 @@ void hulk_runtime_cast_error(void) {
     exit(1);
 }
 
+void hulk_runtime_case_error(void) {
+    fprintf(stderr, "Runtime error: case sin rama coincidente\n");
+    exit(1);
+}
+
 static char* boxed_string_ptr(BoxedValue* boxed) {
     char** slot = (char**)(boxed->data);
     return *slot;

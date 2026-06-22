@@ -45,7 +45,6 @@ run_hulk_eval() {
     set +e
     "$HULK" "$file" --semantic --interpret >"$stdout_file" 2>"$stderr_file"
     rc=$?
-    set -e
     HULK_STDOUT="$(cat "$stdout_file")"
     HULK_STDERR="$(cat "$stderr_file")"
     rm -f "$stdout_file" "$stderr_file"

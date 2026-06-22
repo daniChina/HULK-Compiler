@@ -1,5 +1,6 @@
 #include "llvm_codegen.hpp"
 
+#include <numeric>
 #include <unordered_set>
 
 #include <llvm/IR/Constants.h>
@@ -658,6 +659,17 @@ void LLVMCodeGenerator::emitCastFailure() {
     builder_->CreateUnreachable();
 }
 
+void LLVMCodeGenerator::emitCaseFailure() {
+    llvm::Function* fail_fn = module_->getFunction("hulk_runtime_case_error");
+    if (fail_fn == nullptr) {
+        llvm::FunctionType* fail_ty = llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), false);
+        fail_fn = llvm::Function::Create(fail_ty, llvm::Function::ExternalLinkage,
+                                         "hulk_runtime_case_error", module_.get());
+    }
+    builder_->CreateCall(fail_fn, {});
+    builder_->CreateUnreachable();
+}
+
 llvm::Function* LLVMCodeGenerator::lookupMethod(const std::string& class_name,
                                                 const std::string& method_name,
                                                 std::size_t arity) {
@@ -786,14 +798,10 @@ void LLVMCodeGenerator::defineClassMethods(parser::ClassDecl* decl) {
     }
 }
 
-void LLVMCodeGenerator::emitMethodCall(parser::Expr* object_expr, const std::string& method_name,
-                                       const std::vector<parser::ExprPtr>& args) {
-    llvm::StructType* struct_ty = nullptr;
-    llvm::Value* instance_ptr = resolveInstancePtr(object_expr, &struct_ty);
-    if (instance_ptr == nullptr || had_error_) {
-        return;
-    }
-
+void LLVMCodeGenerator::emitMethodCallOnInstance(llvm::Value* instance_ptr,
+                                                 llvm::StructType* struct_ty,
+                                                 const std::string& method_name,
+                                                 const std::vector<parser::ExprPtr>& args) {
     ClassInfo* info = lookupClassInfoByStruct(struct_ty);
     if (info == nullptr || info->decl == nullptr) {
         fail("codegen: tipo de instancia desconocido para llamada a metodo");
@@ -887,6 +895,34 @@ void LLVMCodeGenerator::emitMethodCall(parser::Expr* object_expr, const std::str
 
     builder_->SetInsertPoint(merge_bb);
     current_value_ = result_phi;
+}
+
+void LLVMCodeGenerator::emitMethodCall(parser::Expr* object_expr, const std::string& method_name,
+                                       const std::vector<parser::ExprPtr>& args) {
+    llvm::StructType* struct_ty = nullptr;
+    llvm::Value* instance_ptr = resolveInstancePtr(object_expr, &struct_ty);
+    if (instance_ptr == nullptr || had_error_) {
+        return;
+    }
+
+    emitMethodCallOnInstance(instance_ptr, struct_ty, method_name, args);
+}
+
+llvm::Value* LLVMCodeGenerator::boxValueForStorage(llvm::Value* value) {
+    if (value == nullptr) {
+        return llvm::ConstantPointerNull::get(opaquePtr());
+    }
+    if (value->getType()->isPointerTy()) {
+        return value;
+    }
+    if (value->getType()->isDoubleTy()) {
+        return createBoxedFromDouble(value);
+    }
+    if (value->getType()->isIntegerTy(1)) {
+        return createBoxedFromBool(value);
+    }
+    fail("codegen: tipo no soportado para almacenamiento");
+    return nullptr;
 }
 
 void LLVMCodeGenerator::registerPrintDeclarations() {
@@ -2107,39 +2143,160 @@ void LLVMCodeGenerator::visit(parser::ForExpr* expr) {
         return;
     }
 
-    llvm::Value* range_ptr = current_value_;
-    if (!isRangeValue(range_ptr)) {
-        fail("for requiere un iterable (p. ej. range)");
+    if (isRangeValue(current_value_)) {
+        llvm::Value* range_ptr = current_value_;
+
+        llvm::StructType* range_ty = getRangeType();
+        llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
+        llvm::Value* start =
+            builder_->CreateLoad(double_ty, builder_->CreateStructGEP(range_ty, range_ptr, 0));
+        llvm::Value* end = builder_->CreateLoad(double_ty, builder_->CreateStructGEP(range_ty, range_ptr, 1));
+
+        llvm::Function* parent_fn = builder_->GetInsertBlock()->getParent();
+        llvm::BasicBlock* loop_cond = llvm::BasicBlock::Create(*context_, "for.cond", parent_fn);
+        llvm::BasicBlock* loop_body = llvm::BasicBlock::Create(*context_, "for.body", parent_fn);
+        llvm::BasicBlock* loop_step = llvm::BasicBlock::Create(*context_, "for.step", parent_fn);
+        llvm::BasicBlock* loop_end = llvm::BasicBlock::Create(*context_, "for.end", parent_fn);
+
+        llvm::AllocaInst* index_slot = builder_->CreateAlloca(double_ty, nullptr, "");
+        builder_->CreateStore(start, index_slot);
+        builder_->CreateBr(loop_cond);
+
+        builder_->SetInsertPoint(loop_cond);
+        llvm::Value* index_val = builder_->CreateLoad(double_ty, index_slot);
+        llvm::Value* continue_loop = builder_->CreateFCmpOLT(index_val, end);
+        builder_->CreateCondBr(continue_loop, loop_body, loop_end);
+
+        builder_->SetInsertPoint(loop_body);
+        enterScope();
+        llvm::AllocaInst* var_alloca = builder_->CreateAlloca(double_ty, nullptr, "");
+        builder_->CreateStore(index_val, var_alloca);
+        current_scope_->variables[expr->variable.lexeme] = var_alloca;
+        current_scope_->variable_types[expr->variable.lexeme] = double_ty;
+
+        expr->body->accept(this);
+        if (had_error_) {
+            exitScope();
+            return;
+        }
+        llvm::Value* body_value = current_value_;
+        exitScope();
+
+        builder_->CreateBr(loop_step);
+
+        builder_->SetInsertPoint(loop_step);
+        llvm::Value* next_index =
+            builder_->CreateFAdd(builder_->CreateLoad(double_ty, index_slot),
+                                llvm::ConstantFP::get(double_ty, 1.0));
+        builder_->CreateStore(next_index, index_slot);
+        builder_->CreateBr(loop_cond);
+
+        builder_->SetInsertPoint(loop_end);
+        if (body_value != nullptr) {
+            current_value_ = body_value;
+        } else {
+            current_value_ = llvm::ConstantFP::get(double_ty, 0.0);
+        }
         return;
     }
 
-    llvm::StructType* range_ty = getRangeType();
-    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
-    llvm::Value* start =
-        builder_->CreateLoad(double_ty, builder_->CreateStructGEP(range_ty, range_ptr, 0));
-    llvm::Value* end = builder_->CreateLoad(double_ty, builder_->CreateStructGEP(range_ty, range_ptr, 1));
+    if (!isInstanceValue(current_value_)) {
+        fail("for requiere un iterable (p. ej. range o objeto con next() y current())");
+        return;
+    }
+
+    llvm::StructType* struct_ty = resolveInstanceStructType(current_value_);
+    if (struct_ty == nullptr) {
+        fail("for requiere un iterable (objeto con next() y current())");
+        return;
+    }
+
+    ClassInfo* info = lookupClassInfoByStruct(struct_ty);
+    if (info == nullptr || info->decl == nullptr) {
+        fail("codegen: tipo de instancia desconocido en for");
+        return;
+    }
+
+    const MethodResolution next_res = resolveMethod(info->decl, "next");
+    const MethodResolution current_res = resolveMethod(info->decl, "current");
+    if (next_res.method == nullptr || current_res.method == nullptr) {
+        fail("for requiere un iterable (objeto con next() y current())");
+        return;
+    }
+    if (next_res.method->params.size() != 0 || current_res.method->params.size() != 0) {
+        fail("next() y current() no deben recibir argumentos");
+        return;
+    }
+
+    std::string element_type_name = "Number";
+    if (expr->declared_type.has_value()) {
+        element_type_name = expr->declared_type->lexeme;
+    } else if (current_res.method->return_type.has_value()) {
+        element_type_name = current_res.method->return_type->lexeme;
+    }
+
+    llvm::Type* loop_storage_ty = opaquePtr();
+    llvm::Type* loop_semantic_ty = getBoxedValueType();
+    if (element_type_name == "Number") {
+        loop_storage_ty = llvm::Type::getDoubleTy(*context_);
+        loop_semantic_ty = llvm::Type::getDoubleTy(*context_);
+    } else if (element_type_name == "Boolean") {
+        loop_storage_ty = llvm::Type::getInt1Ty(*context_);
+        loop_semantic_ty = llvm::Type::getInt1Ty(*context_);
+    } else if (element_type_name == "String") {
+        loop_storage_ty = opaquePtr();
+        loop_semantic_ty = getBoxedValueType();
+    } else if (llvm::StructType* inst_ty = getInstanceStructType(element_type_name)) {
+        loop_storage_ty = opaquePtr();
+        loop_semantic_ty = inst_ty;
+    }
+
+    llvm::AllocaInst* iter_slot = builder_->CreateAlloca(opaquePtr(), nullptr, "for.iter");
+    builder_->CreateStore(current_value_, iter_slot);
 
     llvm::Function* parent_fn = builder_->GetInsertBlock()->getParent();
-    llvm::BasicBlock* loop_cond = llvm::BasicBlock::Create(*context_, "for.cond", parent_fn);
+    llvm::BasicBlock* loop_next = llvm::BasicBlock::Create(*context_, "for.next", parent_fn);
     llvm::BasicBlock* loop_body = llvm::BasicBlock::Create(*context_, "for.body", parent_fn);
-    llvm::BasicBlock* loop_step = llvm::BasicBlock::Create(*context_, "for.step", parent_fn);
     llvm::BasicBlock* loop_end = llvm::BasicBlock::Create(*context_, "for.end", parent_fn);
 
-    llvm::AllocaInst* index_slot = builder_->CreateAlloca(double_ty, nullptr, "");
-    builder_->CreateStore(start, index_slot);
-    builder_->CreateBr(loop_cond);
+    builder_->CreateBr(loop_next);
 
-    builder_->SetInsertPoint(loop_cond);
-    llvm::Value* index_val = builder_->CreateLoad(double_ty, index_slot);
-    llvm::Value* continue_loop = builder_->CreateFCmpOLT(index_val, end);
-    builder_->CreateCondBr(continue_loop, loop_body, loop_end);
+    builder_->SetInsertPoint(loop_next);
+    llvm::Value* iter_ptr = builder_->CreateLoad(opaquePtr(), iter_slot);
+    trackInstanceType(iter_ptr, struct_ty);
+    emitMethodCallOnInstance(iter_ptr, struct_ty, "next", {});
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* has_next = unboxBoolValue(current_value_, "for");
+    if (has_next == nullptr) {
+        return;
+    }
+    builder_->CreateCondBr(has_next, loop_body, loop_end);
 
     builder_->SetInsertPoint(loop_body);
+    iter_ptr = builder_->CreateLoad(opaquePtr(), iter_slot);
+    trackInstanceType(iter_ptr, struct_ty);
+    emitMethodCallOnInstance(iter_ptr, struct_ty, "current", {});
+    if (had_error_) {
+        return;
+    }
+
+    llvm::Value* element_value = current_value_;
+    if (element_type_name == "Number") {
+        element_value = unboxDoubleValue(current_value_, "for");
+    } else if (element_type_name == "Boolean") {
+        element_value = unboxBoolValue(current_value_, "for");
+    }
+    if (element_value == nullptr) {
+        return;
+    }
+
     enterScope();
-    llvm::AllocaInst* var_alloca = builder_->CreateAlloca(double_ty, nullptr, "");
-    builder_->CreateStore(index_val, var_alloca);
+    llvm::AllocaInst* var_alloca = builder_->CreateAlloca(loop_storage_ty, nullptr, "");
+    builder_->CreateStore(element_value, var_alloca);
     current_scope_->variables[expr->variable.lexeme] = var_alloca;
-    current_scope_->variable_types[expr->variable.lexeme] = double_ty;
+    current_scope_->variable_types[expr->variable.lexeme] = loop_semantic_ty;
 
     expr->body->accept(this);
     if (had_error_) {
@@ -2149,20 +2306,13 @@ void LLVMCodeGenerator::visit(parser::ForExpr* expr) {
     llvm::Value* body_value = current_value_;
     exitScope();
 
-    builder_->CreateBr(loop_step);
-
-    builder_->SetInsertPoint(loop_step);
-    llvm::Value* next_index =
-        builder_->CreateFAdd(builder_->CreateLoad(double_ty, index_slot),
-                            llvm::ConstantFP::get(double_ty, 1.0));
-    builder_->CreateStore(next_index, index_slot);
-    builder_->CreateBr(loop_cond);
+    builder_->CreateBr(loop_next);
 
     builder_->SetInsertPoint(loop_end);
     if (body_value != nullptr) {
         current_value_ = body_value;
     } else {
-        current_value_ = llvm::ConstantFP::get(double_ty, 0.0);
+        current_value_ = llvm::ConstantFP::get(llvm::Type::getDoubleTy(*context_), 0.0);
     }
 }
 
@@ -2592,10 +2742,394 @@ void LLVMCodeGenerator::visit(parser::GroupedExpr* expr) {
     expr->expression->accept(this);
 }
 
-HULK_VISIT_STUB(WithExpr)
-HULK_VISIT_STUB(CaseExpr)
-HULK_VISIT_STUB(UnlessExpr)
-HULK_VISIT_STUB(RepeatExpr)
-HULK_VISIT_STUB(LoopWhileExpr)
+void LLVMCodeGenerator::visit(parser::UnlessExpr* expr) {
+    llvm::BasicBlock* cond_bb = builder_->GetInsertBlock();
+
+    expr->condition->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* cond = expectBoolValue(current_value_, "unless");
+    if (cond == nullptr) {
+        return;
+    }
+
+    llvm::Function* fn = cond_bb->getParent();
+    llvm::BasicBlock* then_bb = llvm::BasicBlock::Create(*context_, "unless.then", fn);
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "unless.end", fn);
+    llvm::BasicBlock* else_bb = nullptr;
+
+    if (expr->else_branch) {
+        else_bb = llvm::BasicBlock::Create(*context_, "unless.else", fn);
+        builder_->CreateCondBr(cond, else_bb, then_bb);
+    } else {
+        builder_->CreateCondBr(cond, merge_bb, then_bb);
+    }
+
+    builder_->SetInsertPoint(then_bb);
+    expr->then_branch->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* then_val = current_value_;
+    if (then_val == nullptr) {
+        fail("codegen: rama principal de unless sin valor");
+        return;
+    }
+    llvm::Type* result_ty = then_val->getType();
+    builder_->CreateBr(merge_bb);
+    llvm::BasicBlock* then_end = builder_->GetInsertBlock();
+
+    llvm::BasicBlock* else_end = nullptr;
+    llvm::Value* else_val = nullptr;
+    if (expr->else_branch) {
+        builder_->SetInsertPoint(else_bb);
+        expr->else_branch->accept(this);
+        if (had_error_) {
+            return;
+        }
+        else_val = current_value_;
+        if (else_val == nullptr) {
+            fail("codegen: rama 'else' de unless sin valor");
+            return;
+        }
+        builder_->CreateBr(merge_bb);
+        else_end = builder_->GetInsertBlock();
+    }
+
+    builder_->SetInsertPoint(merge_bb);
+    if (expr->else_branch) {
+        llvm::PHINode* phi = builder_->CreatePHI(result_ty, 2, "unless.result");
+        phi->addIncoming(then_val, then_end);
+        phi->addIncoming(else_val, else_end);
+        current_value_ = phi;
+    } else {
+        llvm::PHINode* phi = builder_->CreatePHI(result_ty, 2, "unless.result");
+        phi->addIncoming(then_val, then_end);
+        phi->addIncoming(defaultValueForType(result_ty), cond_bb);
+        current_value_ = phi;
+    }
+}
+
+void LLVMCodeGenerator::visit(parser::RepeatExpr* expr) {
+    expr->count->accept(this);
+    if (had_error_) {
+        return;
+    }
+
+    llvm::Type* i32_ty = llvm::Type::getInt32Ty(*context_);
+    llvm::Value* count_val = unboxDoubleValue(current_value_, "repeat");
+    if (count_val == nullptr) {
+        return;
+    }
+    llvm::Value* times = builder_->CreateFPToSI(count_val, i32_ty, "repeat.times");
+
+    llvm::AllocaInst* result_slot = builder_->CreateAlloca(opaquePtr(), nullptr, "repeat.last");
+    llvm::AllocaInst* index_slot = builder_->CreateAlloca(i32_ty, nullptr, "repeat.i");
+
+    llvm::Function* fn = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* zero_bb = llvm::BasicBlock::Create(*context_, "repeat.zero", fn);
+    llvm::BasicBlock* init_bb = llvm::BasicBlock::Create(*context_, "repeat.init", fn);
+    llvm::BasicBlock* cond_bb = llvm::BasicBlock::Create(*context_, "repeat.cond", fn);
+    llvm::BasicBlock* body_bb = llvm::BasicBlock::Create(*context_, "repeat.body", fn);
+    llvm::BasicBlock* end_bb = llvm::BasicBlock::Create(*context_, "repeat.end", fn);
+
+    llvm::Value* is_nonpos =
+        builder_->CreateICmpSLE(times, llvm::ConstantInt::get(i32_ty, 0), "repeat.nonpos");
+    builder_->CreateCondBr(is_nonpos, zero_bb, init_bb);
+
+    builder_->SetInsertPoint(zero_bb);
+    builder_->CreateStore(llvm::ConstantPointerNull::get(opaquePtr()), result_slot);
+    builder_->CreateBr(end_bb);
+
+    builder_->SetInsertPoint(init_bb);
+    builder_->CreateStore(llvm::ConstantInt::get(i32_ty, 0), index_slot);
+    builder_->CreateStore(llvm::ConstantPointerNull::get(opaquePtr()), result_slot);
+    builder_->CreateBr(cond_bb);
+
+    builder_->SetInsertPoint(cond_bb);
+    llvm::Value* index_val = builder_->CreateLoad(i32_ty, index_slot);
+    llvm::Value* continue_loop = builder_->CreateICmpSLT(index_val, times, "repeat.cont");
+    builder_->CreateCondBr(continue_loop, body_bb, end_bb);
+
+    builder_->SetInsertPoint(body_bb);
+    expr->body->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* stored = boxValueForStorage(current_value_);
+    if (stored == nullptr || had_error_) {
+        return;
+    }
+    builder_->CreateStore(stored, result_slot);
+    llvm::Value* next_index =
+        builder_->CreateAdd(index_val, llvm::ConstantInt::get(i32_ty, 1), "repeat.next_i");
+    builder_->CreateStore(next_index, index_slot);
+    builder_->CreateBr(cond_bb);
+
+    builder_->SetInsertPoint(end_bb);
+    current_value_ = builder_->CreateLoad(opaquePtr(), result_slot);
+}
+
+void LLVMCodeGenerator::visit(parser::LoopWhileExpr* expr) {
+    llvm::Function* fn = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* body_bb = llvm::BasicBlock::Create(*context_, "loopwhile.body", fn);
+    llvm::BasicBlock* cond_bb = llvm::BasicBlock::Create(*context_, "loopwhile.cond", fn);
+    llvm::BasicBlock* end_bb = llvm::BasicBlock::Create(*context_, "loopwhile.end", fn);
+
+    llvm::AllocaInst* result_slot = builder_->CreateAlloca(opaquePtr(), nullptr, "loopwhile.last");
+
+    builder_->CreateBr(body_bb);
+
+    builder_->SetInsertPoint(body_bb);
+    expr->body->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* stored = boxValueForStorage(current_value_);
+    if (stored == nullptr || had_error_) {
+        return;
+    }
+    builder_->CreateStore(stored, result_slot);
+    builder_->CreateBr(cond_bb);
+
+    builder_->SetInsertPoint(cond_bb);
+    expr->condition->accept(this);
+    if (had_error_) {
+        return;
+    }
+    llvm::Value* cond = expectBoolValue(current_value_, "loop-while");
+    if (cond == nullptr) {
+        return;
+    }
+    builder_->CreateCondBr(cond, body_bb, end_bb);
+
+    builder_->SetInsertPoint(end_bb);
+    current_value_ = builder_->CreateLoad(opaquePtr(), result_slot);
+}
+
+void LLVMCodeGenerator::visit(parser::WithExpr* expr) {
+    llvm::BasicBlock* entry_bb = builder_->GetInsertBlock();
+
+    expr->value->accept(this);
+    if (had_error_) {
+        return;
+    }
+
+    llvm::Value* bound = current_value_;
+    if (bound == nullptr) {
+        fail("codegen: with sin valor fuente");
+        return;
+    }
+
+    llvm::Function* fn = entry_bb->getParent();
+    llvm::BasicBlock* body_bb = llvm::BasicBlock::Create(*context_, "with.body", fn);
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "with.end", fn);
+    llvm::BasicBlock* else_bb = nullptr;
+
+    llvm::Value* is_null_val = llvm::ConstantInt::getFalse(*context_);
+    if (bound->getType()->isPointerTy()) {
+        is_null_val = builder_->CreateICmpEQ(bound, llvm::ConstantPointerNull::get(opaquePtr()));
+    }
+
+    if (expr->else_branch) {
+        else_bb = llvm::BasicBlock::Create(*context_, "with.else", fn);
+        builder_->CreateCondBr(is_null_val, else_bb, body_bb);
+    } else {
+        builder_->CreateCondBr(is_null_val, merge_bb, body_bb);
+    }
+
+    builder_->SetInsertPoint(body_bb);
+    llvm::Type* semantic_ty = classifySemanticType(bound);
+    llvm::Type* storage_ty = bound->getType();
+    if (bound->getType()->isPointerTy()) {
+        storage_ty = opaquePtr();
+    }
+
+    enterScope();
+    llvm::AllocaInst* alias_alloca = builder_->CreateAlloca(storage_ty, nullptr, "");
+    builder_->CreateStore(bound, alias_alloca);
+    current_scope_->variables[expr->alias.lexeme] = alias_alloca;
+    current_scope_->variable_types[expr->alias.lexeme] = semantic_ty;
+
+    expr->body->accept(this);
+    if (had_error_) {
+        exitScope();
+        return;
+    }
+    llvm::Value* body_val = current_value_;
+    if (body_val == nullptr) {
+        fail("codegen: cuerpo de with sin valor");
+        exitScope();
+        return;
+    }
+    llvm::Type* result_ty = body_val->getType();
+    if (expr->else_branch) {
+        body_val = boxValueForStorage(body_val);
+        if (body_val == nullptr || had_error_) {
+            exitScope();
+            return;
+        }
+    }
+    exitScope();
+    builder_->CreateBr(merge_bb);
+    llvm::BasicBlock* body_end = builder_->GetInsertBlock();
+
+    llvm::BasicBlock* else_end = nullptr;
+    llvm::Value* else_val = nullptr;
+    if (expr->else_branch) {
+        builder_->SetInsertPoint(else_bb);
+        expr->else_branch->accept(this);
+        if (had_error_) {
+            return;
+        }
+        else_val = current_value_;
+        if (else_val == nullptr) {
+            fail("codegen: rama else de with sin valor");
+            return;
+        }
+        else_val = boxValueForStorage(else_val);
+        if (else_val == nullptr || had_error_) {
+            return;
+        }
+        builder_->CreateBr(merge_bb);
+        else_end = builder_->GetInsertBlock();
+    }
+
+    builder_->SetInsertPoint(merge_bb);
+    if (expr->else_branch) {
+        llvm::PHINode* phi = builder_->CreatePHI(opaquePtr(), 2, "with.result");
+        phi->addIncoming(body_val, body_end);
+        phi->addIncoming(else_val, else_end);
+        current_value_ = phi;
+    } else {
+        llvm::PHINode* phi = builder_->CreatePHI(result_ty, 2, "with.result");
+        phi->addIncoming(body_val, body_end);
+        phi->addIncoming(defaultValueForType(result_ty), entry_bb);
+        current_value_ = phi;
+    }
+}
+
+void LLVMCodeGenerator::visit(parser::CaseExpr* expr) {
+    llvm::BasicBlock* entry_bb = builder_->GetInsertBlock();
+
+    expr->value->accept(this);
+    if (had_error_) {
+        return;
+    }
+
+    llvm::Value* scrutinee = current_value_;
+    if (scrutinee == nullptr) {
+        fail("codegen: case sin valor fuente");
+        return;
+    }
+
+    if (expr->branches.empty()) {
+        fail("codegen: case sin ramas");
+        return;
+    }
+
+    llvm::Function* fn = entry_bb->getParent();
+    llvm::BasicBlock* merge_bb = llvm::BasicBlock::Create(*context_, "case.end", fn);
+    llvm::BasicBlock* fail_bb = llvm::BasicBlock::Create(*context_, "case.fail", fn);
+
+    std::vector<std::size_t> branch_order(expr->branches.size());
+    std::iota(branch_order.begin(), branch_order.end(), 0);
+    std::sort(branch_order.begin(), branch_order.end(),
+              [&](std::size_t i, std::size_t j) {
+                  const std::string& a = expr->branches[i].type_name.lexeme;
+                  const std::string& b = expr->branches[j].type_name.lexeme;
+                  const auto a_it = class_decls_.find(a);
+                  const auto b_it = class_decls_.find(b);
+                  if (a_it != class_decls_.end() && b_it != class_decls_.end()) {
+                      if (instanceConformsTo(a_it->second, b) && a != b) {
+                          return true;
+                      }
+                      if (instanceConformsTo(b_it->second, a) && a != b) {
+                          return false;
+                      }
+                  }
+                  return false;
+              });
+
+    llvm::BasicBlock* next_bb = fail_bb;
+    std::vector<llvm::BasicBlock*> branch_end_blocks;
+    std::vector<llvm::Value*> branch_values;
+    llvm::Type* result_ty = nullptr;
+    llvm::BasicBlock* entry_check_bb = nullptr;
+
+    for (const std::size_t idx : branch_order) {
+        const auto& branch = expr->branches[idx];
+        const std::string& target = branch.type_name.lexeme;
+
+        llvm::BasicBlock* check_bb = llvm::BasicBlock::Create(*context_, "case.check", fn);
+        llvm::BasicBlock* body_bb = llvm::BasicBlock::Create(*context_, "case.body", fn);
+        if (entry_check_bb == nullptr) {
+            entry_check_bb = check_bb;
+        }
+
+        builder_->SetInsertPoint(check_bb);
+
+        llvm::Value* matches = nullptr;
+        if (isInstanceValue(scrutinee)) {
+            llvm::StructType* struct_ty = resolveInstanceStructType(scrutinee);
+            if (struct_ty == nullptr) {
+                fail("codegen: tipo de instancia desconocido en case");
+                return;
+            }
+            llvm::Value* runtime_type = loadInstanceRuntimeType(scrutinee, struct_ty);
+            matches = emitRuntimeTypeConforms(runtime_type, target);
+        } else {
+            matches = emitScalarIsCheck(scrutinee, target);
+        }
+
+        builder_->CreateCondBr(matches, body_bb, next_bb);
+
+        builder_->SetInsertPoint(body_bb);
+        enterScope();
+        llvm::Type* semantic_ty = classifySemanticType(scrutinee);
+        llvm::Type* storage_ty = scrutinee->getType();
+        if (scrutinee->getType()->isPointerTy()) {
+            storage_ty = opaquePtr();
+        }
+        llvm::AllocaInst* alias_alloca = builder_->CreateAlloca(storage_ty, nullptr, "");
+        builder_->CreateStore(scrutinee, alias_alloca);
+        current_scope_->variables[branch.name.lexeme] = alias_alloca;
+        current_scope_->variable_types[branch.name.lexeme] = semantic_ty;
+
+        branch.body->accept(this);
+        if (had_error_) {
+            exitScope();
+            return;
+        }
+        llvm::Value* body_val = current_value_;
+        if (body_val == nullptr) {
+            fail("codegen: rama de case sin valor");
+            exitScope();
+            return;
+        }
+        if (result_ty == nullptr) {
+            result_ty = body_val->getType();
+        }
+        exitScope();
+        builder_->CreateBr(merge_bb);
+        branch_end_blocks.push_back(builder_->GetInsertBlock());
+        branch_values.push_back(body_val);
+        next_bb = check_bb;
+    }
+
+    builder_->SetInsertPoint(fail_bb);
+    emitCaseFailure();
+
+    builder_->SetInsertPoint(entry_bb);
+    builder_->CreateBr(entry_check_bb);
+
+    builder_->SetInsertPoint(merge_bb);
+    llvm::PHINode* phi = builder_->CreatePHI(result_ty, branch_values.size(), "case.result");
+    for (std::size_t i = 0; i < branch_values.size(); ++i) {
+        phi->addIncoming(branch_values[i], branch_end_blocks[i]);
+    }
+    current_value_ = phi;
+}
 
 }  // namespace hulk::codegen

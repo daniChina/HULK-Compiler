@@ -16,6 +16,9 @@ valid/60_v6_sin.hulk	0\n
 valid/62_v6_range_print.hulk	0\n1\n2\n
 valid/80_v8_with.hulk	1\n
 valid/81_v8_with_null_else.hulk	42\n
+valid/99_v17_case_inheritance.hulk	B\n
+valid/100_v17_case_compact.hulk	compact\n
+valid/103_v17_case_number.hulk	42\n
 valid/90_v10_new_attr.hulk	1\n
 valid/91_v11_set_attr.hulk	5\n
 valid/92_v11_method.hulk	1\n
@@ -24,3 +27,7 @@ valid/94_v13_is.hulk	A\n
 valid/95_v14_implicit_inherit.hulk	42\n
 valid/96_v14_attr_infer.hulk	1\n
 valid/97_v15_method_infer.hulk	6\n
+valid/98_v16_for_custom_iter.hulk	0\n1\n2\n
+valid/99_v17_for_countdown.hulk	3\n2\n1\n
+valid/101_v17_print_instance.hulk	<instance>\n
+invalid/102_v17_case_no_match.hulk	runtime	ninguna rama

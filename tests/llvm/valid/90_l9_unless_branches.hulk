@@ -1,0 +1,2 @@
+print(unless (false) 10 else 20);
+print(unless (true) 10 else 20);

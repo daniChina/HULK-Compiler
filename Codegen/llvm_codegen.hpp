@@ -155,6 +155,7 @@ private:
     bool isInstanceValue(llvm::Value* value);
     llvm::StructType* resolveInstanceStructType(llvm::Value* value);
     void emitCastFailure();
+    void emitCaseFailure();
     void trackInstanceType(llvm::Value* value, llvm::StructType* struct_ty);
     void initializeParentAttributes(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
                                     parser::ClassDecl* type_def);
@@ -180,6 +181,10 @@ private:
                                  std::size_t arity);
     void emitMethodCall(parser::Expr* object_expr, const std::string& method_name,
                         const std::vector<parser::ExprPtr>& args);
+    void emitMethodCallOnInstance(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
+                                  const std::string& method_name,
+                                  const std::vector<parser::ExprPtr>& args);
+    llvm::Value* boxValueForStorage(llvm::Value* value);
 
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::Module> module_;

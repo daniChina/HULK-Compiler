@@ -86,6 +86,8 @@ private:
     bool assignInstanceAttr(const std::shared_ptr<value::Instance>& instance, const std::string& attr_name,
                             const value::Value& value);
     bool instanceConformsTo(parser::ClassDecl* dynamic_type, const std::string& static_type_name) const;
+    bool valueConformsTo(const value::Value& val, const std::string& target_type) const;
+    bool branchTypeIsMoreSpecific(const std::string& candidate, const std::string& current_best) const;
     void invokeUserFunction(const UserFunction& fn, const std::vector<parser::ExprPtr>& args);
     bool callBuiltin(const std::string& name, const std::vector<parser::ExprPtr>& args);
 };

@@ -1,0 +1,1 @@
+print(case 42 of n:Number -> n);

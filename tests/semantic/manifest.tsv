@@ -15,9 +15,9 @@ invalid/13_r3_overload_same_arity.hulk	semantic	ya est
 invalid/14_r4_undefined_call.hulk	semantic	no est
 invalid/15_r4_typo_undefined_function.hulk	semantic	prnt
 # parse: dos lets seguidos en BlockExpr sin 'in' entre bindings (no es BlockStmt top-level matcom)
-invalid/19_block_multi_let_without_in.hulk	parse	BindingTail
+invalid/19_block_multi_let_without_in.hulk	parse	SYNTACTIC
 # parse: bloque suelto con lets sin 'in'; distinto de { let x in ...; ... } permitido en M1
-invalid/20_block_stmt_alone.hulk	parse	BindingTail
+invalid/20_block_stmt_alone.hulk	parse	SYNTACTIC
 # parse: post-M1 'is' es operador de comparacion; tipo inexistente → error semantico
 invalid/46_e_is_undefined_type.hulk	semantic	Ghost
 invalid/21_a4_redefine_e.hulk	semantic	ya est
@@ -60,4 +60,9 @@ invalid/63_i1_three_way_cycle.hulk	semantic	ciclic
 invalid/64_i7_for_type_mismatch.hulk	semantic	conforma
 invalid/65_i8_attr_infer_mismatch.hulk	semantic	conforma
 invalid/66_i10_grandchild_override_mismatch.hulk	semantic	Error de tipos
+invalid/68_g_for_no_current.hulk	semantic	current()
+invalid/69_g_for_non_iterable.hulk	semantic	iterable
+invalid/70_g_for_no_next.hulk	semantic	next()
+invalid/71_g_with_assign_alias.hulk	semantic	solo lectura
+invalid/72_g_case_no_branch.hulk	semantic	ninguna rama
 

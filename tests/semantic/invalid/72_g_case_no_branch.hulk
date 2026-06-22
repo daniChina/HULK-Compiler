@@ -1,0 +1,5 @@
+type A() { }
+type B() inherits A() { }
+type C() inherits A() { }
+
+let x: C = new C() in case x of b:B -> print(1);
