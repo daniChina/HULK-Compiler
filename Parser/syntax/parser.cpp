@@ -157,8 +157,7 @@ ExprPtr Parser::parse_power() {
 
 ExprPtr Parser::parse_unary() {
     if (tokens_.is(TokenType::MINUS) ||
-        tokens_.is(TokenType::BANG) ||
-        tokens_.is(TokenType::TILDE)) {
+        tokens_.is(TokenType::BANG)) {
         Token op = tokens_.advance();
         auto right = parse_unary();
         return std::make_unique<UnaryExpr>(std::move(op), std::move(right));

@@ -107,7 +107,10 @@ IDENT       {ALPHA}{ALNUM_}*
                             case 'n':  buf += '\n'; break;
                             case 't':  buf += '\t'; break;
                             case 'r':  buf += '\r'; break;
-                            default:   buf += '\\'; buf += (char)esc; break;
+                            default:
+                                sem.str_val = std::string("\\") + static_cast<char>(esc);
+                                lexeme_ = sem.str_val;
+                                return static_cast<int>(TokenType::UNKNOWN);
                         }
                     } else {
                         buf += (char)ch;
@@ -213,7 +216,6 @@ IDENT       {ALPHA}{ALNUM_}*
 "*"           { UPD(STAR);      }
 "/"           { UPD(SLASH);     }
 "^"           { UPD(CARET);     }
-"~"           { UPD(TILDE);     }
 "!"           { UPD(BANG);      }
 "<"           { UPD(LESS);      }
 ">"           { UPD(GREATER);   }

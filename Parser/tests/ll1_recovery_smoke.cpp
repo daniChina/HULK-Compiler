@@ -42,13 +42,13 @@ int main() {
             TokenList tokens = {
                 make_token(TokenType::NUMBER_LITERAL, "1", 1, 1),
                 make_token(TokenType::SEMICOLON, ";", 1, 2),
-                make_token(TokenType::NUMBER_LITERAL, "2", 2, 1),
+                make_token(TokenType::PLUS, "+", 2, 1),
                 make_token(TokenType::EOF_TOKEN, "", 2, 2),
             };
 
             parser::Ll1Parser parser(std::move(tokens), grammar, ll1_table.table, &stmt_first);
             const auto result = parser.parse_with_recovery();
-            ok &= expect(result.recovered, "recovery reports error on missing semicolon");
+            ok &= expect(result.recovered, "recovery reports error on invalid stmt start");
             ok &= expect(result.errors.size() == 1, "recovery collects one syntax error");
             ok &= expect(result.cst_root != nullptr, "recovery keeps partial CST root");
         }

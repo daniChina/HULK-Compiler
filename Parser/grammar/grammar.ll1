@@ -1,6 +1,9 @@
 // Primera gramatica LL(1) formal del proyecto.
 // Alcance actual (dialecto matcom):
-// - programa: sentencias en orden libre (type, function, expresiones, bloque top-level)
+// - programa: sentencias en orden libre (type, function, for, expresiones, bloque top-level)
+// - for de nivel superior: cuerpo bloque sin ';' final (ForBlockStmt), cuerpo expresion con ';' (ForInlineStmt)
+// - demas expresiones en ExprStmt con ';' obligatorio
+// - bloques top-level (BlockStmt): ';' opcional tras '}' (matcom type_mismatch vs assign_undeclared)
 // - condicionales if / elif / else (cuerpos IfBody: expresion o bloque)
 // - while (cuerpo WhileBody; else opcional WhileElseOpt)
 // - expresiones y precedencia de operadores
@@ -15,12 +18,15 @@ Program         -> StmtList EOF_TOKEN
 StmtList        -> Stmt StmtList
                 | ε
 
-Stmt            -> ExprStmt
+Stmt            -> ForStmt
+                | ExprStmt
                 | FunctionDecl
                 | ClassDecl
                 | BlockStmt
 
-BlockStmt       -> BlockExpr
+BlockStmt       -> BlockExpr BlockStmtTail
+BlockStmtTail   -> SEMICOLON
+                | ε
 
 FunctionDecl    -> FUNCTION IDENTIFIER LPAREN ArgIdListOpt RPAREN TypeAnnotationOpt FunctionBody
 
@@ -69,7 +75,6 @@ ExprStmt        -> Expr SEMICOLON
 Expr            -> IfExpr
                 | LetExpr
                 | WhileExpr
-                | ForExpr
                 | WithExpr
                 | CaseExpr
                 | AssignExpr
@@ -81,7 +86,13 @@ AssignExpr      -> OrExpr AssignTail
 AssignTail      -> ASSIGN AssignExpr
                 | ε
 
-ForExpr         -> FOR LPAREN IDENTIFIER ForTypeOpt IN Expr RPAREN Expr
+ForStmt         -> FOR LPAREN IDENTIFIER ForTypeOpt IN Expr RPAREN ForStmtBody
+ForStmtBody     -> BlockExpr
+                | Expr SEMICOLON
+
+ForExpr         -> FOR LPAREN IDENTIFIER ForTypeOpt IN Expr RPAREN ForBody
+ForBody         -> BlockExpr
+                | Expr
 ForTypeOpt      -> COLON IDENTIFIER
                 | ε
 
@@ -147,7 +158,6 @@ WithSourcePowerExprTail -> CARET WithSourcePowerExpr | ε
 
 WithSourceUnaryExpr -> MINUS WithSourceUnaryExpr
                     | BANG WithSourceUnaryExpr
-                    | TILDE WithSourceUnaryExpr
                     | WithSourcePostfixExpr
 
 WithSourcePostfixExpr -> Primary PostfixTail
@@ -220,7 +230,6 @@ PowerExprTail   -> CARET PowerExpr | ε
 
 UnaryExpr       -> MINUS UnaryExpr
                 | BANG UnaryExpr
-                | TILDE UnaryExpr
                 | PostfixExpr
 
 PostfixExpr     -> Primary PostfixTail AsExprOpt
@@ -247,5 +256,8 @@ Primary         -> NUMBER_LITERAL
 
 BlockExpr       -> LBRACE BlockList RBRACE
 
-BlockList       -> Expr SEMICOLON BlockList
+BlockList       -> BlockListHead SEMICOLON BlockList
                 | ε
+
+BlockListHead   -> ForExpr
+                | Expr

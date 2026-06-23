@@ -37,6 +37,8 @@ ExprPtr build_expr(const CstNode& node);
 ExprPtr build_if_expr(const CstNode& node);
 ExprPtr build_while_expr(const CstNode& node);
 ExprPtr build_for_expr(const CstNode& node);
+ExprPtr build_for_stmt(const CstNode& node);
+ExprPtr build_for_stmt_body(const CstNode& node);
 std::optional<Token> build_for_type_opt(const CstNode& node);
 ExprPtr build_unless_expr(const CstNode& node);
 ExprPtr build_repeat_expr(const CstNode& node);
@@ -49,6 +51,7 @@ ExprPtr build_let_expr(const CstNode& node);
 ExprPtr build_let_body(const CstNode& node);
 ExprPtr build_if_body(const CstNode& node);
 ExprPtr build_while_body(const CstNode& node);
+ExprPtr build_for_body(const CstNode& node);
 ExprPtr build_while_else_opt(const CstNode& node);
 ExprPtr build_with_body(const CstNode& node);
 ExprPtr build_with_else_opt(const CstNode& node);
@@ -115,6 +118,7 @@ void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts);
 StmtPtr build_stmt(const CstNode& node);
 StmtPtr build_expr_stmt(const CstNode& node);
 StmtPtr build_block_stmt(const CstNode& node);
+ExprPtr build_block_list_head(const CstNode& node);
 StmtPtr build_function_decl(const CstNode& node);
 
 std::vector<std::pair<Token, std::optional<Token>>> build_arg_id_list_opt(const CstNode& node);
@@ -151,6 +155,9 @@ StmtPtr build_stmt(const CstNode& node) {
     if (first_child.symbol == "BlockStmt") {
         return build_block_stmt(first_child);
     }
+    if (first_child.symbol == "ForStmt") {
+        return std::make_unique<ExprStmt>(build_for_stmt(first_child));
+    }
     throw std::runtime_error("Forma no esperada en Stmt");
 }
 
@@ -173,9 +180,6 @@ ExprPtr build_expr(const CstNode& node) {
     if (first_child.symbol == "WhileExpr") {
         return build_while_expr(first_child);
     }
-    if (first_child.symbol == "ForExpr") {
-        return build_for_expr(first_child);
-    }
     if (first_child.symbol == "WithExpr") {
         return build_with_expr(first_child);
     }
@@ -197,7 +201,7 @@ ExprPtr build_expr(const CstNode& node) {
     if (first_child.symbol == "LoopWhileExpr") {
         return build_loop_while_expr(first_child);
     }
-    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, ForExpr, WithExpr, CaseExpr, LetExpr, AssignExpr, UnlessExpr, RepeatExpr o LoopWhileExpr");
+    throw std::runtime_error("Forma no esperada en Expr: se esperaba IfExpr, WhileExpr, WithExpr, CaseExpr, LetExpr, AssignExpr, UnlessExpr, RepeatExpr o LoopWhileExpr");
 }
 
 std::optional<Token> build_for_type_opt(const CstNode& node) {
@@ -213,8 +217,35 @@ ExprPtr build_for_expr(const CstNode& node) {
     Token variable = child(node, 2).token;
     auto declared_type = build_for_type_opt(child(node, 3));
     ExprPtr iterable = build_expr(child(node, 5));
-    ExprPtr body = build_expr(child(node, 7));
+    ExprPtr body = build_for_body(child(node, 7));
     return std::make_unique<ForExpr>(std::move(variable), std::move(declared_type), std::move(iterable), std::move(body));
+}
+
+ExprPtr build_for_stmt(const CstNode& node) {
+    expect_symbol(node, "ForStmt");
+    Token variable = child(node, 2).token;
+    auto declared_type = build_for_type_opt(child(node, 3));
+    ExprPtr iterable = build_expr(child(node, 5));
+    ExprPtr body = build_for_stmt_body(child(node, 7));
+    return std::make_unique<ForExpr>(std::move(variable), std::move(declared_type), std::move(iterable), std::move(body));
+}
+
+ExprPtr build_for_stmt_body(const CstNode& node) {
+    expect_symbol(node, "ForStmtBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "BlockExpr") {
+        return build_block_expr(first_child);
+    }
+    return build_expr(first_child);
+}
+
+ExprPtr build_for_body(const CstNode& node) {
+    expect_symbol(node, "ForBody");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "BlockExpr") {
+        return build_block_expr(first_child);
+    }
+    return build_expr(first_child);
 }
 
 ExprPtr build_unless_expr(const CstNode& node) {
@@ -899,8 +930,17 @@ void extract_block_list(const CstNode& node, std::vector<ExprPtr>& exprs) {
     if (node.children.empty() || is_epsilon_node(child(node, 0))) {
         return;
     }
-    exprs.push_back(build_expr(child(node, 0)));
+    exprs.push_back(build_block_list_head(child(node, 0)));
     extract_block_list(child(node, 2), exprs);
+}
+
+ExprPtr build_block_list_head(const CstNode& node) {
+    expect_symbol(node, "BlockListHead");
+    const auto& first_child = child(node, 0);
+    if (first_child.symbol == "ForExpr") {
+        return build_for_expr(first_child);
+    }
+    return build_expr(first_child);
 }
 
 void extract_stmt_list(const CstNode& node, std::vector<StmtPtr>& stmts) {

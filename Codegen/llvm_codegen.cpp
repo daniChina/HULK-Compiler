@@ -2771,7 +2771,6 @@ void LLVMCodeGenerator::visit(parser::NewExpr* expr) {
 }
 
 void LLVMCodeGenerator::visit(parser::BaseCallExpr* expr) {
-    (void)expr;
     if (current_self_alloca_ == nullptr || current_self_class_ == nullptr ||
         current_method_name_.empty()) {
         fail("codegen: base() fuera de contexto de metodo");
@@ -2790,6 +2789,11 @@ void LLVMCodeGenerator::visit(parser::BaseCallExpr* expr) {
         return;
     }
 
+    if (resolution.method->params.size() != expr->args.size()) {
+        fail("base(): numero de argumentos incorrecto");
+        return;
+    }
+
     llvm::Function* fn = lookupMethod(resolution.declaring_class->name.lexeme, current_method_name_,
                                       resolution.method->params.size());
     if (fn == nullptr) {
@@ -2798,7 +2802,22 @@ void LLVMCodeGenerator::visit(parser::BaseCallExpr* expr) {
     }
 
     llvm::Value* self_ptr = builder_->CreateLoad(opaquePtr(), current_self_alloca_);
-    current_value_ = builder_->CreateCall(fn, {self_ptr});
+    std::vector<llvm::Value*> call_args;
+    call_args.push_back(self_ptr);
+    for (std::size_t i = 0; i < expr->args.size(); ++i) {
+        expr->args[i]->accept(this);
+        if (had_error_) {
+            return;
+        }
+        llvm::Type* param_ty = llvmTypeForHulkType(resolution.method->params[i].second);
+        llvm::Value* value = expectFieldValue(current_value_, param_ty, current_method_name_);
+        if (value == nullptr) {
+            return;
+        }
+        call_args.push_back(value);
+    }
+
+    current_value_ = builder_->CreateCall(fn, call_args);
 }
 
 void LLVMCodeGenerator::visit(parser::IsExpr* expr) {

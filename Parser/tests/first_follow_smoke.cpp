@@ -47,7 +47,7 @@ int main() {
         ok &= expect(
             contains_all(
                 first_follow.first_sets.at("UnaryExpr"),
-                {"MINUS", "BANG", "TILDE", "NUMBER_LITERAL", "STRING_LITERAL", "NULL_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
+                {"MINUS", "BANG", "NUMBER_LITERAL", "STRING_LITERAL", "NULL_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
             "FIRST(UnaryExpr) contains unary operators and primary starters");
 
         ok &= expect(
@@ -94,7 +94,7 @@ int main() {
             ok &= expect(
                 contains_all(
                     first_sequence,
-                    {"MINUS", "BANG", "TILDE", "NUMBER_LITERAL", "STRING_LITERAL", "NULL_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
+                    {"MINUS", "BANG", "NUMBER_LITERAL", "STRING_LITERAL", "NULL_LITERAL", "TRUE", "FALSE", "IDENTIFIER", "LPAREN"}),
                 "FIRST(UnaryExpr PowerExprTail) matches expression starters");
         }
 
