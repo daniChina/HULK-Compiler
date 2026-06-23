@@ -169,6 +169,7 @@ endif
 
 lexer:
 	flex++ --c++ -o Lexer/hulk_lexer.cpp Lexer/hulk_lexer.l
+	sed -i 's/#include <FlexLexer.h>/#include "FlexLexer.h"/' Lexer/hulk_lexer.cpp
 
 compile:
 ifeq ($(HULK_HAVE_LLVM),1)

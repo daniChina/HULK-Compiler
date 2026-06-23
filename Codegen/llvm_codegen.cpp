@@ -21,6 +21,7 @@
 #include <llvm/Support/Host.h>
 #endif
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Config/llvm-config.h>
 
 #include "llvm_aux.hpp"
 
@@ -68,7 +69,13 @@ void LLVMCodeGenerator::fail(const std::string& message) {
 void LLVMCodeGenerator::initialize(const std::string& module_name) {
     context_ = std::make_unique<llvm::LLVMContext>();
     module_ = std::make_unique<llvm::Module>(module_name, *context_);
-    module_->setTargetTriple(llvm::Triple(llvm::sys::getDefaultTargetTriple()));
+    module_->setTargetTriple(
+#if LLVM_VERSION_MAJOR >= 19
+        llvm::Triple(llvm::sys::getDefaultTargetTriple())
+#else
+        llvm::sys::getDefaultTargetTriple()
+#endif
+    );
     builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);
     scopes_.clear();
     scopes_.push_back(std::make_unique<LLVMScope>());
