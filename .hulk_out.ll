@@ -57,23 +57,11 @@ declare ptr @hulk_range_create(double, double)
 
 define i32 @main() {
 entry:
-  br i1 true, label %with.else, label %with.body
-
-with.body:                                        ; preds = %entry
-  %0 = alloca ptr, align 8
-  store ptr null, ptr %0, align 8
-  call void @hulk_print_double(double 1.000000e+00)
-  %boxed_double = call ptr @hulk_box_number(double 0.000000e+00)
-  br label %with.end
-
-with.end:                                         ; preds = %with.else, %with.body
-  %with.result = phi ptr [ %boxed_double, %with.body ], [ %boxed_double1, %with.else ]
-  call void @hulk_print_boxed(ptr %with.result)
+  %0 = alloca double, align 8
+  store double 1.000000e+00, ptr %0, align 8
+  %1 = load double, ptr %0, align 8
+  call void @hulk_print_double(double %1)
   %expr_tmp = alloca double, align 8
   store double 0.000000e+00, ptr %expr_tmp, align 8
   ret i32 0
-
-with.else:                                        ; preds = %entry
-  %boxed_double1 = call ptr @hulk_box_number(double 4.200000e+01)
-  br label %with.end
 }

@@ -7,11 +7,11 @@ Facultad de Matemática y Computación — Universidad de La Habana · 2025–20
 
 ## 1. Introducción
 
-HULK (Havana University Language for Kompilers) es un lenguaje de programación académico diseñado para el curso de Compilación de la Universidad de La Habana. El objetivo central de este proyecto es construir un compilador funcional y completo que recorra todas las fases clásicas de la teoría de compiladores: análisis léxico, análisis sintáctico, análisis semántico y generación de código o interpretación directa.
+HULK (Havana University Language for Kompilers) es un lenguaje de programación académico diseñado para el curso de Compilación de la Universidad de La Habana. El objetivo de este proyecto es construir un compilador funcional que recorra las fases clásicas de la teoría de compiladores: análisis léxico, análisis sintáctico, análisis semántico y generación de código.
 
-HULK es un lenguaje orientado a expresiones. Los programas consisten en cero o más declaraciones de nivel superior (funciones globales y definiciones de tipos) seguidas de una o más expresiones ejecutables. El lenguaje soporta operadores aritméticos, lógicos y de comparación; estructuras de control como `if`/`elif`/`else`, `while`, `for`, `unless`, `repeat`, `loop … while` y `with`; declaración de funciones con tipo de retorno opcional; tipos orientados a objetos con herencia simple; expresiones de ligadura con `let … in`; bloques de expresiones; pruebas de tipo con `is` y conversiones con `as`; y asignación destructiva con `:=`. Funciones predefinidas como `print`, `sin`, `cos` y `range` forman parte de la biblioteca estándar. Las extensiones de control de flujo e iteración se documentan en la sección 6.
+HULK es un lenguaje orientado a expresiones. Los programas consisten en cero o más declaraciones de nivel superior (funciones globales y definiciones de tipos) seguidas de una o más expresiones ejecutables. El lenguaje soporta operadores aritméticos, lógicos y de comparación; estructuras de control como `if`/`elif`/`else`, `while`, `for`, `unless`, `repeat`, `loop … while`, `with` y `case`; declaración de funciones con tipo de retorno opcional; tipos orientados a objetos con herencia simple; expresiones de ligadura con `let … in`; bloques de expresiones; pruebas de tipo con `is` y conversiones con `as`; y asignación destructiva con `:=`. Las extensiones `unless`, `repeat`, `loop … while` y `for` con tipo opcional se documentan en la sección 6. Funciones predefinidas como `print`, `sin`, `cos` y `range` forman parte de la biblioteca estándar.
 
-Este informe describe la arquitectura de nuestro compilador HULK, las decisiones de diseño tomadas en cada etapa, las funcionalidades implementadas, las limitaciones conocidas y la metodología de pruebas empleada para validar la corrección.
+Este informe describe la arquitectura del compilador, las decisiones de diseño en cada etapa, las funcionalidades implementadas, las limitaciones conocidas y la metodología de pruebas empleada.
 
 ---
 
@@ -46,7 +46,7 @@ archivo.hulk
 
 ### 2.2 Interfaz de línea de comandos
 
-El binario del compilador `./hulk` soporta dos modos de operación dentro de un mismo ejecutable. Invocado sin flags como `./hulk archivo.hulk`, ejecuta el pipeline de producción: analiza el programa y, si no hay errores, emite un ejecutable nativo `./output` en el directorio actual. Cuando se suministran flags de desarrollo (`--interpret`, `--semantic`, `--tokens`, `--ast`), se produce salida diagnóstica adicional sin alterar el comportamiento por defecto.
+El binario `./hulk` soporta dos modos de operación. Invocado como `./hulk archivo.hulk`, ejecuta el pipeline de producción: analiza el programa y, si no hay errores, emite un ejecutable nativo `./output` en el directorio actual. Flags de desarrollo (`--interpret`, `--semantic`, `--tokens`, `--ast`) producen salida diagnóstica adicional sin alterar el comportamiento por defecto.
 
 ---
 
@@ -54,65 +54,19 @@ El binario del compilador `./hulk` soporta dos modos de operación dentro de un 
 
 ### 3.1 Función del lexer
 
-El lexer es la primera etapa del compilador. Lee el archivo fuente como una secuencia plana de caracteres y la transforma en una secuencia de **tokens** — pares formados por un tipo de token y, cuando aplica, un valor semántico. Por ejemplo, el texto `42` se convierte en un token `NUMBER_LITERAL` con valor numérico 42; `if` se convierte en `KEYWORD_IF`; y `mensaje` se convierte en `IDENTIFIER` con lexema `"mensaje"`.
+El lexer lee el archivo fuente y lo transforma en una secuencia de **tokens** — pares formados por un tipo y, cuando aplica, un valor semántico. Además de tokenizar, mantiene la posición actual (línea y columna), descarta espacios en blanco y comentarios, y reporta errores léxicos ante caracteres no reconocidos o construcciones sin terminar.
 
-Además de tokenizar, el lexer mantiene la posición actual en el archivo (número de línea y columna), descarta el ruido léxico (espacios en blanco y comentarios) y reporta errores léxicos ante caracteres no reconocidos o construcciones sin terminar, como cadenas y comentarios de bloque.
+### 3.2 Implementación con Flex
 
-### 3.2 Elección de Flex
+El lexer se implementó con **Flex** (`Lexer/hulk_lexer.l`). Flex genera un escáner en C++ a partir de expresiones regulares y aplica la política de **coincidencia más larga** (*longest match*), lo que resuelve ambigüedades como distinguir `:=` de `:` seguido de `=`. La opción `nodefault` desactiva la acción silenciosa por defecto; los caracteres no reconocidos se manejan con una regla de respaldo que reporta error léxico.
 
-El lexer de HULK se implementó con **Flex** (Fast Lexical Analyzer Generator). Flex genera un escáner en C++ a partir de un archivo de especificación (`Lexer/hulk_lexer.l`) donde cada token se describe mediante una expresión regular y una acción asociada. Este enfoque alinea la implementación con el modelo formal de lenguajes regulares, que es el marco teórico correcto para el análisis léxico.
+Las reglas cubren espacios en blanco, comentarios de línea y bloque (con detección de bloques sin cerrar), literales de cadena con secuencias de escape, literales numéricos (flotantes antes que enteros), booleanos, palabras clave (declaradas antes que identificadores), operadores multi-carácter y fin de archivo.
 
-Flex aplica la política de **coincidencia más larga** (*longest match*): cuando varias reglas pueden hacer match, selecciona la que consume más caracteres. Esto resuelve automáticamente ambigüedades como distinguir `:=` de `:` seguido de `=`. Cuando dos reglas coinciden en longitud, Flex da prioridad a la regla que aparece primero en el archivo, lo que permite controlar la precedencia entre palabras clave e identificadores.
+Cada token lleva una estructura `SemanticValue` con campos para cadenas, números y booleanos. Los contadores `line_` y `column_` se copian en la estructura `Token` del parser para que todos los mensajes de error incluyan ubicaciones precisas. Los caracteres no reconocidos producen diagnósticos de la forma `(línea,col) LEXICAL: unexpected character 'X'` con código de salida 1.
 
-### 3.3 Estructura de hulk_lexer.l
+### 3.3 Adaptador de tokens
 
-La especificación del lexer sigue el diseño estándar de tres secciones de Flex, separadas por marcadores `%%`.
-
-**Opciones de configuración.** Cuatro opciones controlan la generación de código:
-
-- `%option yyclass="HulkLexer"` — genera `yylex()` como método de instancia de la clase `HulkLexer`, permitiendo uso orientado a objetos con un stream de entrada específico.
-- `%option noyywrap` — suprime la llamada a `yywrap()` al final del archivo, ya que HULK siempre procesa un solo archivo.
-- `%option never-interactive` — habilita entrada con buffer para mayor eficiencia.
-- `%option nodefault` — desactiva la acción por defecto silenciosa de Flex; los caracteres no reconocidos se manejan explícitamente con una regla de respaldo `.` que reporta un error léxico.
-
-**Macros de patrones.** Alias reutilizables de expresiones regulares mejoran la legibilidad:
-
-```
-DIGIT    [0-9]
-ALPHA    [a-zA-Z]
-ALNUM_   [a-zA-Z0-9_]
-INT      {DIGIT}+
-FLOAT    {DIGIT}+\.{DIGIT}+
-IDENT    {ALPHA}{ALNUM_}*
-```
-
-**La macro UPD.** Para evitar repetir la lógica de actualización de posición y retorno en cada regla de token simple, se define una macro auxiliar en el prólogo:
-
-```cpp
-#define UPD(t) do { column_ += yyleng; \
-                    return static_cast<int>(TokenType::t); } while(0)
-```
-
-El envoltorio `do { … } while(0)` es un idiom clásico de C que garantiza que la macro se comporte como una sola sentencia en cualquier contexto de control de flujo.
-
-### 3.4 Reglas de tokens
-
-Las reglas siguen la coincidencia más larga y la precedencia por orden de declaración:
-
-- Los **espacios en blanco** se consumen sin emitir token; los saltos de línea incrementan el contador de línea y reinician la columna.
-- Los **comentarios de línea** (`//…`) se descartan. Los **comentarios de bloque** (`/*…*/`) se manejan con un bucle manual que rastrea la posición y reporta error si no se encuentra el delimitador de cierre.
-- Los **literales de cadena** acumulan caracteres entre comillas dobles, interpretan secuencias de escape (`\n`, `\t`, etc.) y reportan errores en cadenas sin terminar.
-- Los **literales numéricos** reconocen flotantes antes que enteros para que el punto decimal tenga prioridad.
-- Los **literales booleanos** `true` y `false` se reconocen antes que la regla general de identificadores.
-- Cada **palabra clave** tiene una regla dedicada ubicada antes de los identificadores.
-- Los **operadores de varios caracteres** (`:=`, `==`, `<=`, `>=`, …) se definen antes que los de un solo carácter.
-- El **fin de archivo** (`<<EOF>>`) y la regla de respaldo `.` completan la especificación.
-
-### 3.5 Valores semánticos y seguimiento de posición
-
-Cada token lleva una estructura `SemanticValue` con tres campos: `str_val` (lexemas de identificadores y contenido de cadenas), `num_val` (literales numéricos) y `bool_val` (literales booleanos). Los campos de instancia `line_` y `column_` rastrean la posición; un adaptador copia estos valores en la estructura `Token` del parser para que todos los mensajes de error posteriores incluyan ubicaciones precisas en el fuente.
-
-Cuando el lexer encuentra un carácter no reconocido, produce un token de tipo `UNKNOWN`. El pipeline del compilador convierte el primero de tales tokens en un diagnóstico de la forma `(línea,col) LEXICAL: unexpected character 'X'` en la salida de error estándar, con código de salida 1.
+La salida del lexer se convierte mediante un adaptador (`Parser/core/token_adapter.*`) en una estructura uniforme `Token` con campos `type`, `lexeme`, `line` y `col`. La lista completa se envuelve en un `TokenStream` que provee `current()`, `advance()`, `peek(n)` y `consume(type, msg)`. Esta capa de abstracción desacopla el lexer Flex del parser LL(1) y garantiza que toda la información de posición fluya de forma consistente hasta los diagnósticos finales, independientemente de en qué fase se detecte un error.
 
 ---
 
@@ -120,84 +74,31 @@ Cuando el lexer encuentra un carácter no reconocido, produce un token de tipo `
 
 ### 4.1 Función del parser
 
-El parser toma la secuencia de tokens del lexer y verifica que cumple la gramática de HULK. En caso de éxito, construye dos representaciones en árbol:
+El parser verifica que la secuencia de tokens cumple la gramática de HULK y construye dos representaciones en árbol: el **CST**, que refleja las derivaciones gramaticales incluyendo no terminales auxiliares, y el **AST**, que elimina el andamiaje gramatical y conserva solo la estructura semánticamente relevante.
 
-- El **árbol de sintaxis concreto (CST)** refleja la estructura exacta de las derivaciones gramaticales, incluyendo no terminales auxiliares introducidos para compatibilidad LL(1).
-- El **árbol de sintaxis abstracto (AST)** es una forma simplificada que elimina el andamiaje gramatical y conserva solo la estructura semánticamente relevante para las fases posteriores.
+### 4.2 Parser LL(1)
 
-### 4.2 Elección del análisis LL(1)
+Implementamos un **parser LL(1) dirigido por tabla**: lee la entrada de izquierda a derecha, produce una derivación por la izquierda y usa un token de anticipación para seleccionar producciones. Esta elección conecta directamente con los conceptos del curso (conjuntos FIRST y FOLLOW, tablas predictivas) y separa la definición de la gramática (`Parser/grammar/grammar.ll1`) del algoritmo de parseo.
 
-Implementamos un **parser LL(1) dirigido por tabla**: lee la entrada de izquierda a derecha, produce una derivación por la izquierda y usa un token de anticipación (*lookahead*) para seleccionar producciones. Esta elección se motivó por varios factores.
+La gramática formal reside en `grammar.ll1` y el parser construye la tabla LL(1) dinámicamente mediante un generador propio (`Parser/generator/`) que calcula conjuntos FIRST/FOLLOW y detecta conflictos. Nuestra gramática actual tiene cero conflictos, verificado por prueba automatizada.
 
-En primer lugar, LL(1) conecta directamente con los conceptos teóricos del curso — conjuntos FIRST y FOLLOW, tablas de análisis predictivo y gramáticas libres de conflictos — y desarrollamos nuestro propio generador de tablas en lugar de depender de una herramienta de caja negra. En segundo lugar, separar la definición de la gramática (`Parser/grammar/grammar.ll1`) del algoritmo de parseo hace explícita e independientemente inspeccionable la especificación del lenguaje. En tercer lugar, los parsers LL(1) producen mensajes de error predecibles y localizados porque las decisiones se toman en cada posición de la entrada sin retroceso.
+**Precedencia de operadores.** Se eliminó la recursión izquierda mediante colas estándar para suma/resta y multiplicación/división (asociatividad izquierda). La exponenciación usa una cola recursiva a la derecha para que `2^3^2` se parsee como `2^(3^2)`.
 
-La restricción principal es que la gramática debe estar libre de recursión izquierda y de conflictos LL(1), lo que exigió reestructurar cuidadosamente la precedencia de operadores y la sintaxis del cuerpo de clase.
+**Desambiguación del cuerpo de clase.** Atributos y métodos comienzan con un identificador; con un solo token de anticipación se factoriza por la izquierda: tras consumir el identificador, `COLON` indica atributo y `LPAREN` indica método.
 
-### 4.3 Infraestructura del parser
+**Restricción de bloques.** `FIRST(Expr)` no incluye `LBRACE`, por lo que los bloques `{…}` aparecen solo en posiciones explícitamente permitidas.
 
-**Token y adaptador.** La salida del lexer se convierte mediante un adaptador de tokens (`Parser/core/token_adapter.*`) en una estructura uniforme `Token` con campos `type`, `lexeme`, `line` y `col`. La lista completa se envuelve en un `TokenStream` que provee `current()`, `advance()`, `peek(n)` y `consume(type, msg)` — este último lanza un `ParseError` con información de posición cuando falta el token esperado.
+Los errores sintácticos se representan como excepciones `ParseError` y se formatean como `(línea,col) SYNTACTIC: …` con código de salida 2. El parser incluye recuperación a nivel de sentencia para construir un AST parcial útil en diagnósticos.
 
-**ParseError.** Los errores sintácticos se representan como excepciones que portan el token problemático y un mensaje descriptivo. El punto de entrada las captura y las formatea como `(línea,col) SYNTACTIC: …` con código de salida 2.
+### 4.3 Conversión CST a AST
 
-### 4.4 La gramática
+La conversión (`Parser/ast/cst_to_ast.cpp`) recorre el CST recursivamente. Bajo un nodo raíz `Program` emergen sentencias (`Stmt`) — funciones, tipos, expresiones de nivel superior — y expresiones (`Expr`). Transformaciones notables: cadenas de cola de operadores se aplanan en nodos `BinaryExpr`; accesos y llamadas postfix se convierten en `GetAttrExpr` y `CallExpr` anidados; ligaduras múltiples en `let` se anidan; ramas `elif` se normalizan a `IfExpr` anidados; las llamadas a método y asignación a atributo se unifican mediante `GetAttrExpr` combinado con `CallExpr` o `AssignExpr`, simplificando las fases posteriores.
 
-La gramática formal reside en `Parser/grammar/grammar.ll1`. El parser no tiene conocimiento fijo de la sintaxis de HULK; lee este archivo y construye la tabla LL(1) dinámicamente.
+Los tipos de nodo del AST cubren literales, identificadores, operadores, `let`, bloques, todas las estructuras de control del lenguaje, declaraciones de funciones y tipos, `is`/`as`, `new` y asignación destructiva.
 
-**Precedencia de operadores.** Fue necesario eliminar la recursión izquierda. La suma y la resta usan el patrón estándar de cola:
+### 4.4 El parser predictivo
 
-```
-AddExpr     -> MulExpr AddExprTail
-AddExprTail -> PLUS  MulExpr AddExprTail
-             | MINUS MulExpr AddExprTail
-             | epsilon
-```
-
-Esto produce asociatividad izquierda. La exponenciación, que requiere asociatividad derecha, usa una cola recursiva a la derecha:
-
-```
-PowerExpr     -> UnaryExpr PowerExprTail
-PowerExprTail -> CARET PowerExpr
-               | epsilon
-```
-
-de modo que `2^3^2` se parsea como `2^(3^2)`.
-
-**Desambiguación del cuerpo de clase.** Dentro de una declaración de clase, tanto atributos como métodos comienzan con un identificador. Con un solo token de anticipación, el parser no puede distinguirlos de inmediato. Aplicamos factorización por la izquierda: se consume el identificador y luego se inspecciona el token siguiente — `COLON` indica un atributo, `LPAREN` un método. Esto se implementa mediante el no terminal `ClassAttrListHead`.
-
-**Sin punto y coma tras la llave de cierre de clase.** Las declaraciones de clase no requieren punto y coma después de `}`. Añadir un `;` opcional crearía un conflicto LL(1): tras `}`, el parser no podría determinar si `;` pertenece a la clase o a la siguiente sentencia. Omitirlo mantiene la gramática sin ambigüedad y coincide con la especificación del lenguaje HULK.
-
-**Restricción de bloques.** La gramática define que `FIRST(Expr)` no incluye `LBRACE`, por lo que los bloques `{…}` aparecen solo en posiciones explícitamente permitidas (cuerpos de funciones, de `let`/`if`/`while`, etc.) y no pueden usarse como operandos arbitrarios.
-
-### 4.5 Generación de la tabla LL(1)
-
-El generador (`Parser/generator/`) comprende tres componentes:
-
-1. **Lector de gramática** — parsea `grammar.ll1` en objetos de producción e identifica terminales, no terminales y símbolo inicial.
-2. **Calculador FIRST/FOLLOW** — computa ambos conjuntos iterativamente hasta un punto fijo con los algoritmos clásicos.
-3. **Constructor de tabla** — construye `M[A, a]`; si una segunda producción se asigna a una celda ya ocupada, se registra un conflicto LL(1). Nuestra gramática actual tiene cero conflictos, verificado por una prueba automatizada.
-
-### 4.6 El parser predictivo y el CST
-
-El parser LL(1) (`Parser/syntax/ll1_parser.*`) mantiene una pila inicializada con el símbolo inicial `Program`. En cada paso empareja un terminal con el token actual de entrada o expande un no terminal usando la entrada de tabla para el próximo token, sin haberlo consumido aún. El CST se construye simultáneamente: los nodos internos corresponden a no terminales y las hojas a terminales consumidos.
-
-Se generan mensajes de error sensibles al contexto analizando el estado del parseo — por ejemplo, reportando que un operador no es aplicable a una expresión de cierto tipo en lugar de un genérico «token inesperado».
-
-### 4.7 Conversión CST a AST
-
-La conversión (`Parser/ast/cst_to_ast.cpp`) recorre el CST recursivamente, aplanando el ruido gramatical y construyendo un AST limpio. Bajo un nodo raíz `Program` emergen dos jerarquías:
-
-- **Sentencias (`Stmt`)** — declaraciones de funciones, declaraciones de tipos, sentencias de expresión.
-- **Expresiones (`Expr`)** — cualquier construcción que produce o evalúa un valor.
-
-Transformaciones notables:
-
-- **Expresiones binarias** — cadenas de cola como `AddExpr` + `AddExprTail` se aplanan en nodos `BinaryExpr` con asociatividad izquierda.
-- **Cadenas postfix** — accesos y llamadas secuenciales (`obj.m(a).b`) se convierten en nodos anidados `GetAttrExpr` y `CallExpr`.
-- **Ligaduras let** — `let x = 1, y = 2 in expr` se convierte en nodos `LetExpr` anidados.
-- **If/elif** — las ramas elif se normalizan a nodos `IfExpr` anidados.
-- **Representación OO unificada** — las llamadas a método `obj.m(a)` se convierten en `Call(GetAttr(obj, m), [a])`; la asignación a atributo `obj.attr := v` en `Assign(GetAttr(obj, attr), :=, v)`. Este diseño de dos nodos (en lugar de cuatro tipos separados) simplifica tanto el análisis semántico como la generación de código.
-
-Los tipos de nodo del AST cubren literales, identificadores, todos los operadores binarios y unarios, `let`, bloques, `if`/`while`/`for`, `unless`/`repeat`/`loop … while`, `with`, `case`, declaraciones de funciones y tipos, `is`/`as`, `new` y asignación destructiva.
+El parser LL(1) (`Parser/syntax/ll1_parser.*`) mantiene una pila inicializada con el símbolo inicial `Program`. En cada paso empareja un terminal con el token actual o expande un no terminal usando la entrada de tabla correspondiente al próximo token, sin haberlo consumido aún. El CST se construye simultáneamente: los nodos internos corresponden a no terminales y las hojas a terminales consumidos. Cuando el token actual no coincide con ninguna producción aplicable, se lanza un `ParseError` con mensaje contextual — por ejemplo, indicando que falta un punto y coma al final de una sentencia en lugar de un genérico «token inesperado».
 
 ---
 
@@ -205,225 +106,118 @@ Los tipos de nodo del AST cubren literales, identificadores, todos los operadore
 
 ### 5.1 Estructura de dos pasadas
 
-El análisis semántico se divide en una pasada de **recolección de declaraciones** y otra de **verificación de tipos**. Esta separación permite que las declaraciones orientadas a objetos referencien tipos registrados pero aún no analizados completamente dentro de la misma unidad de compilación.
+El análisis semántico se divide en recolección de declaraciones y verificación de tipos. La primera pasada (`decl_collector.cpp`) registra firmas de funciones (con sobrecarga por aridad), nombres de clases, herencia, atributos y métodos. Las funciones predefinidas y constantes globales (`PI`, `E`) se inyectan antes del código del usuario. La segunda pasada (`phase2_checker.cpp`) valida el programa completo.
 
-La pasada de recolección (`decl_collector.cpp`) recorre las sentencias de nivel superior y registra firmas de funciones (con sobrecarga por aridad), nombres de clases, aristas de herencia, nombres de atributos y firmas de métodos. Las funciones predefinidas y las constantes globales (`PI`, `E`) se inyectan antes del código del usuario.
+### 5.2 Reglas núcleo
 
-El analizador principal (`SemanticCheck/phase2_checker.cpp`) valida entonces el programa completo.
+**R1 — Una definición por ámbito.** Un nombre de variable solo puede declararse una vez dentro del mismo ámbito `let`. La asignación destructiva `:=` reasigna un enlace existente. Las variables globales predefinidas no pueden redefinirse.
 
-### 5.2 Reglas núcleo (R1–R4)
+**R2 — Definida antes de uso.** Los enlaces en `let` se procesan de izquierda a derecha. La autorreferencia en un inicializador se rechaza. Las funciones son globales y no capturan variables de ámbitos `let` exteriores.
 
-**R1 — Una definición por ámbito.** Un nombre de variable solo puede declararse una vez dentro del mismo ámbito `let`. En let anidados, está permitido declarar en let interiores nuevamente variables ya declaradas en let exteriores. La asignación destructiva `:=` reasigna un enlace existente en lugar de crear uno nuevo. Las variables globales predefinidas no pueden redefinirse con `let`.
+**R3 — Parámetros únicos y sobrecarga.** Los nombres de parámetros deben ser únicos dentro de una firma. Varias funciones globales pueden compartir nombre si difieren en aridad.
 
-**R2 — Definida antes de uso.** Toda variable debe estar definida antes de aparecer en una expresión. En `let a = 1, b = a + 1 in …`, los enlaces se procesan de izquierda a derecha de modo que `b` puede referenciar `a`. La autorreferencia en un inicializador (`let x = x in …`) se rechaza. Las funciones son solo globales y no capturan variables de ámbitos `let` exteriores.
-
-**R3 — Parámetros únicos y sobrecarga.** Los nombres de parámetros deben ser únicos dentro de la firma de una función o método. Varias funciones globales pueden compartir nombre si difieren en aridad; redefinir el mismo nombre con la misma aridad es un error.
-
-**R4 — Orden textual de declaración.** Las funciones se registran al encontrar sus declaraciones. Una llamada a una función aún no declarada en el fuente produce `UNDEFINED_FUNCTION`. Las funciones predefinidas están precargadas y no pueden redeclararse.
+**R4 — Orden textual de declaración.** Una llamada a una función aún no declarada produce `UNDEFINED_FUNCTION`. Las funciones predefinidas están precargadas.
 
 ### 5.3 Semántica orientada a objetos
 
-Para cada declaración `type`, el analizador valida que los objetivos de `inherits` existen, detecta ciclos de herencia, registra atributos en el ámbito de la clase y analiza cuerpos de métodos en un ámbito donde `self` tiene el tipo de la clase actual. Las comprobaciones de compatibilidad de sobrescritura de métodos comparan tipos de retorno y listas de parámetros con los métodos del padre a lo largo de la cadena de herencia.
+Para cada declaración `type`, el analizador valida herencia, detecta ciclos, registra atributos y analiza métodos en un ámbito donde `self` tiene el tipo de la clase actual. Las comprobaciones de sobrescritura comparan tipos de retorno y parámetros con los métodos del padre a lo largo de toda la cadena de herencia. `new` se valida contra la lista de parámetros del constructor; las expresiones de inicialización de atributos se verifican en el contexto de la clase. `base()` está permitido solo dentro de métodos de clases que declaran un padre, y su invocación se restringe al cuerpo de métodos donde tiene sentido delegar en la implementación heredada.
 
-La expresión `new` se valida contra la lista de parámetros del constructor del tipo objetivo. Las expresiones de inicialización de atributos se verifican en el contexto de la clase. Las llamadas a `base()` están permitidas solo dentro de métodos de clases con padre.
+La tabla de símbolos (`SymbolTable/`) gestiona ámbitos anidados para `let`, cuerpos de función, métodos y bloques. Cada ámbito mantiene un mapa de enlaces locales y referencias a su ámbito padre. Las declaraciones de tipo viven en un registro global accesible durante todo el análisis, lo que permite resolver referencias cruzadas entre clases declaradas en cualquier orden dentro de la unidad de compilación.
 
-### 5.4 Inferencia de tipos
+### 5.4 Inferencia de tipos y sistema de tipos
 
-HULK permite omitir anotaciones de tipo en varias posiciones: variables locales en `let`, tipos de retorno de funciones y métodos, y tipos de atributos. El analizador ejecuta hasta diez pasadas de punto fijo sobre cuerpos de funciones y métodos hasta que los tipos se estabilizan o se reporta un error. Los operadores binarios numéricos, de cadena y booleanos tienen reglas de propagación que asignan tipos a referencias de identificadores sin tipo cuando se conoce el tipo del otro operando.
+HULK permite omitir anotaciones de tipo en variables locales, retornos de funciones y atributos. El analizador ejecuta hasta diez pasadas de punto fijo sobre cuerpos de funciones y métodos hasta estabilizar tipos. `Types/type_info.cpp` modela `Number`, `String`, `Boolean`, `Null`, tipos objeto y tipos inferidos; el subtipado se verifica mediante `conformsTo`. El operador `is` produce `Boolean`; `as` produce el tipo objetivo cuando el cast es estáticamente posible.
 
-### 5.5 Sistema de tipos
+### 5.5 Estructuras de control del lenguaje
 
-`Types/type_info.cpp` modela `Number`, `String`, `Boolean`, `Null`, tipos objeto y tipos desconocidos o inferidos. El subtipado a lo largo de aristas de herencia se verifica mediante `conformsTo`. El operador `is` produce un `Boolean`; `as` produce el tipo objetivo cuando el cast es estáticamente posible, con comprobaciones en tiempo de ejecución emitidas por el generador de código para los casos dinámicos.
+Todas las construcciones de control son **expresiones** con valor de retorno. `if`/`elif`/`else` y `while` siguen la semántica estándar. `with (expr as alias) cuerpo` introduce el alias solo si el valor no es `Null`. `case expr of { rama: Tipo => cuerpo; … }` selecciona la rama cuyo tipo es el ancestro más cercano entre las que coinciden con el tipo dinámico de la expresión. El analizador verifica tipos de condiciones, legibilidad de alias y alcanzabilidad estática de ramas en `case`. Cuatro extensiones adicionales de control de flujo e iteración se describen en la sección 6.
 
-### 5.6 Reporte de errores
+### 5.6 Funciones predefinidas
 
-El compilador distingue dos modos de reporte:
+El analizador precarga un conjunto de funciones y constantes globales antes de procesar el código del usuario. Entre las funciones builtin están `print` (acepta cualquier tipo imprimible), funciones matemáticas (`sin`, `cos`, `log`, `sqrt`, `exp`), y `range(inicio, fin)` que produce un iterable numérico en el intervalo `[inicio, fin)`. Las constantes `@PI` y `@E` tienen tipo `Number`. Estas declaraciones no pueden redefinirse ni sobrecargarse; cualquier intento de redeclaración produce error semántico. Las llamadas a builtins se resuelven en tiempo de compilación cuando los argumentos son conocidos estáticamente, y en tiempo de ejecución en los casos generales.
 
-| Modo | Activación | Comportamiento |
-|------|------------|----------------|
-| **multi-fase** (por defecto) | `./hulk archivo.hulk` | Acumula diagnósticos de todas las fases alcanzables. El parser usa recuperación a nivel de sentencia para construir un AST parcial; la semántica se ejecuta sobre las sentencias válidas. Los mensajes se ordenan por `(línea, columna)` y se deduplican. |
-| **primera fase** | `./hulk --first-phase archivo.hulk` | Se detiene en la primera fase que falla: léxico (exit 1) → sintáctico (exit 2) → semántico (exit 3). Solo se muestran diagnósticos de esa fase. |
+### 5.7 Reporte de errores
 
-Formato de salida: `(línea,col) FASE: mensaje` en stderr (`LEXICAL`, `SYNTACTIC`, `SEMANTIC`). Con errores sintácticos presentes el código de salida es 2 aunque también haya semánticos; sin sintaxis pero con semánticos, exit 3. El AST parcial sirve solo para diagnósticos: no se genera `./output` si la compilación falla. Los errores léxicos irrecuperables (`UNKNOWN`, cadena sin cerrar) siguen abortando antes del parseo.
-
-Ejemplo (`playground/test2.hulk`):
-
-```
-$ ./hulk playground/test2.hulk
-(4,7) SEMANTIC: Variable 'a' no está definida
-(5,10) SYNTACTIC: se esperaba ';' al final de la sentencia
-
-$ ./hulk --first-phase playground/test2.hulk
-(5,10) SYNTACTIC: se esperaba ';' al final de la sentencia
-```
-
-La infraestructura vive en `Compiler/diagnostic.*` y `Compiler/pipeline.cpp`; la recuperación sintáctica en `Parser/syntax/ll1_parser.cpp` (`parse_with_recovery`). Tests: `make test_multi_phase`, `tests/run_multi_phase.sh`.
+El compilador reporta diagnósticos con formato `(línea,col) FASE: mensaje` en stderr, donde `FASE` es `LEXICAL`, `SYNTACTIC` o `SEMANTIC`. Por defecto acumula errores de todas las fases alcanzables, los ordena por posición y deduplica; el código de salida refleja la fase más fundamental (léxico > sintáctico > semántico). Con `--first-phase` solo se muestran errores de la primera fase que falla. No se genera `./output` si la compilación falla.
 
 ---
 
-## 6. Extensiones al lenguaje HULK
+## 6. Extensiones de control de flujo e iteración
 
-Además del núcleo del lenguaje HULK descrito en las secciones anteriores, nuestro compilador incorpora un **paquete de extensiones de control de flujo e iteración** que amplían la expresividad sin romper la sintaxis base. Estas extensiones se integran en la misma gramática LL(1) (`Parser/grammar/grammar.ll1`), producen nodos dedicados en el AST, pasan por el analizador semántico y están implementadas **end-to-end** en intérprete y codegen LLVM (`tests/extensions/`, `tests/llvm/valid/86_l8_with.hulk`, `tests/llvm/valid/87_l8_case.hulk`).
+Además del núcleo de HULK (`if`, `while`, `for … in range`), el compilador incorpora **cuatro extensiones** que amplían las formas de expresar condicionales y bucles. Todas son expresiones con valor de retorno, se integran en la gramática LL(1) (`Parser/grammar/grammar.ll1`), producen nodos dedicados en el AST, pasan por el analizador semántico y están implementadas de extremo a extremo en intérprete y codegen LLVM. Ejemplos ejecutables se encuentran en `tests/extensions/valid/`; casos adicionales en `tests/eval/valid/` y `tests/llvm/valid/`.
 
-Las seis extensiones del paquete — `unless`, `repeat`, `loop … while`, `for` con tipo opcional e iterables OO, `with … as` y `case … of` — comparten el mismo pipeline que el núcleo del lenguaje.
+### 6.1 `unless` — condicional invertida
 
-### 6.1 Motivación y relación con HULK base
+**Sintaxis:** `unless (condición) expresión` o `unless (condición) expresión else alternativa`.
 
-HULK base ya provee `if`/`elif`/`else`, `while` y `for … in …` sobre iterables. Las extensiones añaden formas alternativas — más concisas o más expresivas — que se apoyan en la misma infraestructura de expresiones: todas son **expresiones** con valor de retorno, respetan la necesidad de paréntesis en condiciones y se integran en `let`, bloques y cuerpos de función igual que las construcciones originales.
-
-Tres de las extensiones (`unless`, `repeat`, `loop … while`) pueden entenderse como **azúcar sintáctica** sobre `if` y `while` ya existentes; la extensión de `for` tipado refuerza el sistema de tipos estático sin exigir anotaciones cuando el iterable es conocido (por ejemplo, `range`).
-
-### 6.2 `unless` — guardia invertida
-
-**Sintaxis:**
-
-```hulk
-unless (condición) expresión
-unless (condición) expresión else expresión_alternativa
-```
-
-**Semántica.** Equivalente a `if (!(condición)) expresión [else alternativa]`: el cuerpo principal se ejecuta cuando la condición es **falsa**. La condición debe ser de tipo `Boolean`; de lo contrario el analizador reporta error semántico y el intérprete aborta con mensaje de tipo.
+**Qué aporta.** Equivalente a `if (!(condición)) …`: el cuerpo principal se ejecuta cuando la condición es **falsa**. La condición debe ser `Boolean`.
 
 **Ejemplo:**
 
 ```hulk
-unless (false) 42 else 0;    // produce 42
-unless (true)  print("no");  // no imprime; devuelve 0 si no hay else
+unless (false) 42 else 0;           // produce 42
+print(unless (false) 1 else 2);     // imprime 1
 ```
 
-**Implementación.** Nodo `UnlessExpr` con condición, rama principal y rama `else` opcional. El analizador verifica el tipo booleano de la condición y calcula el tipo del resultado como ancestro común de ambas ramas. El intérprete evalúa la condición y ramifica en consecuencia; el codegen LLVM sigue el mismo esquema invertido respecto a `IfExpr`.
+**Archivos de referencia:** `tests/extensions/valid/unless.hulk`, `unless_then.hulk`, `unless_else.hulk`; `tests/eval/valid/43_v9_unless.hulk`; `tests/llvm/valid/83_l8_unless.hulk`, `90_l9_unless_branches.hulk`.
 
-### 6.3 `repeat` — repetición contada
+### 6.2 `repeat` — repetición contada
 
-**Sintaxis:**
+**Sintaxis:** `repeat (n) cuerpo`.
 
-```hulk
-repeat (n) cuerpo
-```
-
-**Semántica.** Evalúa `cuerpo` exactamente `n` veces, donde `n` debe ser una expresión de tipo `Number`. El valor de la expresión `repeat` es el valor devuelto por la **última** ejecución del cuerpo; si `n ≤ 0`, el resultado es `Null` (sin ejecutar el cuerpo). Es útil para efectos secundarios repetidos sin escribir un contador manual.
+**Qué aporta.** Evalúa `cuerpo` exactamente `n` veces, donde `n` es de tipo `Number`. El valor de la expresión es el de la **última** ejecución; si `n ≤ 0`, el resultado es `Null` sin ejecutar el cuerpo.
 
 **Ejemplo:**
 
 ```hulk
-repeat (3) print("hola");   // imprime "hola" tres veces
+print(let n = 0 in { repeat (3) n := n + 1; n; });   // imprime 3
 ```
 
-**Implementación.** Nodo `RepeatExpr` en el AST. La verificación semántica exige contador numérico y tipa el resultado con el tipo del cuerpo. El intérprete convierte el contador a entero y ejecuta un bucle for interno; el codegen LLVM replica la misma semántica, incluyendo la rama `n ≤ 0 → Null`.
+**Archivos de referencia:** `tests/extensions/valid/repeat.hulk`, `repeat_count.hulk`, `repeat_zero.hulk`; `tests/eval/valid/44_v9_repeat.hulk`; `tests/llvm/valid/84_l8_repeat.hulk`, `91_l9_repeat_edges.hulk`.
 
-### 6.4 `loop … while` — bucle con evaluación posterior
+### 6.3 `loop … while` — bucle con evaluación posterior
 
-**Sintaxis:**
+**Sintaxis:** `loop cuerpo while (condición)`.
 
-```hulk
-loop cuerpo while (condición)
-```
-
-**Semántica.** Similar al `do … while` de C o Java: el **cuerpo se ejecuta al menos una vez** antes de comprobar la condición; mientras la condición sea verdadera, el cuerpo se repite. La condición debe ser `Boolean`. El valor de la expresión es el de la última ejecución del cuerpo.
+**Qué aporta.** Similar al `do … while` de C: el cuerpo se ejecuta **al menos una vez** antes de comprobar la condición; mientras sea verdadera, se repite. La condición debe ser `Boolean`.
 
 **Ejemplo:**
 
 ```hulk
-loop print("una vez") while (false);   // imprime una vez y termina
+print(loop 7 while (false));   // imprime 7 (una sola ejecución)
 ```
 
-**Implementación.** Nodo `LoopWhileExpr`. El analizador valida la condición booleana y tipa el resultado con el tipo del cuerpo; el intérprete y el codegen LLVM ejecutan el cuerpo, evalúan la condición y continúan mientras sea verdadera.
+**Archivos de referencia:** `tests/extensions/valid/loop_while.hulk`, `loop_while_once.hulk`, `loop_while_multi.hulk`; `tests/eval/valid/45_v9_loop_while.hulk`; `tests/llvm/valid/85_l8_loop_while.hulk`, `92_l9_loop_while_multi.hulk`.
 
-### 6.5 `for` con anotación de tipo opcional
+### 6.4 `for` con tipo opcional e iterables definidos por el usuario
 
-**Sintaxis ampliada:**
+**Sintaxis ampliada:** `for (x in iterable) cuerpo` o `for (x: Tipo in iterable) cuerpo`.
 
-```hulk
-for (variable in iterable) cuerpo
-for (variable: Tipo in iterable) cuerpo
-```
-
-La forma base `for (x in range(0, 10)) …` ya pertenece a HULK; la **extensión** es la cláusula opcional `: Tipo` tras el identificador del iterador, que fija o restringe el tipo estático de la variable de bucle.
-
-**Semántica.** El iterable debe ser compatible con iteración. Un objeto es iterable si implementa `next(): Boolean` y `current(): T`. El builtin `range(inicio, fin)` cumple este contrato y produce valores numéricos en el intervalo `[inicio, fin)`. Los tipos definidos por el usuario pueden usarse en `for` implementando esos métodos de instancia. Cuando se anota el tipo — por ejemplo `for (x: Number in range(10))` — el analizador comprueba que el tipo inferido del elemento del iterable **conforme** al tipo declarado; si el iterable es un objeto con método `current()`, se usa el tipo de retorno de ese método para la inferencia. Si el iterable no es `range` ni un objeto con `next()`/`current()`, Phase2 reporta error explícito.
+**Qué aporta.** La forma base `for (x in range(0, n))` ya pertenece a HULK; la extensión añade la cláusula opcional `: Tipo` tras el identificador del iterador y permite iterar sobre objetos que implementan `next(): Boolean` y `current(): T`, no solo sobre `range`.
 
 **Ejemplo:**
 
 ```hulk
-for (x: Number in range(0, 5)) print(x);   // imprime 0, 1, 2, 3, 4
+for (x: Number in range(0, 3)) print(x);   // imprime 0, 1, 2
 ```
 
-**Implementación.** La gramática introduce el no terminal `ForTypeOpt` (`: IDENTIFIER` o ε). El analizador usa `inferForElementType` para deducir el tipo del elemento (p. ej. `Number` para `range`, o el retorno de `current()` para iterables OO) y valida la anotación opcional y la presencia de `next()`/`current()` en tipos usuario. El intérprete y el codegen usan un fast path optimizado para `range` y un path genérico con llamadas a métodos de instancia para iterables OO.
+Para iterables personalizados, ver `tests/extensions/valid/for_custom_iter.hulk` y `for_string_iter.hulk`.
 
-### 6.6 `with … as` — enlace condicionado a no-nulo
+**Archivos de referencia:** `tests/extensions/valid/for_range.hulk`, `for_typed.hulk`, `for_custom_iter.hulk`, `for_countdown_iter.hulk`; `tests/eval/valid/98_v16_for_custom_iter.hulk`, `99_v17_for_countdown.hulk`; `tests/llvm/valid/81_l8_range_for.hulk`, `82_l8_for_custom_iter.hulk`, `89_l9_for_countdown.hulk`, `98_l9_for_string_iter.hulk`.
 
-**Sintaxis:**
-
-```hulk
-with (expresión as alias) cuerpo
-with (expresión as alias) cuerpo else cuerpo_alternativo
-```
-
-**Semántica.** Evalúa `expresión`. Si el resultado **no** es `Null`, introduce `alias` en un ámbito nuevo con ese valor y ejecuta `cuerpo`. Si el resultado es `Null`, salta directamente a `cuerpo_alternativo` cuando existe, o devuelve `Null` en caso contrario. La subexpresión fuente admite asignaciones destructivas (`:=`) dentro del paréntesis, siguiendo la gramática dedicada `WithSourceExpr`.
-
-**Ejemplo:**
-
-```hulk
-with (42 as n) print(n);              // imprime 42
-with (Null as x) print(1) else print(0);   // imprime 0
-```
-
-**Implementación.** Nodo `WithExpr` con valor, alias, cuerpo y rama `else` opcional. El analizador tipa el cuerpo y combina ramas con ancestro común; declara el alias como **solo lectura** (asignaciones al alias son error semántico). El intérprete crea un marco de entorno temporal para el alias. El codegen LLVM ramifica según `Null`, enlaza el alias en un ámbito local y unifica ramas con tipos distintos mediante boxing antes del PHI de fusión.
-
-### 6.7 `case … of` — coincidencia dinámica por tipo
-
-**Sintaxis:**
-
-```hulk
-case expresión of rama1: Tipo => cuerpo; rama2: Tipo => cuerpo
-case expresión of { rama1: Tipo => cuerpo; … }
-case expresión of id: Tipo => cuerpo          // forma compacta (una rama)
-```
-
-**Semántica.** Compara el tipo dinámico de `expresión` contra cada `Tipo` de rama y ejecuta el cuerpo de la rama cuyo tipo es el **ancestro más cercano** entre las que coinciden. Si ninguna rama aplica en runtime, se aborta con error. Cuando el tipo estático de la expresión es conocido, Phase2 verifica que al menos una rama sea alcanzable; de lo contrario reporta error semántico. Cada variable de rama es de solo lectura.
-
-**Ejemplo (herencia):**
-
-```hulk
-type A() { }
-type B() inherits A() { }
-type C() inherits B() { }
-
-case new C() of {
-    a:A -> print("A");
-    b:B -> print("B");   // se ejecuta esta rama
-};
-```
-
-**Implementación.** Nodo `CaseExpr` con ramas tipadas. El intérprete elige la rama más específica usando `instanceConformsTo` y la jerarquía de tipos. El codegen LLVM ordena las ramas por especificidad, emite una cadena de comprobaciones de tipo en runtime (`emitRuntimeTypeConforms` / `emitScalarIsCheck`) y delega el fallo sin coincidencia a `hulk_runtime_case_error` en el runtime C.
-
-### 6.8 Extensiones no implementadas
-
-Las siguientes características aparecen en especificaciones ampliadas de HULK pero **no** forman parte del compilador descrito en este informe:
-
-- **Protocolos** (`protocol`): el lexer reconoce la palabra clave, pero no hay producciones gramaticales ni análisis semántico de conformidad estructural.
-- **Vectores / arreglos** con literal `[ … ]`.
-- **Expresiones lambda** y **macros**.
+Las tres primeras extensiones (`unless`, `repeat`, `loop … while`) pueden entenderse como azúcar sintáctica sobre `if` y `while`; la cuarta refuerza el sistema de tipos estático y el protocolo de iteración orientado a objetos sin exigir anotaciones cuando el iterable es conocido.
 
 ---
 
 ## 7. Intérprete
 
-Junto con la generación de código, el compilador incluye un intérprete de recorrido del árbol (`Evaluator/evaluator.cpp`) que ejecuta el AST directamente. Este componente sirve para desarrollo y validación: su salida en la salida estándar se compara con el binario nativo `./output` para verificar que ambas vías de ejecución producen resultados idénticos.
+Junto con la generación de código, el compilador incluye un intérprete de recorrido del árbol (`Evaluator/evaluator.cpp`) que ejecuta el AST directamente. Sirve para desarrollo y validación: su salida se compara con el binario nativo `./output` para verificar equivalencia de comportamiento.
 
-### 7.1 Modelo de valores en tiempo de ejecución
+El módulo `Value/` define un tipo `Value` con etiquetas para `Number`, `String`, `Boolean`, `Null`, `Range` e instancias objeto. Los enlaces se gestionan mediante una cadena de marcos de entorno (`env_frame.hpp`); la asignación destructiva recorre marcos ancestros. Las funciones de usuario se almacenan en un mapa indexado por nombre y aridad.
 
-El módulo `Value/` define un tipo `Value` con etiquetas que soporta `Number`, `String`, `Boolean`, `Null`, `Range` e instancias objeto `Instance`. Las instancias objeto portan un puntero a su declaración de clase y un entorno de atributos. La iteración sobre rangos la proveen `RangeValue` y `RangeIterator` en `Value/iterable.hpp`.
+El evaluador procesa un `Program` en dos pasadas: primero registra declaraciones de tipo, luego ejecuta funciones de nivel superior y la expresión final. Todas las estructuras de control, operadores (incluyendo cortocircuito de `and`/`or`, módulo, exponenciación y concatenación `@`), funciones predefinidas, construcción de objetos, despacho de métodos, `base()`, `is`/`as` están implementados. El flag `--interpret` activa esta vía.
 
-### 7.2 Entorno de ejecución
-
-Los enlaces se gestionan mediante una cadena de marcos de entorno (`Evaluator/env_frame.hpp`). La búsqueda para asignación destructiva `:=` recorre marcos ancestros de modo que la reasignación alcance el enlace correcto incluso en ámbitos anidados. Las funciones definidas por el usuario se almacenan en un mapa indexado por nombre y aridad (`Evaluator/user_function.hpp`).
-
-### 7.3 Ejecución del programa
-
-El evaluador procesa un `Program` en dos pasadas: primero registra todas las declaraciones de tipo para que las expresiones `new` puedan resolver metadatos de clase, luego ejecuta funciones de nivel superior y la expresión final del programa. Todas las estructuras de control (incluidas las extensiones `unless`, `repeat`, `loop … while`, `with` y `case`), operadores (incluyendo cortocircuito de `and`/`or`, módulo, exponenciación y concatenación de cadenas con `@`), funciones predefinidas, construcción de objetos, despacho de métodos, llamadas a `base()` e `is`/`as` están implementados en el visitor.
-
-El flag `--interpret` activa esta vía e imprime solo la salida del programa en la salida estándar, manteniendo limpia la salida de error para diagnósticos.
+La iteración sobre rangos la proveen `RangeValue` y `RangeIterator` en `Value/iterable.hpp`. Para iterables definidos por el usuario, el evaluador invoca `next()` y `current()` en cada paso del bucle `for`, respetando el contrato de iteración del lenguaje. Este mismo protocolo se replica en el backend LLVM, con un camino optimizado para `range` y un camino genérico basado en llamadas a métodos de instancia.
 
 ---
 
@@ -433,124 +227,81 @@ El backend LLVM (`Codegen/llvm_codegen.cpp`) traduce el AST validado a IR LLVM u
 
 ### 8.1 Pipeline
 
-Tras el éxito del análisis semántico, el generador de código construye un módulo LLVM, emite IR a `.hulk_out.ll` e invoca `clang` con `Codegen/runtime.c` para producir `./output`. Las funciones de runtime para impresión, manipulación de cadenas, asignación de objetos, comprobaciones dinámicas de tipo, fallos de cast/`case` e igualdad en cajas (*boxed*) se declaran en el módulo IR y se definen en el runtime en C.
+Tras el éxito semántico, el generador construye un módulo LLVM, emite IR a `.hulk_out.ll` e invoca `clang` con `Codegen/runtime.c` para producir `./output`. Las funciones de runtime para impresión, cadenas, objetos, comprobaciones dinámicas de tipo y fallos de cast/`case` se declaran en el IR y se definen en C.
 
-Todos los nodos de expresión del AST tienen visitor implementado en `llvm_codegen.cpp`; no quedan stubs de visita (`HULK_VISIT_STUB` está definido pero sin uso). Las declaraciones de tipo, función y método se registran en pasadas previas al codegen y sus `visit` correspondientes son intencionalmente vacíos durante la emisión de IR del programa principal.
+Todos los nodos de expresión del AST tienen visitor implementado; no quedan stubs de visita.
 
-### 8.2 Estrategia de bajada (*lowering*)
+### 8.2 Estrategia de bajada
 
-**Literales y globales.** Los literales numéricos, de cadena y booleanos bajan a valores LLVM del tipo apropiado. Las constantes matemáticas `@PI` y `@E` se emiten como variables globales.
+Los literales bajan a valores LLVM del tipo apropiado. Los enlaces locales usan `alloca`/`store`/`load` con mapas de ámbito anidados. Las estructuras de control bajan a bloques básicos con puntos de fusión explícitos; las condiciones booleanas se evalúan a `i1`. Las funciones de usuario se convierten en `@hulk_fn_<nombre>_<aridad>`. Las llamadas a `print`, funciones trigonométricas, `log`, `sqrt`, `exp` y `range` bajan a llamadas al runtime en C.
 
-**Variables y ámbitos.** Los enlaces locales usan `alloca`/`store`/`load` con mapas de ámbito anidados que rastrean los valores LLVM asociados a cada nombre. El sombreado crea un nuevo enlace en el ámbito interior sin destruir los del exterior.
+### 8.3 Código orientado a objetos
 
-**Flujo de control.** `if`, `while`, `unless`, `repeat`, `loop … while`, `for` (sobre `range` e iterables OO), `with` y `case` bajan a bloques básicos con puntos de fusión explícitos. Las condiciones booleanas se evalúan a `i1`. Los operadores lógicos de cortocircuito se manejan en el visitor del AST antes del bajado a LLVM.
+Cada clase se convierte en una estructura LLVM `HulkInstance_ClassName` con etiqueta de tipo en tiempo de ejecución (`__hulk_rt_type__` como puntero a cadena) y campos almacenados como valores en caja o ranuras tipadas según la declaración. Las estructuras de subclase extienden el layout del padre. `new` asigna en el heap, inicializa la etiqueta, evalúa argumentos del constructor y ejecuta inicializadores de atributos. El acceso a atributos usa `getelementptr` sobre el layout de la estructura cuando se conoce el tipo estático.
 
-**Funciones.** Las funciones de usuario se convierten en funciones LLVM nombradas `@hulk_fn_<nombre>_<aridad>`. La recursión está soportada sin optimización especial de llamada en cola. Las rutas de retorno dejan un valor en la pila o usan `ret void` para cuerpos que son solo sentencias.
+El despacho de métodos resuelve el nombre de tipo en runtime y ramifica a la función `@hulk_meth_*` correcta, soportando sobrescritura a lo largo de cadenas de herencia sin tablas virtuales. `base()` delega en la implementación del método de la clase padre operando sobre la porción padre de `self`. `is` baja a una comparación de tipo en runtime; `as` emite un cast protegido que invoca un auxiliar de error si el cast falla. La igualdad entre tipos heterogéneos usa `hulk_boxed_equals` del runtime para que `==` se comporte de forma consistente entre primitivos y objetos.
 
-**Funciones predefinidas.** Las llamadas a `print`, funciones trigonométricas, `log`, `sqrt`, `exp` y `range` bajan a llamadas a las funciones correspondientes del runtime en C. El bucle `for` sobre un rango se desazucara en un protocolo de iteración usando la implementación de rangos del runtime.
+### 8.4 Representación de valores y coerción
 
-### 8.3 Generación de código orientada a objetos
-
-**Layout de instancia.** Cada clase se convierte en una estructura LLVM `HulkInstance_ClassName` que contiene una etiqueta de tipo en tiempo de ejecución (`__hulk_rt_type__` como puntero a cadena) y campos almacenados como valores en caja o ranuras tipadas según la declaración. Las estructuras de subclase embeben o extienden el layout del padre.
-
-**Construcción.** `new NombreTipo(…)` asigna una estructura en el heap, inicializa la etiqueta de tipo, evalúa argumentos del constructor y ejecuta expresiones inicializadoras de atributos.
-
-**Despacho de métodos.** En lugar de tablas virtuales, las llamadas a método resuelven el nombre de tipo en tiempo de ejecución y ramifican a la función `@hulk_meth_*` correcta. Este diseño reduce la complejidad del codegen mientras soporta sobrescritura de métodos a lo largo de cadenas de herencia.
-
-**Herencia.** Las llamadas a `base()` delegan en la implementación del método de la clase padre operando sobre la porción padre de `self`. El acceso a atributos usa `getelementptr` sobre el layout de la estructura cuando se conoce el tipo estático.
-
-**Pruebas y conversiones de tipo.** El operador `is` baja a una comparación de tipo en tiempo de ejecución. El operador `as` emite un cast protegido; un cast fallido invoca un auxiliar de error en tiempo de ejecución (fallo de runtime, no diagnóstico de compilación).
-
-**Igualdad.** Las comparaciones entre tipos usan una función de runtime `hulk_boxed_equals` para que `==` se comporte de forma consistente entre primitivos y objetos.
-
-### 8.4 Detalles de implementación
-
-`LLVM Function::Create` requiere nombres estables `const char*`; el generador almacena cadenas de nombre en contenedores `std::string` antes de pasar `.c_str()` para evitar punteros colgantes. La serialización del IR usa un buffer `SmallString` vía `raw_svector_ostream` en lugar de imprimir directamente a `std::string`.
-
-Las definiciones anidadas de funciones y métodos mantienen mapas de ámbito redimensionando a la profundidad correcta en lugar de limpiar por completo, evitando uso después de liberación cuando el constructor de IR mantiene punteros a estructuras de ámbito.
+El generador mantiene una capa de valores unificada para transiciones entre primitivos LLVM y representación en caja en fronteras polimórficas (retornos multi-tipo, ramas de `if`/`case`, parámetros de `print`). La asignación destructiva aplica coerción cuando el valor asignado conforma al tipo del destino.
 
 ---
 
 ## 9. Sistema de compilación
 
-El `Makefile` provee los siguientes objetivos principales:
+El `Makefile` provee los objetivos principales:
 
 | Objetivo | Propósito |
 |----------|-----------|
-| `make compile` | Compila el binario del compilador con todas las fuentes |
-| `make build` | Produce `./hulk` en la raíz del repositorio (compilado con `-O2` en Linux) |
-| `make test_llvm` | Ejecuta pruebas de humo de codegen |
-| `make test_llvm_fixtures` | Compara la salida del binario nativo con la del intérprete |
-| `make test_eval` | Ejecuta pruebas de humo del intérprete |
-| `make test_semantic` | Ejecuta pruebas de humo del análisis semántico |
+| `make build` | Produce `./hulk` en la raíz del repositorio |
+| `make test_semantic` | Pruebas del análisis semántico |
+| `make test_eval` | Pruebas del intérprete |
+| `make test_llvm` | Pruebas de humo de codegen |
+| `make test_llvm_fixtures` | Compara salida nativa con intérprete |
 
-LLVM se descubre mediante `llvm-config` en el path del sistema. Cuando están instalados los paquetes de desarrollo de LLVM 21, la compilación define `HULK_HAVE_LLVM` y enlaza contra las bibliotecas LLVM. La variable de entorno `LLVM_CONFIG` puede sobreescribir el nombre del binario por defecto (p. ej. `llvm-config-21`).
-
-Componentes requeridos del toolchain: compilador C++17 (`g++`), Flex++ (`flex++`), Make, LLVM 21 (`llvm-config`, cabeceras, bibliotecas) y Clang 21 para el paso final de enlace.
+LLVM se descubre mediante `llvm-config`. Con LLVM 21 instalado, la compilación define `HULK_HAVE_LLVM` y enlaza contra las bibliotecas correspondientes. Componentes requeridos: g++ C++17, Flex++, Make, LLVM 21 y Clang 21.
 
 ---
 
 ## 10. Estrategia de pruebas
 
-### 10.1 Criterio de corrección del código nativo
-
-La regla principal de validación para la generación de código es la equivalencia de comportamiento:
+El criterio principal de validación para codegen es la equivalencia de comportamiento:
 
 ```
-./hulk programa.hulk && ./output   debe producir la misma stdout que   ./hulk programa.hulk --interpret
+./hulk programa.hulk && ./output   ≡   ./hulk programa.hulk --interpret
 ```
 
-Esto se verifica mediante `scripts/test_llvm_fixtures.sh` sobre la suite de pruebas LLVM y programas orientados a objetos.
-
-### 10.2 Suites de prueba
-
-**Fixtures semánticos** (`tests/semantic/`) — programas válidos e inválidos que ejercitan las reglas R1–R4, inferencia de tipos, construcciones OO y resolución de funciones predefinidas.
-
-**Fixtures de extensiones** (`tests/extensions/valid/`) — programas mínimos que validan `unless`, `repeat`, `loop … while` y `for` con anotación de tipo.
-
-**Fixtures de evaluación** (`tests/eval/`) — programas ejecutados por el intérprete, cubriendo operadores, flujo de control, funciones, predefinidas y comportamiento OO completo incluyendo herencia, `base()`, `is` y `as`.
-
-**Fixtures de codegen** (`tests/llvm/`) — programas compilados a código nativo y comparados con la salida del intérprete.
-
-**Programas orientados a objetos** — suite dedicada que cubre clases básicas, herencia, sobrescritura de métodos, expresiones de constructor y despacho polimórfico.
-
-**Pruebas de humo** — drivers C++ independientes bajo `Codegen/tests/` y `SemanticCheck/tests/` que construyen fragmentos mínimos de AST o ejecutan fases aisladas del compilador sin requerir un parseo completo.
-
-### 10.3 Pruebas de errores
-
-Pruebas dedicadas de errores léxicos verifican que caracteres inválidos, cadenas sin terminar y comentarios de bloque sin cerrar producen diagnósticos `LEXICAL` con código de salida 1. Los fixtures de errores de parser y semántica verifican el comportamiento `SYNTACTIC` (salida 2) y `SEMANTIC` (salida 3) respectivamente.
+Las suites cubren análisis semántico (`tests/semantic/`), evaluación (`tests/eval/`), codegen LLVM (`tests/llvm/`), extensiones de control de flujo (`tests/extensions/`) y programas OO (`tests/matcom/oop/`). Los fixtures de codegen compilan a código nativo y comparan la salida estándar con la del intérprete como oráculo. Pruebas de humo bajo `Codegen/tests/` y `SemanticCheck/tests/` ejercitan fases aisladas. La suite `tests/multi_phase/` valida el reporte multi-fase y el modo `--first-phase`.
 
 ---
 
 ## 11. Decisiones de diseño
 
-1. **LL(1) frente a LALR.** Ubicaciones de error predecibles, tabla de parseo visible y depurable, y aplicación directa de la teoría del curso. El tamaño de la gramática es manejable sin la complejidad añadida de un generador bottom-up.
+1. **LL(1) frente a LALR.** Ubicaciones de error predecibles, tabla visible y aplicación directa de la teoría del curso.
 
-2. **Flex para el análisis léxico.** Herramienta estándar que refuerza el modelo de lenguajes regulares y resuelve automáticamente la desambiguación por coincidencia más larga.
+2. **Flex para el análisis léxico.** Herramienta estándar que refuerza el modelo de lenguajes regulares.
 
-3. **Gramática en archivo separado.** `grammar.ll1` es la única fuente de verdad de la sintaxis; el motor del parser es agnóstico a la gramática.
+3. **Gramática en archivo separado.** `grammar.ll1` es la única fuente de verdad de la sintaxis.
 
-4. **Nodos AST OO unificados.** Representar llamadas a método y acceso a atributos mediante `GetAttrExpr` + `CallExpr` / `AssignExpr` reduce el número de tipos de nodo y simplifica todos los visitors posteriores.
+4. **Nodos AST OO unificados.** `GetAttrExpr` + `CallExpr` / `AssignExpr` reduce tipos de nodo y simplifica visitors.
 
-5. **CLI de doble modo.** Un solo binario sirve tanto para compilación de producción como para depuración en desarrollo sin contaminar la ruta por defecto con flags.
+5. **CLI de doble modo.** Un binario sirve para compilación de producción y depuración.
 
-6. **Intérprete para validación.** Comparar la salida nativa con la interpretación directa evita mantener grandes colecciones de archivos de salida esperada y detecta regresiones de codegen temprano.
+6. **Intérprete para validación.** Comparar salida nativa con interpretación directa detecta regresiones sin mantener oráculos estáticos extensos.
 
-7. **LLVM como backend.** El IR LLVM ofrece una representación intermedia bien tipada y portable, con optimización madura y generación de código nativo mediante Clang.
+7. **LLVM como backend.** IR bien tipado con generación nativa mediante Clang.
 
-8. **Runtime en C.** Mantener E/S, manejo de cadenas y primitivas de objetos en `runtime.c` permite que el visitor LLVM se centre en bajar construcciones HULK en lugar de detalles de libc.
+8. **Runtime en C.** E/S, cadenas y primitivas OO en `runtime.c`; el visitor LLVM se centra en bajar construcciones HULK.
 
-9. **Despacho por tipo en runtime frente a vtables.** Almacenar una cadena con el nombre del tipo en cada instancia y ramificar en los sitios de llamada evita construcción de vtables y corrección de punteros, manteniendo polimorfismo y sobrescritura.
+9. **Despacho por tipo en runtime.** Etiqueta de tipo en cada instancia y ramificación en sitios de llamada, evitando vtables.
 
-10. **Inferencia de tipos multipasada.** La iteración de punto fijo maneja firmas de funciones mutuamente recursivas y tipos de atributos inferidos sin exigir que el programador anote explícitamente cada enlace.
-
-11. **Extensiones como azúcar controlado.** `unless`, `repeat` y `loop … while` reutilizan nodos AST dedicados y visitors existentes en lugar de duplicar lógica de `if`/`while`, manteniendo mensajes de error específicos por construcción.
+10. **Inferencia multipasada.** Punto fijo sobre firmas mutuamente recursivas y tipos inferidos.
 
 ---
 
 ## 12. Cumplimiento del contrato de entrega
 
-El compilador satisface el contrato de interfaz del curso:
+El compilador satisface el [contrato de interfaz del curso](https://github.com/matcom/compilers/blob/main/docs/interface.md):
 
 | Requisito | Implementación |
 |-----------|----------------|
@@ -560,40 +311,37 @@ El compilador satisface el contrato de interfaz del curso:
 | Error sintáctico | Salida 2, `(línea,col) SYNTACTIC: mensaje` |
 | Error semántico | Salida 3, `(línea,col) SEMANTIC: mensaje` |
 | Prioridad de fases | Léxico > sintáctico > semántico |
+| `REPORT.md` en la raíz | Este documento |
 
-Ejemplo:
+Ejemplo de formato de error:
 
 ```
 (1,9) LEXICAL: unexpected character '$'
 ```
 
-Validado en Ubuntu 22.04 con g++ 11.4, LLVM 21.1.8 y Clang 21.
-
 ---
 
 ## 13. Limitaciones y trabajo futuro
 
-1. **Características del lenguaje aún no implementadas.** Protocolos, vectores, lambdas y macros no forman parte del compilador. Las seis extensiones de control de flujo del paquete (`unless`, `repeat`, `loop … while`, `for` tipado/OO, `with`, `case`) sí están completas end-to-end.
+1. **Características no implementadas.** Protocolos, vectores, lambdas y macros no forman parte del compilador actual.
 
-2. **Idioma de los diagnósticos.** Los mensajes de error están redactados en español, mientras que el prefijo `TYPE` (`LEXICAL`, `SYNTACTIC`, `SEMANTIC`) sigue el formato requerido en inglés.
+2. **Idioma de los diagnósticos.** Los mensajes están en español; el prefijo `TYPE` (`LEXICAL`, `SYNTACTIC`, `SEMANTIC`) sigue el formato requerido en inglés.
 
 3. **Optimización de llamada en cola.** Las funciones recursivas son correctas pero no optimizadas.
 
-4. **Salida multiplataforma.** El pipeline de producción apunta a Linux x86_64. El desarrollo en Windows usa el intérprete y una copia del binario; la generación nativa de `./output` se valida en Linux.
+4. **Plataforma objetivo.** El pipeline de producción apunta a Linux x86_64.
 
-5. **Errores en tiempo de ejecución.** Los fallos durante la ejecución del programa (cast `as` inválido, `case` sin rama) los reporta `./output` vía `hulk_runtime_error_at(line, col, msg)` con formato `(línea,col) RUNTIME: …`, alineado con los diagnósticos estáticos `(línea,col) SEMANTIC: …`. El codegen pasa la ubicación del token `as` o de la primera rama del `case`.
+5. **Errores en tiempo de ejecución.** Los fallos durante la ejecución (`as` inválido, `case` sin rama) los reporta `./output` con formato `(línea,col) RUNTIME: …`.
 
-6. **Formato de impresión de cadenas.** Pueden aparecer diferencias menores de comillas o formato entre el intérprete y el runtime nativo en ciertos escenarios de impresión de cadenas.
-
-7. **Mejoras LLVM recientes (Fases 1–4, jun 2026).** Capa de valores unificada (`coerceToLlvmType`, boxing en fronteras), funciones multi-tipo con retorno `opaquePtr` (fixtures 93–96), audit de builtins + `log` (80_l8_log), asignación destructiva a atributos y variables con coerción, retorno `Void` en cadenas de llamadas (forward reference, fixture 97), e igualdad de punteros nulos en comparaciones. Inventario vivo en `playground/llvm_gap_inventory.md`.
+6. **Formato de impresión.** Pueden aparecer diferencias menores de formato entre intérprete y runtime nativo en ciertos escenarios de impresión de cadenas.
 
 ---
 
 ## 14. Conclusiones
 
-Hemos construido un compilador HULK completo que implementa análisis léxico con Flex, parseo LL(1) dirigido por tabla con generación automática de conjuntos FIRST/FOLLOW y tabla de análisis, un analizador semántico rico con inferencia de tipos multipasada y soporte orientado a objetos completo, extensiones de control de flujo e iteración (`unless`, `repeat`, `loop … while`, `for` tipado, `with` y `case`), un intérprete de recorrido del árbol y un generador de código basado en LLVM que produce ejecutables nativos.
+Hemos construido un compilador HULK completo que implementa análisis léxico con Flex, parseo LL(1) con generación automática de tabla de análisis, un analizador semántico con inferencia de tipos multipasada y soporte orientado a objetos, cuatro extensiones de control de flujo e iteración, un intérprete de recorrido del árbol y un generador de código basado en LLVM que produce ejecutables nativos.
 
-Las decisiones arquitectónicas clave — separar la gramática del parser, unificar construcciones OO en el AST, usar despacho por tipo en runtime en lugar de vtables y validar el código nativo contra el intérprete — mantuvieron manejable la implementación mientras soportan el poder expresivo completo del lenguaje HULK, incluyendo herencia, polimorfismo, pruebas de tipo y asignación destructiva.
+Las decisiones arquitectónicas clave — separar la gramática del parser, unificar construcciones OO en el AST, usar despacho por tipo en runtime y validar el código nativo contra el intérprete — mantuvieron manejable la implementación mientras soportan el poder expresivo del lenguaje, incluyendo herencia, polimorfismo, pruebas de tipo y asignación destructiva.
 
 El compilador se construye desde fuentes con herramientas estándar de código abierto, produce diagnósticos con el formato correcto y genera binarios `./output` cuyo comportamiento coincide con la interpretación directa en las suites de prueba del proyecto.
 
@@ -608,7 +356,6 @@ El compilador se construye desde fuentes con herramientas estándar de código a
 | LL(1) | Lectura izquierda a derecha, derivación por la izquierda, un token de anticipación |
 | FIRST / FOLLOW | Conjuntos clásicos usados para construir la tabla de análisis LL(1) |
 | Valor en caja (*boxed*) | Representación en runtime que permite comparación uniforme entre tipos |
-| SSA | Asignación estática única — propiedad del IR LLVM donde cada registro se asigna una vez |
 
 ---
 
@@ -622,7 +369,7 @@ export LLVM_CONFIG=llvm-config-21
 export PATH=/usr/lib/llvm-21/bin:$PATH
 
 # Compilar
-make compile && make build
+make build
 
 # Ejecutar pruebas
 make test_semantic
