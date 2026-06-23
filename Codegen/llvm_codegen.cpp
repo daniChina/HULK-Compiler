@@ -10,7 +10,16 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/ADT/SmallString.h>
+#if __has_include(<llvm/TargetParser/Triple.h>)
+#include <llvm/TargetParser/Triple.h>
+#else
+#include <llvm/ADT/Triple.h>
+#endif
+#if __has_include(<llvm/TargetParser/Host.h>)
 #include <llvm/TargetParser/Host.h>
+#else
+#include <llvm/Support/Host.h>
+#endif
 #include <llvm/Support/raw_ostream.h>
 
 #include "llvm_aux.hpp"
