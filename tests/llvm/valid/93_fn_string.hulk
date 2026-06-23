@@ -1,0 +1,2 @@
+function greet(name) => "Hi " @ name;
+print(greet("World"));

@@ -1,0 +1,3 @@
+function caller() => callee();
+function callee() => print(1);
+caller();

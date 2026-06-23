@@ -1,0 +1,3 @@
+function both(a: Boolean, b: Boolean) => a and b;
+print(both(true, true));
+print(both(true, false));

@@ -182,7 +182,7 @@ public:
     /**
      * @brief Look up a function overload by name and argument count (R4)
      */
-    std::shared_ptr<FunctionSymbol> lookupFunction(const std::string &name, size_t arity)
+    std::shared_ptr<FunctionSymbol> lookupFunction(const std::string &name, size_t arity) const
     {
         auto found = functions_.find(name);
         if (found == functions_.end())
@@ -198,6 +198,11 @@ public:
             }
         }
         return nullptr;
+    }
+
+    std::shared_ptr<FunctionSymbol> lookupFunction(const std::string &name, size_t arity)
+    {
+        return std::as_const(*this).lookupFunction(name, arity);
     }
 
     /**
@@ -573,8 +578,7 @@ private:
                                 TypeInfo(TypeInfo::Kind::Number));
         registerBuiltinFunction("exp", {TypeInfo(TypeInfo::Kind::Number)},
                                 TypeInfo(TypeInfo::Kind::Number));
-        registerBuiltinFunction("log",
-                                {TypeInfo(TypeInfo::Kind::Number), TypeInfo(TypeInfo::Kind::Number)},
+        registerBuiltinFunction("log", {TypeInfo(TypeInfo::Kind::Number)},
                                 TypeInfo(TypeInfo::Kind::Number));
         registerBuiltinFunction("rand", {}, TypeInfo(TypeInfo::Kind::Number));
         registerBuiltinFunction("print", {}, TypeInfo(TypeInfo::Kind::Void));

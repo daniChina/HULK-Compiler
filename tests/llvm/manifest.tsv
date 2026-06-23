@@ -31,13 +31,27 @@ valid/60_l6_assign.hulk      llvm_ok    store double 3.000000e+00
 
 # I7 — funciones globales (oracle E2E en Codegen/tests/i7_functions_smoke.cpp)
 valid/70_l7_function.hulk    llvm_ok    @hulk_fn_f_1
-valid/71_l7_recursion.hulk   llvm_ok    call double @hulk_fn_fact_1
+valid/71_l7_recursion.hulk   llvm_ok    call ptr @hulk_fn_fact_1
+valid/93_fn_string.hulk      llvm_ok    @hulk_fn_greet_1
+valid/94_fn_bool.hulk        llvm_ok    @hulk_fn_isPos_1
+valid/95_fn_oo.hulk          llvm_ok    @hulk_fn_origin_0
+valid/96_fn_oo_param.hulk    llvm_ok    @hulk_fn_getX_1
+valid/97_fn_forward_ref.hulk llvm_ok    @hulk_fn_caller_0
+valid/99_fn_nums_to_string.hulk      llvm_ok    @hulk_fn_cmp_2
+valid/100_fn_strings_to_bool.hulk    llvm_ok    @hulk_fn_strEq_2
+valid/101_fn_strings_to_num.hulk     llvm_ok    @hulk_fn_strCmp_2
+valid/102_fn_bool_string_mix.hulk  llvm_ok    @hulk_fn_pick_3
+valid/103_fn_bools_to_bool.hulk    llvm_ok    @hulk_fn_both_2
+valid/104_fn_oo_params_to_num.hulk llvm_ok    @hulk_fn_dist_2
+valid/105_fn_print_user_type.hulk    llvm_ok    hulk_print_instance
 
 # I8 — builtins math / range (oracle E2E en Codegen/tests/i8_builtins_smoke.cpp)
 valid/80_l8_sin.hulk         llvm_ok    call double @sin
+valid/80_l8_log.hulk         llvm_ok    call double @log
 valid/81_l8_range_for.hulk   llvm_ok    for.cond
 valid/82_l8_for_custom_iter.hulk   llvm_ok    for.next
 valid/89_l9_for_countdown.hulk     llvm_ok    for.next
+valid/98_l9_for_string_iter.hulk   llvm_ok    for.next
 
 valid/83_l8_unless.hulk            llvm_ok    unless.then
 valid/84_l8_repeat.hulk            llvm_ok    repeat.body
@@ -48,6 +62,7 @@ valid/92_l9_loop_while_multi.hulk  llvm_ok    loopwhile.body
 
 valid/86_l8_with.hulk              llvm_ok    with.body
 valid/87_l8_case.hulk              llvm_ok    case.body
+valid/88_l8_print_instance.hulk    llvm_ok    hulk_print_instance
 
 # I9 — OOP type/new/attrs/methods (oracle E2E en Codegen/tests/i9_oo_smoke.cpp)
 valid/02_new_attr.hulk       llvm_ok    HulkInstance_Point

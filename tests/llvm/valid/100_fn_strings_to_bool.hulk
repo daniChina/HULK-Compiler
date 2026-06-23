@@ -1,0 +1,3 @@
+function strEq(a: String, b: String) => a == b;
+print(strEq("hulk", "hulk"));
+print(strEq("hulk", "llvm"));

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "../SymbolTable/symbol_table.hpp"
 #include "llvm_codegen.hpp"
 
 namespace hulk::codegen {
@@ -39,9 +40,13 @@ bool run_command(const std::string& command, std::string* error_out) {
 
 }  // namespace
 
-bool build_executable(parser::Program* program, const std::string& exe_path, std::string* error_out) {
+bool build_executable(parser::Program* program, const std::string& exe_path, std::string* error_out,
+                    const SymbolTable* symbol_table) {
     LLVMCodeGenerator generator;
     generator.initialize("hulk_program");
+    if (symbol_table != nullptr) {
+        generator.setSymbolTable(symbol_table);
+    }
     generator.generate(program);
     if (generator.hadError()) {
         if (error_out) {

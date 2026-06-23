@@ -7,6 +7,8 @@
 
 #include "../../Parser/ast/expr.hpp"
 #include "../../Parser/core/token.hpp"
+#include "../../SymbolTable/symbol_table.hpp"
+#include "../../Types/type_info.hpp"
 #include "../llvm_codegen.hpp"
 #include "../output_build.hpp"
 
@@ -18,6 +20,10 @@ parser::Token token(parser::TokenType type, const std::string& lexeme) {
 
 parser::ExprPtr numberLiteral(const std::string& value) {
     return std::make_unique<parser::NumberExpr>(token(parser::TokenType::NUMBER_LITERAL, value));
+}
+
+parser::ExprPtr stringLiteral(const std::string& value) {
+    return std::make_unique<parser::StringExpr>(token(parser::TokenType::STRING_LITERAL, value));
 }
 
 parser::ExprPtr identifier(const std::string& name) {
@@ -110,6 +116,24 @@ std::unique_ptr<parser::Program> programOverload() {
     return programWithStmts(std::move(stmts));
 }
 
+std::unique_ptr<parser::Program> programStringFn() {
+    std::vector<parser::StmtPtr> stmts;
+    stmts.push_back(functionDecl(
+        "tag",
+        {"s"},
+        binary(stringLiteral("x"), parser::TokenType::CONCAT, "@", identifier("s"))));
+    std::vector<parser::ExprPtr> args;
+    args.push_back(stringLiteral("hi"));
+    stmts.push_back(std::make_unique<parser::ExprStmt>(printCall(callExpr("tag", std::move(args)))));
+    return programWithStmts(std::move(stmts));
+}
+
+SymbolTable symbolTableForStringFn() {
+    SymbolTable table;
+    table.declareFunction("tag", {TypeInfo::String()}, TypeInfo::String());
+    return table;
+}
+
 bool expectContains(const std::string& haystack, const std::string& needle, const char* label) {
     if (haystack.find(needle) == std::string::npos) {
         std::fprintf(stderr, "[FAIL] %s: falta \"%s\" en IR\n", label, needle.c_str());
@@ -119,9 +143,13 @@ bool expectContains(const std::string& haystack, const std::string& needle, cons
     return true;
 }
 
-bool checkIR(parser::Program* program, const std::vector<std::string>& needles, const char* label) {
+bool checkIR(parser::Program* program, const std::vector<std::string>& needles, const char* label,
+             const SymbolTable* symbol_table = nullptr) {
     hulk::codegen::LLVMCodeGenerator generator;
     generator.initialize("hulk_i7_smoke");
+    if (symbol_table != nullptr) {
+        generator.setSymbolTable(symbol_table);
+    }
     generator.generate(program);
 
     if (generator.hadError()) {
@@ -163,9 +191,9 @@ std::string captureProcessOutput(const std::string& command) {
 }
 
 bool runPrintProgram(parser::Program* program, const std::string& expected_stdout, const char* label,
-                     const std::string& exe_path) {
+                     const std::string& exe_path, const SymbolTable* symbol_table = nullptr) {
     std::string error;
-    if (!hulk::codegen::build_executable(program, exe_path, &error)) {
+    if (!hulk::codegen::build_executable(program, exe_path, &error, symbol_table)) {
         std::fprintf(stderr, "[FAIL] %s: build error: %s\n", label, error.c_str());
         return false;
     }
@@ -197,7 +225,7 @@ int main() {
 
     ok &= checkIR(
         programIncrementF().get(),
-        {"define double @hulk_fn_f_1", "call double @hulk_fn_f_1"},
+        {"define ptr @hulk_fn_f_1", "call ptr @hulk_fn_f_1"},
         "I7.1: define y call de funcion global");
 
     ok &= runPrintProgram(
@@ -217,6 +245,20 @@ int main() {
         "7\n",
         "I7.4: E2E overload por aridad f(3, 4)",
         exe);
+
+    SymbolTable string_sym = symbolTableForStringFn();
+    ok &= checkIR(
+        programStringFn().get(),
+        {"define ptr @hulk_fn_tag_1(ptr", "call ptr @hulk_fn_tag_1"},
+        "I7.5: funcion String multi-tipo",
+        &string_sym);
+
+    ok &= runPrintProgram(
+        programStringFn().get(),
+        "xhi\n",
+        "I7.6: E2E funcion String tag(\"hi\")",
+        exe,
+        &string_sym);
 
     if (ok) {
         std::fprintf(stderr, "[OK] I7 smoke: funciones globales LLVM\n");

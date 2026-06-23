@@ -132,7 +132,8 @@ int run_matcom(const std::string& input_path, bool all_errors) {
     }
 
     std::string build_error;
-    if (!hulk::build_output_executable(source, compiled.program.get(), &build_error)) {
+    if (!hulk::build_output_executable(source, compiled.program.get(), &build_error,
+                                       &compiled.symbol_table)) {
         const std::string message =
             build_error.empty() ? "code generation failed" : build_error;
         std::cerr << hulk::format_semantic(0, 0, message) << '\n';

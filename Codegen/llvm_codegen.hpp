@@ -11,6 +11,8 @@
 
 #include "../Parser/ast/expr.hpp"
 #include "../Parser/ast/visitor.hpp"
+#include "../SymbolTable/symbol_table.hpp"
+#include "../Types/type_info.hpp"
 
 namespace llvm {
 class AllocaInst;
@@ -51,6 +53,7 @@ public:
     ~LLVMCodeGenerator() override;
 
     void initialize(const std::string& module_name);
+    void setSymbolTable(const SymbolTable* symbol_table);
     void generate(parser::Program* program);
     std::string getIR() const;
 
@@ -98,6 +101,7 @@ private:
     void createEmptyMain();
     void registerMathematicalConstants();
     void registerPrintDeclarations();
+    void registerValueHelperDeclarations();
     void registerRangeDeclarations();
     void materializeExprResult();
     void enterScope();
@@ -126,6 +130,13 @@ private:
     llvm::Value* emitBoxedEquality(llvm::Value* left, llvm::Value* right, bool equal);
     llvm::Value* coerceStringBoxed(llvm::Value* value, const std::string& op);
     llvm::Type* semanticTypeForHulkType(const std::optional<parser::Token>& declared_type);
+    TypeInfo typeInfoFromHulkToken(const std::optional<parser::Token>& declared_type) const;
+    llvm::Type* llvmTypeForTypeInfo(const TypeInfo& type);
+    llvm::Type* semanticTypeForTypeInfo(const TypeInfo& type);
+    llvm::Value* coerceToLlvmType(llvm::Value* value, llvm::Type* target);
+    llvm::Value* materializeToOpaquePtr(llvm::Value* value, const TypeInfo& ret_type,
+                                        const std::string& context = "");
+    llvm::Value* demoteFromCallResult(llvm::Value* value, const TypeInfo& expected);
     llvm::Value* defaultValueForType(llvm::Type* type);
     void emitPrintValue(llvm::Value* value);
     void emitPrintNewline();
@@ -137,6 +148,8 @@ private:
     void declareUserFunction(parser::FunctionDecl* decl);
     void defineUserFunction(parser::FunctionDecl* decl);
     llvm::Function* lookupUserFunction(const std::string& name, std::size_t arity);
+    std::shared_ptr<FunctionSymbol> lookupUserFunctionSymbol(const std::string& name,
+                                                             std::size_t arity) const;
     llvm::Value* invokeUserFunction(llvm::Function* fn, const std::vector<llvm::Value*>& args);
     void registerClassDecl(parser::ClassDecl* decl);
     void buildAllClassStructTypes();
@@ -154,12 +167,14 @@ private:
     llvm::Value* emitScalarIsCheck(llvm::Value* value, const std::string& target_type);
     bool isInstanceValue(llvm::Value* value);
     llvm::StructType* resolveInstanceStructType(llvm::Value* value);
-    void emitCastFailure();
-    void emitCaseFailure();
+    void emitRuntimeErrorAt(int line, int col, const char* message);
+    void emitCastFailure(int line = 0, int col = 0);
+    void emitCaseFailure(int line = 0, int col = 0);
     void trackInstanceType(llvm::Value* value, llvm::StructType* struct_ty);
     void initializeParentAttributes(llvm::Value* instance_ptr, llvm::StructType* struct_ty,
                                     parser::ClassDecl* type_def);
-    llvm::Value* materializeMethodResult(llvm::Value* result, const std::string& label);
+    llvm::Value* materializeMethodResult(llvm::Value* result, const TypeInfo& ret_type,
+                                         const std::string& label);
     llvm::Value* expectFieldValue(llvm::Value* value, llvm::Type* field_ty, const std::string& op);
     ClassInfo* lookupClassInfo(const std::string& name);
     llvm::StructType* getInstanceStructType(const std::string& class_name);
@@ -205,6 +220,7 @@ private:
     std::vector<std::string> method_mangled_names_;
     std::unordered_map<std::string, llvm::GlobalVariable*> class_name_globals_;
     std::unordered_map<llvm::Value*, llvm::StructType*> value_instance_types_;
+    const SymbolTable* symbol_table_ = nullptr;
     llvm::AllocaInst* current_self_alloca_ = nullptr;
     parser::ClassDecl* current_self_class_ = nullptr;
     std::string current_method_name_;

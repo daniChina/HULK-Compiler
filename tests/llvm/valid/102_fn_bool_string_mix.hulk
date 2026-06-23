@@ -1,0 +1,3 @@
+function pick(flag: Boolean, a: String, b: String) => if (flag) a else b;
+print(pick(true, "yes", "no"));
+print(pick(false, "yes", "no"));

@@ -1,0 +1,7 @@
+type WordIter() {
+    i: Number = 0;
+    next() { self.i := self.i + 1; self.i <= 3; }
+    current() => if (self.i == 1) "uno" else if (self.i == 2) "dos" else "tres";
+}
+
+for (w: String in new WordIter()) print(w);

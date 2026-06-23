@@ -1,0 +1,5 @@
+type Widget(id: Number) {
+    id: Number = id;
+}
+function make(id) => new Widget(id);
+print(make(7));

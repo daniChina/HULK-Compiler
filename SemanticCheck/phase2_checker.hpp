@@ -24,6 +24,8 @@ public:
     void analyze(parser::Program* program);
 
     const TypeMap& getTypeMap() const { return type_map_; }
+    const SymbolTable& symbolTable() const { return symbol_table_; }
+    SymbolTable takeSymbolTable() { return std::move(symbol_table_); }
 
     bool hasErrors() const { return error_manager_.hasErrors(); }
     void printErrors(std::ostream& out = std::cerr) const { error_manager_.printErrors(out); }

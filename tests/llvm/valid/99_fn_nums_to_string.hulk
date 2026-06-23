@@ -1,0 +1,4 @@
+function cmp(a, b) => if (a == b) "eq" else if (a < b) "lt" else "gt";
+print(cmp(1, 1));
+print(cmp(1, 2));
+print(cmp(3, 2));

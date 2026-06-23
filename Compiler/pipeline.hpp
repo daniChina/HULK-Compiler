@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../Parser/ast/cst_to_ast.hpp"
+#include "../SymbolTable/symbol_table.hpp"
 #include "diagnostic.hpp"
 
 namespace hulk {
@@ -31,6 +32,7 @@ struct CompileDiagnostic {
 struct CompiledProgram {
     CompileDiagnostic diagnostic;
     std::unique_ptr<parser::Program> program;
+    SymbolTable symbol_table;
 };
 
 // Lex -> parse -> semantic. Por defecto acumula errores de todas las fases;

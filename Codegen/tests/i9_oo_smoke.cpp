@@ -184,6 +184,25 @@ std::unique_ptr<parser::Program> programMethodCall() {
     return programWithStmts(std::move(stmts));
 }
 
+std::unique_ptr<parser::Program> programPrintInstance() {
+    std::vector<parser::StmtPtr> stmts;
+    std::vector<std::pair<std::string, parser::ExprPtr>> point_attrs;
+    point_attrs.emplace_back("x", identifier("x"));
+    point_attrs.emplace_back("y", identifier("y"));
+    stmts.push_back(classDecl(
+        "Point",
+        {"x", "y"},
+        std::move(point_attrs),
+        {}));
+
+    std::vector<parser::ExprPtr> ctor_args;
+    ctor_args.push_back(numberLiteral("1"));
+    ctor_args.push_back(numberLiteral("2"));
+    stmts.push_back(std::make_unique<parser::ExprStmt>(
+        printCall(newExpr("Point", std::move(ctor_args)))));
+    return programWithStmts(std::move(stmts));
+}
+
 bool expectContains(const std::string& haystack, const std::string& needle, const char* label) {
     if (haystack.find(needle) == std::string::npos) {
         std::fprintf(stderr, "[FAIL] %s: falta \"%s\" en IR\n", label, needle.c_str());
@@ -296,6 +315,12 @@ int main() {
         programMethodCall().get(),
         {"@hulk_meth_Counter_inc_0"},
         "I9.5: method call IR");
+
+    ok &= runPrintProgram(
+        programPrintInstance().get(),
+        "<instance>\n",
+        "I9.6: E2E print(new Point(...)) (L8 print instance)",
+        exe);
 
     if (ok) {
         std::fprintf(stderr, "[OK] I9 smoke: OOP type/new/attrs/methods\n");

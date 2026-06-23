@@ -25,14 +25,21 @@ void* hulk_range_create(double start, double end) {
 
 void hulk_runtime_init(void) {}
 
-void hulk_runtime_cast_error(void) {
-    fprintf(stderr, "Runtime error: invalid cast\n");
+void hulk_runtime_error_at(int line, int col, const char* msg) {
+    if (line > 0 && col > 0) {
+        fprintf(stderr, "(%d,%d) RUNTIME: %s\n", line, col, msg);
+    } else {
+        fprintf(stderr, "RUNTIME: %s\n", msg);
+    }
     exit(1);
 }
 
+void hulk_runtime_cast_error(void) {
+    hulk_runtime_error_at(0, 0, "invalid cast");
+}
+
 void hulk_runtime_case_error(void) {
-    fprintf(stderr, "Runtime error: case sin rama coincidente\n");
-    exit(1);
+    hulk_runtime_error_at(0, 0, "case sin rama coincidente");
 }
 
 static char* boxed_string_ptr(BoxedValue* boxed) {
@@ -54,6 +61,45 @@ void hulk_print_null(void) {
 
 void hulk_print_newline(void) {
     putchar('\n');
+}
+
+void hulk_print_instance(void* instance) {
+    (void)instance;
+    printf("<instance>\n");
+}
+
+void* hulk_box_number(double value) {
+    BoxedValue* boxed = (BoxedValue*)malloc(sizeof(BoxedValue));
+    if (boxed != NULL) {
+        boxed->tag = HULK_TAG_NUMBER;
+        double* slot = (double*)(boxed->data);
+        *slot = value;
+    }
+    return boxed;
+}
+
+double hulk_unbox_number(void* boxed_ptr) {
+    if (boxed_ptr == NULL) {
+        fprintf(stderr, "Runtime error: unbox number from null\n");
+        exit(1);
+    }
+    BoxedValue* boxed = (BoxedValue*)boxed_ptr;
+    if (boxed->tag != HULK_TAG_NUMBER) {
+        fprintf(stderr, "Runtime error: invalid unbox number\n");
+        exit(1);
+    }
+    double* slot = (double*)(boxed->data);
+    return *slot;
+}
+
+void* hulk_box_bool(int value) {
+    BoxedValue* boxed = (BoxedValue*)malloc(sizeof(BoxedValue));
+    if (boxed != NULL) {
+        boxed->tag = HULK_TAG_BOOL;
+        int* slot = (int*)(boxed->data);
+        *slot = value;
+    }
+    return boxed;
 }
 
 void hulk_print_boxed(BoxedValue* boxed) {

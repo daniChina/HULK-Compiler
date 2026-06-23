@@ -72,14 +72,23 @@ void LLVMCodeGenerator::initialize(const std::string& module_name) {
     method_mangled_names_.clear();
     class_name_globals_.clear();
     value_instance_types_.clear();
+    symbol_table_ = nullptr;
     current_self_alloca_ = nullptr;
     current_self_class_ = nullptr;
     current_method_name_.clear();
     registerRuntimeDeclarations(*module_, *context_);
     registerMathematicalConstants();
     registerPrintDeclarations();
+    registerValueHelperDeclarations();
     registerBuiltinDeclarations(*module_, *context_);
     registerRangeDeclarations();
+}
+
+void LLVMCodeGenerator::setSymbolTable(const SymbolTable* symbol_table) {
+    symbol_table_ = symbol_table;
+    if (symbol_table_ != nullptr) {
+        TypeInfo::setSymbolTable(const_cast<SymbolTable*>(symbol_table_));
+    }
 }
 
 void LLVMCodeGenerator::registerRangeDeclarations() {
@@ -113,9 +122,20 @@ void LLVMCodeGenerator::declareUserFunction(parser::FunctionDecl* decl) {
         return;
     }
 
-    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
-    std::vector<llvm::Type*> param_types(arity, double_ty);
-    llvm::FunctionType* fn_type = llvm::FunctionType::get(double_ty, param_types, false);
+    std::vector<llvm::Type*> param_types;
+    param_types.reserve(arity);
+    if (auto sym = lookupUserFunctionSymbol(name, arity)) {
+        for (const TypeInfo& param : sym->parameter_types) {
+            param_types.push_back(llvmTypeForTypeInfo(param));
+        }
+    } else {
+        for (const auto& param : decl->params) {
+            param_types.push_back(llvmTypeForTypeInfo(typeInfoFromHulkToken(param.second)));
+        }
+    }
+
+    llvm::FunctionType* fn_type =
+        llvm::FunctionType::get(opaquePtr(), param_types, false);
     user_function_names_.push_back(mangleUserFunctionName(name, arity));
     const llvm::StringRef mangled(user_function_names_.back());
     llvm::Function* fn =
@@ -145,14 +165,22 @@ void LLVMCodeGenerator::defineUserFunction(parser::FunctionDecl* decl) {
     scopes_.push_back(std::make_unique<LLVMScope>());
     current_scope_ = scopes_.back().get();
 
-    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
+    const std::shared_ptr<FunctionSymbol> sym = lookupUserFunctionSymbol(name, arity);
+    const TypeInfo return_type =
+        sym ? sym->return_type : typeInfoFromHulkToken(decl->return_type);
+
     llvm::Function::arg_iterator arg_it = fn->arg_begin();
-    for (const auto& param : decl->params) {
+    for (std::size_t i = 0; i < decl->params.size(); ++i) {
+        const auto& param = decl->params[i];
         const std::string& param_name = param.first.lexeme;
-        llvm::AllocaInst* alloca = builder_->CreateAlloca(double_ty, nullptr, "");
+        const TypeInfo param_info =
+            sym && i < sym->parameter_types.size() ? sym->parameter_types[i]
+                                                 : typeInfoFromHulkToken(param.second);
+        llvm::Type* param_ty = llvmTypeForTypeInfo(param_info);
+        llvm::AllocaInst* alloca = builder_->CreateAlloca(param_ty, nullptr, "");
         builder_->CreateStore(&*arg_it, alloca);
         current_scope_->variables[param_name] = alloca;
-        current_scope_->variable_types[param_name] = double_ty;
+        current_scope_->variable_types[param_name] = semanticTypeForTypeInfo(param_info);
         ++arg_it;
     }
 
@@ -166,11 +194,9 @@ void LLVMCodeGenerator::defineUserFunction(parser::FunctionDecl* decl) {
         return;
     }
 
-    llvm::Value* result = current_value_;
+    llvm::Value* result =
+        materializeToOpaquePtr(current_value_, return_type, "funcion '" + name + "'");
     if (result == nullptr) {
-        result = llvm::ConstantFP::get(double_ty, 0.0);
-    } else if (!result->getType()->isDoubleTy()) {
-        fail("La funcion '" + name + "' debe devolver un valor numerico en I7");
         scopes_.resize(saved_scope_depth);
         current_scope_ = scopes_.back().get();
         if (saved_insert_block != nullptr) {
@@ -202,6 +228,14 @@ llvm::Function* LLVMCodeGenerator::lookupUserFunction(const std::string& name, s
     return overload_it->second;
 }
 
+std::shared_ptr<FunctionSymbol> LLVMCodeGenerator::lookupUserFunctionSymbol(const std::string& name,
+                                                                          std::size_t arity) const {
+    if (symbol_table_ == nullptr) {
+        return nullptr;
+    }
+    return symbol_table_->lookupFunction(name, arity);
+}
+
 llvm::Value* LLVMCodeGenerator::invokeUserFunction(llvm::Function* fn,
                                                    const std::vector<llvm::Value*>& args) {
     return builder_->CreateCall(fn, args);
@@ -214,34 +248,201 @@ std::string LLVMCodeGenerator::mangleMethodName(const std::string& class_name,
 }
 
 llvm::Type* LLVMCodeGenerator::llvmTypeForHulkType(const std::optional<parser::Token>& declared_type) {
+    return llvmTypeForTypeInfo(typeInfoFromHulkToken(declared_type));
+}
+
+TypeInfo LLVMCodeGenerator::typeInfoFromHulkToken(const std::optional<parser::Token>& declared_type) const {
     if (!declared_type.has_value()) {
-        return llvm::Type::getDoubleTy(*context_);
+        return TypeInfo(TypeInfo::Kind::Unknown);
     }
     const std::string& name = declared_type->lexeme;
+    if (name == "Number") {
+        return TypeInfo::Number();
+    }
     if (name == "String") {
-        return opaquePtr();
+        return TypeInfo::String();
     }
     if (name == "Boolean") {
-        return llvm::Type::getInt1Ty(*context_);
+        return TypeInfo::Boolean();
     }
-    if (class_decls_.find(name) != class_decls_.end()) {
+    if (name == "Void") {
+        return TypeInfo(TypeInfo::Kind::Void);
+    }
+    if (name == "Object") {
+        return TypeInfo::Object();
+    }
+    return TypeInfo::Object(name);
+}
+
+llvm::Type* LLVMCodeGenerator::llvmTypeForTypeInfo(const TypeInfo& type) {
+    switch (type.getKind()) {
+    case TypeInfo::Kind::Number:
+    case TypeInfo::Kind::Unknown:
+        return llvm::Type::getDoubleTy(*context_);
+    case TypeInfo::Kind::Boolean:
+        return llvm::Type::getInt1Ty(*context_);
+    case TypeInfo::Kind::String:
+    case TypeInfo::Kind::Null:
+    case TypeInfo::Kind::Object:
+    case TypeInfo::Kind::Void:
+    case TypeInfo::Kind::Function:
+    default:
         return opaquePtr();
     }
-    return llvm::Type::getDoubleTy(*context_);
+}
+
+llvm::Type* LLVMCodeGenerator::semanticTypeForTypeInfo(const TypeInfo& type) {
+    switch (type.getKind()) {
+    case TypeInfo::Kind::String:
+        return getBoxedValueType();
+    case TypeInfo::Kind::Object: {
+        const std::string& name = type.getTypeName();
+        if (!name.empty()) {
+            llvm::StructType* inst_ty = getInstanceStructType(name);
+            if (inst_ty != nullptr) {
+                return inst_ty;
+            }
+        }
+        return opaquePtr();
+    }
+    case TypeInfo::Kind::Number:
+    case TypeInfo::Kind::Unknown:
+        return llvm::Type::getDoubleTy(*context_);
+    case TypeInfo::Kind::Boolean:
+        return llvm::Type::getInt1Ty(*context_);
+    default:
+        return llvmTypeForTypeInfo(type);
+    }
+}
+
+llvm::Value* LLVMCodeGenerator::materializeToOpaquePtr(llvm::Value* value, const TypeInfo& ret_type,
+                                                       const std::string& context) {
+    if (ret_type.getKind() == TypeInfo::Kind::Void) {
+        return llvm::ConstantPointerNull::get(opaquePtr());
+    }
+
+    if (value == nullptr) {
+        return llvm::ConstantPointerNull::get(opaquePtr());
+    }
+
+    const llvm::Type* val_ty = value->getType();
+    if (val_ty->isPointerTy()) {
+        return value;
+    }
+
+    const bool infer_number = ret_type.isUnknown() || ret_type.isNumeric();
+    const bool infer_bool = ret_type.isUnknown() || ret_type.isBoolean();
+
+    if (val_ty->isDoubleTy() && infer_number) {
+        return createBoxedFromDouble(value);
+    }
+    if (val_ty->isIntegerTy(1) && infer_bool) {
+        return createBoxedFromBool(value);
+    }
+
+    std::string msg = "codegen: tipo de retorno no soportado";
+    if (!context.empty()) {
+        msg += " en " + context;
+    }
+    fail(msg);
+    return nullptr;
+}
+
+llvm::Value* LLVMCodeGenerator::materializeMethodResult(llvm::Value* result, const TypeInfo& ret_type,
+                                                          const std::string& label) {
+    return materializeToOpaquePtr(result, ret_type, "metodo '" + label + "'");
+}
+
+llvm::Value* LLVMCodeGenerator::coerceToLlvmType(llvm::Value* value, llvm::Type* target) {
+    if (target == nullptr) {
+        fail("codegen: tipo destino nulo en coerceToLlvmType");
+        return nullptr;
+    }
+
+    if (value == nullptr) {
+        if (target->isPointerTy()) {
+            return llvm::ConstantPointerNull::get(opaquePtr());
+        }
+        fail("codegen: valor nulo en coerceToLlvmType");
+        return nullptr;
+    }
+
+    llvm::Type* source = value->getType();
+    if (source == target) {
+        return value;
+    }
+
+    if (target == opaquePtr()) {
+        return materializeToOpaquePtr(value, TypeInfo(TypeInfo::Kind::Unknown));
+    }
+
+    if (target->isDoubleTy()) {
+        if (source->isDoubleTy()) {
+            return value;
+        }
+        if (source->isPointerTy()) {
+            llvm::Function* fn = module_->getFunction("hulk_unbox_number");
+            return builder_->CreateCall(fn, {value}, "unboxed_num");
+        }
+        fail("codegen: no se puede convertir a Number");
+        return nullptr;
+    }
+
+    if (target->isIntegerTy(1)) {
+        if (source->isIntegerTy(1)) {
+            return value;
+        }
+        if (source->isPointerTy() && isBoxedValue(value)) {
+            return unboxBoolValue(value, "coerce");
+        }
+        fail("codegen: no se puede convertir a Boolean");
+        return nullptr;
+    }
+
+    if (target->isPointerTy()) {
+        return materializeToOpaquePtr(value, TypeInfo(TypeInfo::Kind::Unknown));
+    }
+
+    fail("codegen: coerceToLlvmType no soportado");
+    return nullptr;
+}
+
+llvm::Value* LLVMCodeGenerator::demoteFromCallResult(llvm::Value* value, const TypeInfo& expected) {
+    if (value == nullptr) {
+        fail("codegen: valor nulo en demoteFromCallResult");
+        return nullptr;
+    }
+
+    if (expected.isNumeric()) {
+        return coerceToLlvmType(value, llvm::Type::getDoubleTy(*context_));
+    }
+    if (expected.isBoolean()) {
+        return coerceToLlvmType(value, llvm::Type::getInt1Ty(*context_));
+    }
+    if (expected.getKind() == TypeInfo::Kind::Void) {
+        return llvm::ConstantPointerNull::get(opaquePtr());
+    }
+
+    if (expected.isString() || expected.isObject() || expected.isNull() || expected.isUnknown()) {
+        if (value->getType()->isPointerTy()) {
+            if (expected.isObject()) {
+                const std::string& type_name = expected.getTypeName();
+                if (!type_name.empty()) {
+                    if (llvm::StructType* struct_ty = getInstanceStructType(type_name)) {
+                        trackInstanceType(value, struct_ty);
+                    }
+                }
+            }
+            return value;
+        }
+    }
+
+    fail("codegen: demoteFromCallResult no soportado");
+    return nullptr;
 }
 
 llvm::Type* LLVMCodeGenerator::semanticTypeForHulkType(const std::optional<parser::Token>& declared_type) {
-    if (declared_type.has_value()) {
-        const std::string& name = declared_type->lexeme;
-        if (name == "String") {
-            return getBoxedValueType();
-        }
-        llvm::StructType* inst_ty = getInstanceStructType(name);
-        if (inst_ty != nullptr) {
-            return inst_ty;
-        }
-    }
-    return llvmTypeForHulkType(declared_type);
+    return semanticTypeForTypeInfo(typeInfoFromHulkToken(declared_type));
 }
 
 bool LLVMCodeGenerator::isStringHulkType(const std::optional<parser::Token>& declared_type) {
@@ -362,23 +563,6 @@ llvm::Value* LLVMCodeGenerator::expectFieldValue(llvm::Value* value, llvm::Type*
         return value;
     }
     fail("codegen: tipo de campo no soportado en " + op);
-    return nullptr;
-}
-
-llvm::Value* LLVMCodeGenerator::materializeMethodResult(llvm::Value* result, const std::string& label) {
-    if (result == nullptr) {
-        return llvm::ConstantPointerNull::get(opaquePtr());
-    }
-    if (result->getType()->isDoubleTy()) {
-        return createBoxedFromDouble(result);
-    }
-    if (result->getType()->isIntegerTy(1)) {
-        return createBoxedFromBool(result);
-    }
-    if (result->getType()->isPointerTy()) {
-        return result;
-    }
-    fail("codegen: tipo de retorno no soportado en metodo '" + label + "'");
     return nullptr;
 }
 
@@ -648,26 +832,28 @@ void LLVMCodeGenerator::trackInstanceType(llvm::Value* value, llvm::StructType* 
     }
 }
 
-void LLVMCodeGenerator::emitCastFailure() {
-    llvm::Function* fail_fn = module_->getFunction("hulk_runtime_cast_error");
+void LLVMCodeGenerator::emitRuntimeErrorAt(int line, int col, const char* message) {
+    llvm::Function* fail_fn = module_->getFunction("hulk_runtime_error_at");
     if (fail_fn == nullptr) {
-        llvm::FunctionType* fail_ty = llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), false);
+        llvm::Type* i32_ty = llvm::Type::getInt32Ty(*context_);
+        llvm::FunctionType* fail_ty = llvm::FunctionType::get(
+            llvm::Type::getVoidTy(*context_), {i32_ty, i32_ty, opaquePtr()}, false);
         fail_fn = llvm::Function::Create(fail_ty, llvm::Function::ExternalLinkage,
-                                         "hulk_runtime_cast_error", module_.get());
+                                         "hulk_runtime_error_at", module_.get());
     }
-    builder_->CreateCall(fail_fn, {});
+    llvm::Value* line_val = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), line);
+    llvm::Value* col_val = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), col);
+    llvm::Value* msg_val = builder_->CreateGlobalStringPtr(message);
+    builder_->CreateCall(fail_fn, {line_val, col_val, msg_val});
     builder_->CreateUnreachable();
 }
 
-void LLVMCodeGenerator::emitCaseFailure() {
-    llvm::Function* fail_fn = module_->getFunction("hulk_runtime_case_error");
-    if (fail_fn == nullptr) {
-        llvm::FunctionType* fail_ty = llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), false);
-        fail_fn = llvm::Function::Create(fail_ty, llvm::Function::ExternalLinkage,
-                                         "hulk_runtime_case_error", module_.get());
-    }
-    builder_->CreateCall(fail_fn, {});
-    builder_->CreateUnreachable();
+void LLVMCodeGenerator::emitCastFailure(int line, int col) {
+    emitRuntimeErrorAt(line, col, "invalid cast");
+}
+
+void LLVMCodeGenerator::emitCaseFailure(int line, int col) {
+    emitRuntimeErrorAt(line, col, "case sin rama coincidente");
 }
 
 llvm::Function* LLVMCodeGenerator::lookupMethod(const std::string& class_name,
@@ -762,7 +948,8 @@ void LLVMCodeGenerator::defineMethod(parser::ClassDecl* class_decl, const parser
         return;
     }
 
-    llvm::Value* result = materializeMethodResult(current_value_, method.name.lexeme);
+    llvm::Value* result =
+        materializeMethodResult(current_value_, typeInfoFromHulkToken(method.return_type), method.name.lexeme);
     if (result == nullptr) {
         scopes_.resize(saved_scope_depth);
         current_scope_ = scopes_.back().get();
@@ -909,20 +1096,22 @@ void LLVMCodeGenerator::emitMethodCall(parser::Expr* object_expr, const std::str
 }
 
 llvm::Value* LLVMCodeGenerator::boxValueForStorage(llvm::Value* value) {
-    if (value == nullptr) {
-        return llvm::ConstantPointerNull::get(opaquePtr());
-    }
-    if (value->getType()->isPointerTy()) {
-        return value;
-    }
-    if (value->getType()->isDoubleTy()) {
-        return createBoxedFromDouble(value);
-    }
-    if (value->getType()->isIntegerTy(1)) {
-        return createBoxedFromBool(value);
-    }
-    fail("codegen: tipo no soportado para almacenamiento");
-    return nullptr;
+    return coerceToLlvmType(value, opaquePtr());
+}
+
+void LLVMCodeGenerator::registerValueHelperDeclarations() {
+    llvm::PointerType* ptr_ty = opaquePtr();
+    llvm::Type* double_ty = llvm::Type::getDoubleTy(*context_);
+    llvm::Type* i32_ty = llvm::Type::getInt32Ty(*context_);
+
+    module_->getOrInsertFunction("hulk_box_number",
+                                 llvm::FunctionType::get(ptr_ty, {double_ty}, false));
+    module_->getOrInsertFunction("hulk_unbox_number",
+                                 llvm::FunctionType::get(double_ty, {ptr_ty}, false));
+    module_->getOrInsertFunction("hulk_box_bool",
+                                 llvm::FunctionType::get(ptr_ty, {i32_ty}, false));
+    module_->getOrInsertFunction("hulk_print_instance",
+                                 llvm::FunctionType::get(llvm::Type::getVoidTy(*context_), {ptr_ty}, false));
 }
 
 void LLVMCodeGenerator::registerPrintDeclarations() {
@@ -1036,35 +1225,15 @@ llvm::GlobalVariable* LLVMCodeGenerator::registerStringConstant(const std::strin
 }
 
 llvm::Value* LLVMCodeGenerator::createBoxedFromDouble(llvm::Value* double_val) {
-    llvm::StructType* boxed_ty = getBoxedValueType();
-    llvm::Function* malloc_fn = getMallocFunction(*module_, *context_);
-
-    llvm::Value* size = llvm::ConstantExpr::getSizeOf(boxed_ty);
-    llvm::Value* raw_ptr = builder_->CreateCall(malloc_fn, {size});
-    llvm::Value* boxed = builder_->CreateBitCast(raw_ptr, opaquePtr(), "boxed_double");
-
-    builder_->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), 1),
-                          builder_->CreateStructGEP(boxed_ty, boxed, 0));
-
-    llvm::Value* data_ptr = builder_->CreateStructGEP(boxed_ty, boxed, 1);
-    builder_->CreateStore(double_val, data_ptr);
-    return boxed;
+    llvm::Function* fn = module_->getFunction("hulk_box_number");
+    return builder_->CreateCall(fn, {double_val}, "boxed_double");
 }
 
 llvm::Value* LLVMCodeGenerator::createBoxedFromBool(llvm::Value* bool_val) {
-    llvm::StructType* boxed_ty = getBoxedValueType();
-    llvm::Function* malloc_fn = getMallocFunction(*module_, *context_);
-
-    llvm::Value* size = llvm::ConstantExpr::getSizeOf(boxed_ty);
-    llvm::Value* raw_ptr = builder_->CreateCall(malloc_fn, {size});
-    llvm::Value* boxed = builder_->CreateBitCast(raw_ptr, opaquePtr(), "boxed_bool");
-
-    builder_->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context_), 0),
-                          builder_->CreateStructGEP(boxed_ty, boxed, 0));
-
-    llvm::Value* data_ptr = builder_->CreateStructGEP(boxed_ty, boxed, 1);
-    builder_->CreateStore(bool_val, data_ptr);
-    return boxed;
+    llvm::Function* fn = module_->getFunction("hulk_box_bool");
+    llvm::Value* as_i32 =
+        builder_->CreateZExt(bool_val, llvm::Type::getInt32Ty(*context_), "boxed_bool_i32");
+    return builder_->CreateCall(fn, {as_i32}, "boxed_bool");
 }
 
 llvm::Value* LLVMCodeGenerator::createBoxedFromString(llvm::Value* str_val) {
@@ -1704,6 +1873,12 @@ void LLVMCodeGenerator::emitPrintValue(llvm::Value* value) {
         return;
     }
 
+    if (isInstanceValue(value)) {
+        llvm::Function* fn = module_->getFunction("hulk_print_instance");
+        builder_->CreateCall(fn, {value});
+        return;
+    }
+
     llvm::Function* null_fn = module_->getFunction("hulk_print_null");
     builder_->CreateCall(null_fn, {});
 }
@@ -1752,27 +1927,40 @@ void LLVMCodeGenerator::visit(parser::CallExpr* expr) {
         return;
     }
 
-    llvm::Function* fn = lookupUserFunction(name, expr->args.size());
+    const std::size_t arity = expr->args.size();
+    llvm::Function* fn = lookupUserFunction(name, arity);
     if (fn == nullptr) {
-        fail("La funcion '" + name + "' no esta definida con aridad " + std::to_string(expr->args.size()));
+        fail("La funcion '" + name + "' no esta definida con aridad " + std::to_string(arity));
         return;
     }
 
+    const std::shared_ptr<FunctionSymbol> sym = lookupUserFunctionSymbol(name, arity);
+    std::vector<TypeInfo> param_types;
+    if (sym) {
+        param_types = sym->parameter_types;
+    } else {
+        param_types.assign(arity, TypeInfo::Number());
+    }
+    const TypeInfo return_type = sym ? sym->return_type : TypeInfo::Number();
+
     std::vector<llvm::Value*> arg_values;
-    arg_values.reserve(expr->args.size());
-    for (const auto& arg : expr->args) {
-        arg->accept(this);
+    arg_values.reserve(arity);
+    for (std::size_t i = 0; i < arity; ++i) {
+        expr->args[i]->accept(this);
         if (had_error_) {
             return;
         }
-        llvm::Value* value = expectDoubleValue(current_value_, name);
+        const TypeInfo param_info = i < param_types.size() ? param_types[i] : TypeInfo::Number();
+        llvm::Type* param_ty = llvmTypeForTypeInfo(param_info);
+        llvm::Value* value = coerceToLlvmType(current_value_, param_ty);
         if (value == nullptr) {
             return;
         }
         arg_values.push_back(value);
     }
 
-    current_value_ = invokeUserFunction(fn, arg_values);
+    llvm::Value* call_result = invokeUserFunction(fn, arg_values);
+    current_value_ = demoteFromCallResult(call_result, return_type);
 }
 
 void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
@@ -1868,6 +2056,15 @@ void LLVMCodeGenerator::visit(parser::BinaryExpr* expr) {
                 } else {
                     current_value_ = builder_->CreateFCmpONE(left, right, "cmp");
                 }
+                return;
+            }
+
+            if (left->getType()->isPointerTy() && right->getType()->isPointerTy() &&
+                !isInstanceValue(left) && !isInstanceValue(right) &&
+                (!isBoxedValue(left) || !isBoxedValue(right))) {
+                const llvm::CmpInst::Predicate pred =
+                    op == "==" ? llvm::CmpInst::ICMP_EQ : llvm::CmpInst::ICMP_NE;
+                current_value_ = builder_->CreateICmp(pred, left, right, "cmp");
                 return;
             }
 
@@ -2122,13 +2319,14 @@ void LLVMCodeGenerator::visit(parser::AssignExpr* expr) {
 
     const std::string& name = id->token.lexeme;
     llvm::AllocaInst* alloca = nullptr;
-    llvm::Type* var_type = nullptr;
-    if (!lookupLocalVariable(name, &alloca, &var_type)) {
+    if (!lookupLocalVariable(name, &alloca, nullptr)) {
         fail("codegen: variable '" + name + "' no definida para asignacion");
         return;
     }
 
-    if (classifySemanticType(rhs_value) != var_type) {
+    llvm::Type* storage_ty = alloca->getAllocatedType();
+    rhs_value = coerceToLlvmType(rhs_value, storage_ty);
+    if (rhs_value == nullptr) {
         fail("codegen: tipo incompatible en asignacion a '" + name + "'");
         return;
     }
@@ -2660,7 +2858,7 @@ void LLVMCodeGenerator::visit(parser::AsExpr* expr) {
 
     builder_->CreateCondBr(conforms, ok_bb, fail_bb);
     builder_->SetInsertPoint(fail_bb);
-    emitCastFailure();
+    emitCastFailure(expr->as_keyword.line, expr->as_keyword.col);
     builder_->SetInsertPoint(ok_bb);
     llvm::StructType* target_struct = getInstanceStructType(target);
     llvm::Value* casted = builder_->CreateBitCast(current_value_, opaquePtr(), "inst_" + target);
@@ -3119,7 +3317,7 @@ void LLVMCodeGenerator::visit(parser::CaseExpr* expr) {
     }
 
     builder_->SetInsertPoint(fail_bb);
-    emitCaseFailure();
+    emitCaseFailure(expr->branches.front().type_name.line, expr->branches.front().type_name.col);
 
     builder_->SetInsertPoint(entry_bb);
     builder_->CreateBr(entry_check_bb);

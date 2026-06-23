@@ -153,6 +153,14 @@ CompiledProgram compile_program(const std::string& source,
                 result.diagnostic = semantic_diag;
                 return result;
             }
+
+            if (syntactic_items.empty()) {
+                result.program = std::move(program);
+                result.symbol_table = analyzer.takeSymbolTable();
+                result.diagnostic.phase = CompilePhase::Ok;
+                result.diagnostic.exit_code = 0;
+                return result;
+            }
         }
 
         if (!syntactic_items.empty()) {
@@ -170,9 +178,7 @@ CompiledProgram compile_program(const std::string& source,
             return result;
         }
 
-        result.program = std::move(program);
-        result.diagnostic.phase = CompilePhase::Ok;
-        result.diagnostic.exit_code = 0;
+        result.diagnostic = fail_syntactic(0, 0, "compile failed", options.all_errors);
         return result;
     } catch (const parser::ParseError& error) {
         const auto& token = error.found();

@@ -581,9 +581,11 @@ Validado en Ubuntu 22.04 con g++ 11.4, LLVM 21.1.8 y Clang 21.
 
 4. **Salida multiplataforma.** El pipeline de producción apunta a Linux x86_64. El desarrollo en Windows usa el intérprete y una copia del binario; la generación nativa de `./output` se valida en Linux.
 
-5. **Errores en tiempo de ejecución.** Los fallos durante la ejecución del programa (como un cast `as` fallido) los reporta `./output` en runtime y quedan fuera del alcance de los diagnósticos estáticos del compilador.
+5. **Errores en tiempo de ejecución.** Los fallos durante la ejecución del programa (cast `as` inválido, `case` sin rama) los reporta `./output` vía `hulk_runtime_error_at(line, col, msg)` con formato `(línea,col) RUNTIME: …`, alineado con los diagnósticos estáticos `(línea,col) SEMANTIC: …`. El codegen pasa la ubicación del token `as` o de la primera rama del `case`.
 
 6. **Formato de impresión de cadenas.** Pueden aparecer diferencias menores de comillas o formato entre el intérprete y el runtime nativo en ciertos escenarios de impresión de cadenas.
+
+7. **Mejoras LLVM recientes (Fases 1–4, jun 2026).** Capa de valores unificada (`coerceToLlvmType`, boxing en fronteras), funciones multi-tipo con retorno `opaquePtr` (fixtures 93–96), audit de builtins + `log` (80_l8_log), asignación destructiva a atributos y variables con coerción, retorno `Void` en cadenas de llamadas (forward reference, fixture 97), e igualdad de punteros nulos en comparaciones. Inventario vivo en `playground/llvm_gap_inventory.md`.
 
 ---
 

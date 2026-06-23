@@ -1,0 +1,6 @@
+type Point(x: Number, y: Number) {
+    x: Number = x;
+    y: Number = y;
+}
+function dist(p: Point, q: Point) => (p.x - q.x) ^ 2 + (p.y - q.y) ^ 2;
+print(dist(new Point(0, 0), new Point(3, 4)));

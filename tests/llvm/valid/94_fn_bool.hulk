@@ -1,0 +1,3 @@
+function isPos(x) => x > 0;
+print(isPos(5));
+print(isPos(-1));
