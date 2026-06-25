@@ -1,0 +1,647 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{microtype}
+\microtypesetup{expansion=false}
+\usepackage{setspace}
+
+\geometry{a4paper, left=2.5cm, right=2.5cm, top=2.2cm, bottom=2.2cm}
+
+% ---- Colores ----
+\definecolor{hulkblue}{HTML}{1a3f6f}
+\definecolor{codebg}{HTML}{f3f3f3}
+\definecolor{codecomment}{HTML}{3a7a3a}
+\definecolor{codekw}{HTML}{1a3f6f}
+\definecolor{codestr}{HTML}{6a0a9a}
+\definecolor{darkgray}{HTML}{333333}
+
+% ---- Listados de código ----
+\lstdefinestyle{hulkcode}{
+  backgroundcolor=\color{codebg},
+  commentstyle=\color{codecomment}\itshape,
+  keywordstyle=\color{codekw}\bfseries,
+  stringstyle=\color{codestr},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  keepspaces=true,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=6pt,
+  frame=single,
+  rulecolor=\color{hulkblue!40},
+  tabsize=2,
+  showstringspaces=false,
+  xleftmargin=14pt,
+  xrightmargin=4pt,
+  aboveskip=6pt,
+  belowskip=8pt,
+}
+\lstset{style=hulkcode}
+
+% ---- Secciones ----
+\titleformat{\section}
+  {\Large\bfseries\color{hulkblue}}
+  {\thesection.}{0.6em}{}
+  [\vspace{2pt}\hrule height 1pt \vspace{4pt}]
+
+\titleformat{\subsection}
+  {\large\bfseries\color{hulkblue}}
+  {\thesubsection}{0.6em}{}
+
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{darkgray}}
+  {\thesubsubsection}{0.6em}{}
+
+% ---- Encabezado y pie ----
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textcolor{gray}{Compilador HULK — Informe Técnico}}
+\rhead{\small\textcolor{gray}{Universidad de La Habana}}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---- Interlineado ----
+\setstretch{1.08}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=hulkblue,
+  urlcolor=hulkblue,
+  pdftitle={Compilador HULK -- Informe del proyecto de Compilación},
+  pdfauthor={Guerrero, Martinez, Sosa}
+}
+
+\begin{document}
+
+% ==============================================================
+% PORTADA
+% ==============================================================
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+
+  {\Huge\bfseries\color{hulkblue} Compilador HULK}\\[0.5cm]
+  {\large\color{gray} Informe del proyecto de Compilación y Lenguajes de Programación}\\[0.3cm]
+  {\normalsize\color{gray} Arquitectura del compilador y extensiones de control de flujo}\\[2.2cm]
+
+  {\color{hulkblue}\rule{\linewidth}{2pt}}\\[0.4cm]
+  {\large Curso de Compilación}\\[0.2cm]
+  {\normalsize Facultad de Matemática y Computación}\\[0.1cm]
+  {\normalsize Universidad de La Habana}\\[0.4cm]
+  {\color{hulkblue}\rule{\linewidth}{2pt}}\\[3cm]
+
+  {\large Integrantes del equipo}\\[1cm]
+  {\large Daniela De La Caridad Guerrero Álvarez}\\[0.4cm]
+  {\large Rubén Martínez Rojas}\\[0.4cm]
+  {\large Sammy Raul Sosa Justiz}\\[3.5cm]
+
+  {\normalsize\color{gray} 2025 -- 2026}
+\end{titlepage}
+
+% ==============================================================
+% ÍNDICE
+% ==============================================================
+\tableofcontents
+\newpage
+
+% ==============================================================
+\section{Introducción}
+% ==============================================================
+
+HULK (Havana University Language for Kompilers) es un lenguaje de programación diseñado con fines académicos dentro del curso de Compilación de la Facultad de Matemática y Computación de la Universidad de La Habana. El objetivo central del proyecto es construir un compilador funcional y completo para este lenguaje, recorriendo todas las fases clásicas que aparecen en la teoría de compiladores: análisis léxico, análisis sintáctico, análisis semántico y generación de código. La documentación oficial del lenguaje está disponible en \url{https://matcom.github.io/hulk/}.
+
+El pipeline del compilador HULK sigue un flujo lineal y ordenado. El punto de entrada es el módulo \textbf{Compiler}, que actúa como orquestador general: recibe el código fuente, invoca las fases en el orden correcto y gestiona el diagnóstico de errores. A continuación entra en acción el \textbf{Lexer}, que transforma la secuencia de caracteres en tokens. El \textbf{Parser} toma esos tokens y construye primero un árbol de derivación concreto (CST) y luego un \textbf{AST} (Árbol de Sintaxis Abstracto), apoyándose en la \textbf{SymbolTable} para registrar identificadores. Los módulos de soporte \textbf{Types} y \textbf{Value} proveen, respectivamente, la representación estática de tipos y la representación dinámica de valores en tiempo de ejecución. Sobre el AST actúa el \textbf{Analizador Semántico}, que verifica la corrección del programa y anota cada nodo con su tipo inferido. Finalmente, el pipeline se divide en dos salidas alternativas: el \textbf{Evaluador}, que interpreta el AST directamente para producir un resultado inmediato, y el \textbf{Generador de Código LLVM}, que traduce el AST a código máquina nativo a través de LLVM IR.
+
+El lenguaje HULK incluye expresiones aritméticas, lógicas y de comparación, estructuras de control como \texttt{if/elif/else}, \texttt{while}, \texttt{for}, \texttt{with} y \texttt{case}, declaración de funciones con y sin tipo de retorno, un sistema de tipos orientado a objetos con herencia, expresiones de ligadura con \texttt{let\ldots in}, bloques de expresiones, operadores de verificación de tipo (\texttt{is}) y conversión (\texttt{as}), y asignación destructiva con el operador \texttt{:=}. Además, el compilador incorpora un conjunto de cuatro extensiones de control de flujo e iteración ---\texttt{for} tipado, \texttt{repeat}, \texttt{unless} y \texttt{loop\ldots while}--- que constituyen el aporte propio del proyecto.
+
+Las secciones 2 a 9 describen la arquitectura del compilador siguiendo el orden del flujo de compilación. Las secciones 10 en adelante documentan el cumplimiento de los requisitos del proyecto, el diseño de las extensiones, su integración técnica en el repositorio y la validación experimental.
+
+% ==============================================================
+\section{Orquestación del Pipeline y Diagnóstico de Errores}
+% ==============================================================
+
+\subsection{Función y responsabilidades}
+
+Esta capa de orquestación integra todas las fases —léxica, sintáctica, semántica y de generación de código— en una única interfaz coherente, y expone al usuario dos modos de uso distintos: un modo de producción orientado a la evaluación automática y un modo de desarrollo con flags de depuración para explorar el estado interno del compilador en cada etapa.
+
+\subsection{Modos de operación}
+
+El modo de producción (denominado internamente \textit{matcom}) se activa cuando se pasa un archivo fuente \texttt{.hulk} sin ningún flag adicional. En este modo el compilador ejecuta el pipeline completo, reporta todos los errores encontrados en el formato \texttt{(línea,col) TIPO: mensaje} hacia la salida estándar de error, y si la compilación fue exitosa invoca la generación del ejecutable \texttt{./output} mediante LLVM.
+
+El modo de desarrollo se activa con uno o más flags: \texttt{--tokens} imprime la lista de tokens reconocidos por el lexer, \texttt{--cst} imprime el árbol de sintaxis concreto, \texttt{--ast} imprime el árbol de sintaxis abstracto, \texttt{--symbols} imprime estadísticas de la tabla de símbolos, \texttt{--semantic} ejecuta el análisis semántico e imprime los errores encontrados, e \texttt{--interpret} ejecuta el evaluador sobre el programa. Un flag adicional, \texttt{--first-phase}, controla el comportamiento ante errores: en lugar de acumular los errores de todas las fases, se detiene en la primera fase que falla y reporta únicamente los errores de esa fase.
+
+\subsection{El pipeline de compilación}
+
+La función central del módulo es \texttt{compile\_program()}, que ejecuta las fases en orden: primero tokeniza la cadena fuente y detecta errores léxicos antes de intentar el análisis sintáctico; luego construye la tabla LL(1) (con caché estático para no recalcularla en cada invocación) y ejecuta el parser, con recuperación de errores si el modo de todos los errores está activo; a continuación convierte el CST en AST; y finalmente ejecuta el análisis semántico, fusionando los errores sintácticos y semánticos si los hay antes de producir el diagnóstico final. Si no hay errores, retorna el programa compilado junto con la tabla de símbolos para que la fase de generación de código pueda consultarlos.
+
+\subsection{El sistema de diagnósticos}
+
+El sistema de diagnósticos es la infraestructura transversal que permite al módulo acumular, ordenar, deduplicar y formatear errores de cualquier fase. Cada diagnóstico almacena la posición en el fuente, el tipo de error (léxico, sintáctico o semántico) y el mensaje descriptivo. Los diagnósticos son ordenables por línea, columna y tipo, lo que garantiza que el usuario los vea en el orden natural del archivo fuente.
+
+La función \texttt{dominant\_phase()} determina la fase más grave presente en un conjunto de diagnósticos, con el orden léxico por encima del sintáctico y este por encima del semántico. El código de salida del proceso sigue directamente a esta fase: 1 para léxico, 2 para sintáctico, 3 para semántico y 0 para éxito. La función \texttt{finalize\_compile\_diagnostic()} ejecuta la secuencia completa de deduplicación, filtrado por modo, cálculo de fase dominante y formateo de líneas, centralizando toda la lógica en un solo lugar. Cuando el modo \texttt{--first-phase} está activo, el filtrado conserva únicamente los diagnósticos de la fase dominante; de lo contrario, todos los errores de todas las fases se presentan juntos al usuario.
+
+En modo de producción, una compilación exitosa produce el ejecutable nativo \texttt{./output} en el directorio de trabajo, generado a partir del IR LLVM (\texttt{.hulk\_out.ll}) y del runtime en C (\texttt{Codegen/runtime.c}) mediante \texttt{clang}. El binario \texttt{./hulk} es el punto de entrada del compilador; no se requiere un intérprete externo para ejecutar programas compilados.
+
+% ==============================================================
+\section{El Lexer}
+% ==============================================================
+
+\subsection{Qué es un lexer y cuál es su función en el compilador}
+
+El lexer, también llamado analizador léxico o escáner, es la primera etapa del compilador. Su responsabilidad es leer el programa fuente como una secuencia plana de caracteres y transformarla en una secuencia de unidades con significado llamadas tokens. Un token es simplemente un par formado por un tipo y, cuando aplica, un valor semántico. Por ejemplo, el texto \texttt{42} se convierte en un token de tipo \texttt{NUMBER\_LITERAL} con valor numérico 42; el texto \texttt{if} se convierte en un token de tipo \texttt{KEYWORD\_IF} sin valor adicional; el texto \texttt{mensaje} se convierte en un token de tipo \texttt{IDENTIFIER} con el string \texttt{"mensaje"} como valor.
+
+Además de producir tokens, el lexer cumple otras tareas importantes: mantiene el seguimiento de la posición actual en el archivo (número de línea y columna), descarta el ruido léxico (espacios en blanco, comentarios) que no tiene significado para el parser, y reporta errores léxicos cuando encuentra caracteres que no pertenecen al lenguaje o construcciones sin terminar como cadenas o comentarios de bloque que no se cierran.
+
+\subsection{Por qué se eligió Flex}
+
+El lexer de HULK se implementó con Flex (Fast Lexical Analyzer Generator), una herramienta estándar en el ámbito académico que genera automáticamente un analizador léxico en C++ a partir de un archivo de especificación (\texttt{hulk\_lexer.l}) donde cada token se describe mediante una expresión regular y una acción. Flex fuerza al programador a pensar en los tokens según el modelo de lenguajes regulares, que es el marco teórico correcto para el análisis léxico. Además, Flex implementa la política del \textit{longest match}: cuando varias reglas pueden aplicarse, elige la que consume más caracteres, lo que resuelve automáticamente ambigüedades como distinguir \texttt{:=} de \texttt{:} seguido de \texttt{=}. En caso de empate en longitud, Flex da prioridad a la regla que aparece primero en el archivo, lo que permite controlar la precedencia entre, por ejemplo, palabras clave e identificadores.
+
+\subsection{Estructura del archivo hulk\_lexer.l}
+
+El archivo \texttt{hulk\_lexer.l} tiene la estructura estándar de los archivos de Flex, dividida en tres secciones separadas por el marcador \texttt{\%\%}. La primera sección contiene las opciones de configuración de Flex y las definiciones de macros de patrones. La segunda sección, entre los dos marcadores \texttt{\%\%}, contiene las reglas del lexer: cada regla es un par formado por un patrón de expresión regular y el bloque de código C++ que se ejecuta cuando ese patrón hace match. La tercera sección contiene código C++ auxiliar y en este proyecto está vacía.
+
+\subsubsection{Opciones de configuración de Flex}
+
+Al comienzo del archivo se definen cuatro opciones que controlan cómo Flex genera el código del lexer. La opción \texttt{\%option yyclass="HulkLexer"} le indica a Flex que genere el método \texttt{yylex()} como un método de instancia de la clase \texttt{HulkLexer} en lugar de una función global. Esto es necesario porque el proyecto está escrito en C++ orientado a objetos y se quiere que el lexer sea un objeto que se pueda instanciar con un stream de entrada específico.
+
+La opción \texttt{\%option noyywrap} evita que Flex llame a la función \texttt{yywrap()} al llegar al final del archivo. Como el lexer de HULK siempre trabaja con un solo archivo o un solo stream, esta función no es necesaria y se suprime para simplificar el código generado. La opción \texttt{\%option never-interactive} le dice a Flex que trate la entrada como no interactiva, lo que permite hacer lecturas en bloque, más eficientes que leer carácter a carácter. Por último, \texttt{\%option nodefault} desactiva la acción por defecto de Flex, de modo que si un carácter no hace match con ninguna regla, el programador es responsable de cubrirlo; aquí se logra con la regla de fallback \texttt{.} que reporta un error léxico explícito.
+
+\subsubsection{Macros de patrones y el prólogo}
+
+Antes de las reglas, el archivo define un conjunto de macros de patrones: alias de expresiones regulares que se pueden reutilizar dentro de las reglas reales. Las macros \texttt{DIGIT}, \texttt{ALPHA}, \texttt{ALNUM\_}, \texttt{INT}, \texttt{FLOAT} e \texttt{IDENT} cubren los bloques elementales del lenguaje. Cuando una regla escribe \texttt{\{FLOAT\}} o \texttt{\{IDENT\}}, Flex sustituye automáticamente esa referencia por la expresión regular completa.
+
+El bloque \texttt{\%\{ \ldots\ \%\}} al inicio copia código C++ al principio del archivo generado. Ahí se definen tres macros internas: \texttt{MARK\_TOKEN}, que registra la posición donde comienza el token antes de que la columna avance; \texttt{SET\_LEXEME}, que copia el texto reconocido a un campo del objeto; y \texttt{UPD}, que las invoca a ambas, avanza la columna y retorna el tipo del token. Esto evita repetir cuatro instrucciones en cada regla de token simple.
+
+\subsubsection{Las reglas del lexer}
+
+Los espacios, tabulaciones y retornos de carro se consumen sin generar token, actualizando solo la columna. Los saltos de línea incrementan el contador de línea y reinician la columna. Los comentarios de línea se descartan completamente. Los de bloque se manejan con un bucle manual que lee carácter a carácter y reporta error si no se encuentra el cierre.
+
+Los literales de cadena se acumulan en un bucle que interpreta escapes y espera la comilla de cierre; un salto de línea o fin de archivo antes produce un error léxico. Los booleanos \texttt{true} y \texttt{false} se reconocen como tokens específicos antes que como identificadores, almacenando su valor en un campo booleano de la estructura semántica. Cada palabra clave tiene su propia regla ubicada antes de la regla de identificadores. Los operadores de dos caracteres se definen primero para que el \textit{longest match} los prefiera. Al final, \texttt{<<EOF>>} indica el fin de la entrada y \texttt{.} cubre cualquier carácter no reconocido, reportándolo como \texttt{UNKNOWN}.
+
+\subsection{El valor semántico y la posición}
+
+Cada vez que el lexer produce un token guarda información adicional en la estructura \texttt{SemanticValue}, que tiene tres campos: \texttt{str\_val} de tipo \texttt{std::string} para identificadores y cadenas, \texttt{num\_val} de tipo \texttt{float} para literales numéricos, y \texttt{bool\_val} de tipo \texttt{bool} para literales booleanos. La clase \texttt{HulkLexer} mantiene los campos \texttt{token\_line\_} y \texttt{token\_col\_}, que registran la posición donde comenzó el último token reconocido. Esta distinción es importante: en el momento en que \texttt{yylex()} retorna, la columna ya apunta al carácter siguiente; copiar \texttt{token\_col\_} en lugar de \texttt{column\_} garantiza que los mensajes de error señalen el inicio del token problemático y no su carácter de cierre.
+
+% ==============================================================
+\section{El Parser}
+% ==============================================================
+
+\subsection{Qué es un parser y cuál es su función}
+
+El parser, también llamado analizador sintáctico, es la segunda etapa del compilador. Su trabajo es tomar la secuencia de tokens producida por el lexer y verificar que esa secuencia respeta la gramática del lenguaje. Si la secuencia es válida, el parser construye una representación estructurada del programa: un árbol en el que cada nodo representa una construcción del lenguaje y los hijos de ese nodo son sus partes constituyentes.
+
+El parser construye dos representaciones en árbol. La primera es el Árbol de Derivación Concreto (CST), que refleja exactamente la estructura de la gramática. La segunda es el Árbol de Sintaxis Abstracto (AST), que es una versión simplificada del CST, eliminando los nodos intermedios que solo existen por razones gramaticales y conservando solo la estructura semántica relevante para las fases posteriores del compilador.
+
+\subsection{Por qué se eligió un parser LL(1)}
+
+El parser implementado es de tipo LL(1): lee la entrada de izquierda a derecha, produce la derivación más a la izquierda y utiliza un solo token de lookahead para decidir qué producción aplicar. Se eligió principalmente por razones pedagógicas, ya que LL(1) conecta directamente con los conceptos teóricos del curso. Otra ventaja es que la gramática se define en un archivo separado (\texttt{grammar.ll1}) y el parser es un componente genérico que trabaja con cualquier gramática LL(1), separando claramente la descripción del lenguaje del algoritmo de análisis. La principal restricción es que la gramática no puede tener recursión izquierda ni ambigüedades, lo que obligó al equipo a diseñar una estructura gramatical más limpia y aplicar factorización.
+
+\subsection{Infraestructura del parser}
+
+Antes de poder construir el parser propiamente dicho fue necesario construir toda una infraestructura de soporte. El lexer produce tokens en su propio formato interno; para que el parser trabaje de forma limpia, se definió una estructura \texttt{Token} que agrupa el tipo del token, el texto original exacto (lexema) y la posición en el archivo. El adaptador convierte la salida del lexer a una lista de estas estructuras llamando a \texttt{yylex()} repetidamente hasta el EOF, acumulando todos los tokens en un vector. Esta separación desacopla el parser de la API interna de Flex.
+
+La clase \texttt{TokenStream} mantiene el vector de tokens y un índice que apunta al token actual. El método más importante es \texttt{consume(type, msg)}: verifica que el token actual sea del tipo esperado y, si no lo es, lanza un \texttt{ParseError} con el mensaje descriptivo y la posición del token problemático. La clase \texttt{ParseError} extiende \texttt{std::exception} y almacena el token problemático con toda la información necesaria para reportar el error al usuario.
+
+\subsection{La gramática LL(1) y el generador de tablas}
+
+La gramática formal del lenguaje HULK vive en el archivo \texttt{grammar.ll1}. Este archivo es la fuente de verdad sobre la sintaxis del lenguaje y el parser no tiene conocimiento codificado de ella; en cambio, la lee y genera la tabla LL(1) a partir de ella en tiempo de ejecución.
+
+Para que la gramática sea apta para LL(1) fue necesario eliminar toda recursión izquierda. El ejemplo más representativo es la precedencia de operadores: la producción natural $\text{Expr} \to \text{Expr} + \text{Expr}$ se transforma en el patrón estándar que introduce un no terminal ``cola'', convirtiendo la recursión izquierda en recursión derecha más un caso base épsilon. Para la potencia, que necesita asociatividad a la derecha, el no terminal cola llama de vuelta a la producción completa, de modo que $2^{3^2}$ se interpreta correctamente como $2^{(3^2)}$.
+
+El generador de tablas calcula los conjuntos FIRST y FOLLOW de forma iterativa hasta alcanzar un punto fijo, y construye la tabla de análisis predictivo $M[A, a]$. Si en algún momento se intenta agregar una segunda producción a una celda que ya tiene una, hay un conflicto LL(1) y la gramática no es apta; en el estado actual del proyecto, la tabla no tiene ningún conflicto.
+
+\subsection{El parser LL(1) predictivo y el CST}
+
+El parser LL(1) implementado es un analizador predictivo dirigido por la tabla. Su algoritmo mantiene una pila que inicialmente contiene el símbolo inicial \texttt{Program}. En cada paso mira el tope de la pila y el token actual: si el tope es un terminal y coincide, ambos se emparejan; si el tope es un no terminal, consulta la tabla y apila los símbolos del lado derecho en orden inverso. Si la celda está vacía, reporta un error sintáctico. Durante este proceso se construye simultáneamente el CST.
+
+El CST no es adecuado para el análisis semántico directamente porque contiene mucho ruido: nodos que representan producciones épsilon, nodos de no terminales auxiliares como \texttt{AddExprTail} que no tienen significado semántico propio, y múltiples niveles de anidamiento consecuencia de la factorización LL(1). Por eso se construye el AST mediante un recorrido recursivo del CST que elimina ese ruido y preserva solo la estructura semántica.
+
+\subsection{Nodos del AST}
+
+El AST se organiza bajo un nodo raíz \texttt{Program} con dos jerarquías. Las sentencias representan componentes de nivel superior: declaraciones de funciones, de tipos o expresiones con punto y coma. Las expresiones representan cualquier construcción que produce o evalúa un valor, cubriendo literales, operaciones binarias y unarias, estructuras de control, ligaduras \texttt{let}, bloques, llamadas a función, accesos a atributos, instanciación de tipos, \texttt{with}, \texttt{case} y las extensiones \texttt{unless}, \texttt{repeat} y \texttt{loop\ldots while}, además de \texttt{ForExpr} con anotación de tipo opcional (\texttt{declared\_type}).
+
+Al convertir el CST a AST, la función de conversión normaliza estructuras complejas. Las cadenas de nodos de operaciones aritméticas se aplanan en árboles de nodos binarios con asociatividad izquierda. Las operaciones postfix (accesos y llamadas encadenadas como \texttt{obj.m(a).b}) se procesan de izquierda a derecha para construir estructuras jerárquicas correctas. Los \texttt{elif} se normalizan recursivamente en nodos \texttt{if} anidados.
+
+% ==============================================================
+\section{El Árbol de Sintaxis Abstracta y la Gestión de Identificadores}
+% ==============================================================
+
+\subsection{El módulo AST}
+
+El módulo AST actúa como capa de adaptación entre el namespace interno del parser y el resto del compilador. Su propósito es exponer en el namespace global todos los nodos del árbol de sintaxis abstracta y las interfaces del patrón Visitor, permitiendo que los módulos de análisis semántico, verificación de tipos y evaluación los utilicen sin necesidad de calificar explícitamente el namespace \texttt{parser::}. El módulo no define nuevas estructuras de datos propias: delega completamente en los nodos declarados en el parser, manteniendo una única fuente de verdad para la representación del programa. Tres nodos reciben alias con nombres más descriptivos: \texttt{BooleanExpr} para \texttt{parser::BoolExpr}, \texttt{VariableExpr} para \texttt{parser::IdentifierExpr} y \texttt{ExprBlock} para \texttt{parser::BlockExpr}. El resto se reexportan sin cambio de nombre mediante declaraciones \texttt{using}.
+
+\subsection{El módulo SymbolTable}
+
+El módulo SymbolTable implementa la tabla de símbolos del compilador: la estructura de datos que registra y resuelve todos los identificadores que aparecen en el programa fuente. Opera durante el análisis semántico y es consultada por el verificador de tipos, el analizador semántico y el módulo Types para resolver referencias y verificar conformidad de herencia.
+
+La tabla mantiene tres tipos de símbolos. Los símbolos de variable almacenan el nombre del identificador, su tipo estático, si es mutable y la línea de declaración. Los símbolos de función almacenan la firma completa y soportan sobrecarga por aridad, organizando múltiples definiciones del mismo nombre en un vector. Los símbolos de tipo representan una clase con su jerarquía, atributos y métodos.
+
+La gestión de ámbitos se implementa mediante una pila donde cada entrada es un mapa de variables del ámbito activo. \texttt{pushScope()} abre un nuevo ámbito anidado y \texttt{popScope()} lo cierra, descartando todas las variables declaradas en él. El shadowing está explícitamente permitido: un ámbito hijo puede declarar la misma variable que un ámbito padre, y la búsqueda resolverá al símbolo más interno. Las funciones se almacenan fuera de esta pila porque en el lenguaje tienen alcance global. Los tipos también se manejan en un mapa separado, con búsqueda recursiva en la cadena de herencia para resolver atributos y métodos heredados.
+
+El constructor inicializa el entorno con todo lo predefinido: las constantes \texttt{PI} y \texttt{E} como variables inmutables, la jerarquía de tipos base (Object, Number, String, Boolean, Null, Void, Unknown, Iterable), y las funciones builtin (sin, cos, sqrt, exp, log, rand, print y range). Los builtins se protegen de redeclaración por el usuario.
+
+El recolector de declaraciones \texttt{DeclCollector} implementa una primera pasada superficial sobre el AST que registra en la tabla todas las funciones y tipos de primer nivel antes de que comience el análisis semántico completo, habilitando referencias hacia adelante. Los parámetros se registran con tipo desconocido intencionalmente: solo se necesita saber que la función existe y con qué aridad.
+
+% ==============================================================
+\section{El Sistema de Tipos y la Representación de Valores}
+% ==============================================================
+
+\subsection{El módulo Types}
+
+El módulo Types provee la representación estática de tipos usada durante el análisis semántico. Su clase central, \texttt{TypeInfo}, encapsula tanto los tipos primitivos del lenguaje (Number, String, Boolean, Function, Null, Void, Unknown) como los tipos nominales definidos por el usuario, identificados por el nombre de la clase. El valor \texttt{Unknown} es central en el diseño: representa un tipo que todavía no se ha podido determinar y se usa como comodín durante la inferencia.
+
+El sistema de conformidad de tipos se implementa en el método \texttt{conformsTo(other)}, que aplica reglas en orden de prioridad: si cualquiera de los dos tipos es \texttt{Unknown}, la conformidad es verdadera para soportar la inferencia gradual; si ambos tienen el mismo kind y nombre, son idénticos; Null conforma a cualquier tipo objeto; Object sin nombre es supertipo universal de todo; y para pares de tipos nominales se sigue la cadena de herencia mediante \texttt{isSubtypeOf}, que recorre la jerarquía usando la tabla de símbolos para resolver cada \texttt{ClassDecl}.
+
+El cálculo del mínimo ancestro común (LCA) se usa en el verificador de tipos para unificar las ramas de un \texttt{if/else} o un \texttt{case}: el método estático \texttt{getLowestCommonAncestor} combina una lista de tipos encontrando el supertipo más específico que es común a todos. Para pares de tipos nominales, el algoritmo construye el conjunto de todos los ancestros del primer tipo y luego recorre la cadena del segundo buscando el primer nombre en ese conjunto.
+
+La inferencia estática de tipos para operadores se implementa en \texttt{inferBinaryOp} e \texttt{inferUnaryOp}, que determinan el tipo resultante de una operación a partir de los tipos de los operandos sin necesidad de conocer sus valores concretos.
+
+\subsection{El módulo Value}
+
+El módulo Value define la representación en tiempo de ejecución de todos los valores que puede producir o manipular el intérprete. Su clase central, \texttt{Value}, utiliza \texttt{std::variant} como almacenamiento interno, lo que garantiza que solo uno de los tipos alternativos esté activo en cada momento y que la verificación sea exhaustiva en tiempo de compilación. Las alternativas son: monostate para Null, double para Number, string para String, bool para Boolean, y punteros compartidos para rangos, iteradores de rango e instancias de clase de usuario.
+
+La clase expone dos grupos de métodos simétricos: predicados que verifican qué alternativa está activa y accesores que extraen el valor lanzando excepción si el tipo no coincide. Esta simetría garantiza que el evaluador siempre verifique el tipo antes de acceder al valor.
+
+Las instancias de clases de usuario se representan mediante la estructura \texttt{Instance}, que combina un marco de entorno para los atributos (cuyo padre es el entorno global en el momento de creación), un puntero al nodo \texttt{ClassDecl} del AST para búsqueda de métodos y verificación de herencia, y un puntero circular a la propia instancia para pasar \texttt{self} a los métodos sin crear copias.
+
+Para la iteración, \texttt{RangeValue} modela el rango semiabierto $[start, end)$ producido por \texttt{range(start, end)}, y \texttt{RangeIterator} implementa el protocolo de iteración nativa. El método \texttt{next()} inicializa el iterador en la primera llamada y avanza en 1.0 en las sucesivas, retornando falso cuando se alcanza el extremo del rango.
+
+% ==============================================================
+\section{El Analizador Semántico}
+% ==============================================================
+
+\subsection{Qué es el análisis semántico y cuál es su función}
+
+El análisis semántico es la tercera etapa del compilador y recibe como entrada el AST construido por el parser. Mientras que el parser solo verifica que el programa esté bien formado según la gramática, el análisis semántico verifica que el programa tenga sentido: que toda variable usada haya sido declarada antes, que toda función o método se invoque con la cantidad correcta de argumentos, que los tipos de las expresiones sean compatibles entre sí, que las clases formen una jerarquía de herencia válida y sin ciclos, y que las redefiniciones de nombres no entren en conflicto con declaraciones anteriores.
+
+El componente que implementa esta fase se llama \texttt{Phase2Analyzer}. El nombre refleja una decisión de diseño: el análisis semántico de HULK no se hace en una sola pasada lineal sobre el AST, sino en varias fases sucesivas, necesarias porque el lenguaje permite referencias hacia adelante e inferencia de tipos mutuamente dependiente.
+
+\subsection{Arquitectura general: el patrón Visitor}
+
+\texttt{Phase2Analyzer} hereda simultáneamente de \texttt{parser::ExprVisitor} y \texttt{parser::StmtVisitor}, de modo que para cada tipo de nodo del AST implementa un método \texttt{visit} que recibe un puntero al nodo concreto. El estado que se propaga entre llamadas no se pasa como parámetro de retorno explícito, sino a través de dos miembros privados: \texttt{current\_type\_}, que guarda el tipo inferido de la última expresión visitada, y \texttt{current\_class\_}, que guarda el nombre de la clase dentro de cuyo método se está analizando en este momento. El método auxiliar \texttt{visitExpr} no solo invoca el patrón visitor sino que además registra en un mapa el tipo resultante; esto garantiza que cada nodo del AST quede anotado con su tipo inferido, lo cual es un prerrequisito para la generación de código LLVM.
+
+\subsection{Las cuatro pasadas de analyze}
+
+El método público \texttt{analyze(Program*)} organiza el trabajo en pasadas sucesivas. En la primera pasada, \texttt{collectClassDeclarations} y \texttt{collectFunctionDeclarations} recorren el programa registrando en la tabla de símbolos el nombre de cada clase y cada función antes de analizar el cuerpo de ninguna de ellas, lo que habilita las referencias hacia adelante. En la segunda pasada se visita explícitamente cada declaración de clase para validar la jerarquía de herencia, detectar ciclos, registrar atributos y métodos, y aplicar la regla de herencia implícita de parámetros cuando una subclase no declara los propios.
+
+La tercera pasada, la más particular, implementa la inferencia de tipos hasta el punto fijo. Cuando un parámetro de función no tiene tipo declarado, su tipo inicial es \texttt{Unknown}. Al analizar el cuerpo, los operadores que detectan un operando desconocido y el otro concreto propagan el tipo hacia atrás a la variable involucrada. Después de visitar el cuerpo, se actualiza la firma registrada de la función con los tipos que terminaron teniendo sus parámetros. Como esta inferencia puede depender de otra función todavía no analizada, el analizador repite el recorrido completo hasta diez veces, deteniéndose tan pronto como una iteración completa no produce ningún cambio. Este es el algoritmo de punto fijo: el proceso converge porque el conjunto de tipos posibles es finito y la inferencia solo se mueve de \texttt{Unknown} hacia un tipo concreto, nunca al revés. La cuarta y última pasada valida que cuando un método sobreescribe a uno heredado, su tipo de retorno conforme al del método base, comprobación que se posterga porque los tipos de retorno pueden seguir siendo provisionales mientras dura la fase de punto fijo.
+
+\subsection{Resolución de identificadores y comprobación de tipos}
+
+El analizador valida cada uso de variable consultando la tabla de símbolos y reportando error si no existe en ningún ámbito visible. Para las funciones distingue dos motivos de error: si el nombre existe pero con distinta aridad, reporta un error de cantidad de argumentos; si no existe con ninguna aridad, reporta función no definida. Esta distinción también es la base de la sobrecarga por aridad, que el lenguaje permite siempre que dos funciones del mismo nombre difieran en la cantidad de parámetros.
+
+La comprobación de tipos en operadores binarios es el método más largo del analizador porque la validez depende del operador. Los operadores aritméticos exigen Number en ambos lados; los lógicos exigen Boolean; las comparaciones de orden exigen Number; la igualdad exige que ambos lados tengan el mismo kind; la concatenación exige String. Antes de cada comprobación, el analizador intenta propagar el tipo del operando concreto hacia el operando desconocido, actualizándolo en la tabla de símbolos.
+
+Las estructuras de control que pueden aparecer como expresiones producen su tipo mediante la unificación con el mínimo ancestro común: si el \texttt{then} devuelve una instancia de \texttt{Perro} y el \texttt{else} devuelve una instancia de \texttt{Gato}, ambas subclases de \texttt{Animal}, el tipo del \texttt{if} completo es \texttt{Animal}. El analizador implementa además comprobaciones específicas para la herencia de clases, las llamadas al constructor de la clase base, la inicialización de atributos y la sobreescritura compatible de métodos.
+
+% ==============================================================
+\section{El Evaluador}
+% ==============================================================
+
+\subsection{Qué es el evaluador y cuál es su función}
+
+El módulo Evaluador constituye la Fase 3 del compilador: un intérprete de árbol de sintaxis abstracta que recorre el programa ya parseado y produce directamente su resultado en tiempo de ejecución. Opera sobre el AST generado por las fases anteriores y materializa la semántica del lenguaje sin pasar por generación de código intermedio. Al igual que el analizador semántico, implementa el patrón Visitor para expresiones y sentencias.
+
+\subsection{Entorno de ejecución}
+
+El entorno de ejecución se modela con la estructura \texttt{EnvFrame}, que implementa una cadena de marcos léxicos. Cada frame contiene un mapa de nombre a valor y un puntero opcional al frame padre, lo que permite recorrer la cadena léxica en la búsqueda de variables y soporta correctamente el alcance léxico, los bloques anidados y los cierres capturados por las funciones de usuario.
+
+La evaluación de un programa completo se realiza en dos pasadas: en la primera se registran todas las funciones y clases (permitiendo referencias hacia adelante), y en la segunda se ejecutan las sentencias que no son declaraciones. Antes y después de cada bloque de ejecución que requiere su propio alcance, el evaluador salva y restaura el frame activo. Esta garantía de limpieza de entorno también se aplica en presencia de errores, ya que la propagación de errores corta la evaluación antes de continuar.
+
+\subsection{Evaluación de expresiones y estructuras de control}
+
+Los literales se convierten directamente al tipo \texttt{Value} correspondiente. Los operadores lógicos implementan cortocircuito: si el operando izquierdo ya determina el resultado, el derecho no se evalúa. Los bloques evalúan sus subexpresiones en secuencia y el valor resultante es el de la última. La ligadura \texttt{let} crea un nuevo frame hijo, define la variable con el valor del inicializador, evalúa el cuerpo en ese frame y restaura el frame anterior.
+
+Las estructuras de control cubren las variantes \texttt{if/unless}, \texttt{while}, \texttt{repeat}, \texttt{loop...while} y \texttt{for}. El \texttt{for} soporta tanto el rango nativo producido por \texttt{range(start, end)} como el protocolo de iteración definido por el usuario, que exige que el objeto implemente los métodos \texttt{next()} y \texttt{current()}. La expresión \texttt{with} maneja valores potencialmente nulos de forma segura: si el valor es Null, ejecuta la rama \texttt{else}; de lo contrario, enlaza el alias al valor y evalúa el cuerpo. El \texttt{case} implementa despacho por tipo buscando la rama cuyo tipo más concreto en la jerarquía de herencia sea compatible con el valor del escrutinio.
+
+\subsection{Orientación a objetos e iteración}
+
+La construcción \texttt{new Tipo(args)} localiza la \texttt{ClassDecl} en el registro de tipos, verifica la aridad, crea una instancia con su propio frame de atributos, e inicializa en orden los parámetros del constructor, los atributos heredados del padre (de forma recursiva) y los atributos propios de la clase. La búsqueda de métodos también es recursiva por la cadena de herencia. La invocación de método guarda y restaura el estado relevante, crea un frame hijo con los parámetros y evalúa el cuerpo con \texttt{self} declarado. La llamada \texttt{base(args)} permite invocar el método del mismo nombre en la clase padre sin cambiar la instancia activa.
+
+El evaluador adopta una estrategia de error sin excepciones: el método \texttt{setError()} activa una bandera y almacena el mensaje, y todos los métodos comprueban esta bandera antes de proceder, cortocircuitando la evaluación al primer error. Esto produce un comportamiento predecible donde siempre se reporta el error más temprano en el flujo de ejecución.
+
+% ==============================================================
+\section{El Generador de Código LLVM}
+% ==============================================================
+
+\subsection{Qué es la generación de código y cuál es su función}
+
+La generación de código es la cuarta y última fase del compilador. Recibe el AST ya validado por el analizador semántico y produce un artefacto ejecutable. A diferencia del intérprete, que recorre el AST y evalúa directamente cada nodo en tiempo de ejecución, esta fase traduce el AST a LLVM IR (Intermediate Representation), una representación de bajo nivel, tipada y en forma casi-ensamblador que la infraestructura de LLVM sabe optimizar y compilar a código máquina nativo. El resultado final es un binario ELF de Linux x86\_64 capaz de ejecutarse de forma independiente.
+
+El componente vive en el directorio \texttt{Codegen/} y su clase principal es \texttt{LLVMCodeGenerator}, que hereda de los mismos visitantes del AST que el analizador semántico, reutilizando exactamente el mismo patrón de recorrido. Lo único que cambia es qué se construye en cada \texttt{visit}: en lugar de un \texttt{TypeInfo}, cada visita a una expresión deja un \texttt{llvm::Value*}, el handle que la API de LLVM usa para referirse a un valor o instrucción dentro del IR.
+
+\subsection{La cadena de herramientas y la elección de LLVM}
+
+El generador produce texto LLVM IR, que luego se escribe a un archivo temporal \texttt{.hulk\_out.ll} y se pasa a \texttt{clang} junto con la biblioteca de soporte en C \texttt{runtime.c} para producir el ejecutable final. Esta elección está motivada por razones prácticas: LLVM es la infraestructura de compilación estándar de la industria, provee una API de C++ madura para construir IR de manera programática, verificación automática del IR generado y un ecosistema completo de optimización, ninguno de los cuales el equipo necesitó reimplementar.
+
+\subsection{Representación de valores y el protocolo de llamada uniforme}
+
+La decisión de diseño más importante es cómo representar los distintos tipos de valor del lenguaje a nivel de IR, dado que LLVM no tiene noción de valor dinámicamente tipado. El generador usa una estrategia mixta: los valores Number se representan como \texttt{double} nativo, los Boolean como \texttt{i1} (un solo bit), y los String y cualquier valor cuyo tipo no se conoce en tiempo de generación se representan mediante un puntero a una estructura \texttt{BoxedValue} reservada en el heap. Esta estructura ``etiquetada'' de tamaño fijo tiene un campo entero de etiqueta y un área de 8 bytes donde se almacena el dato real, y debe coincidir exactamente entre la definición de LLVM y la del runtime de C.
+
+Para que funciones y métodos no necesiten conocer el tipo dinámico exacto de cada valor, se adopta una convención de llamada uniforme: toda función de usuario y todo método siempre recibe y devuelve un puntero opaco desde el punto de vista de la firma LLVM. Antes de cada llamada, los valores nativos se empaquetan en \texttt{BoxedValue} si es necesario; al volver, el resultado se desempaqueta al tipo nativo si el tipo de retorno esperado lo requiere. Esta uniformidad evita una combinatoria de variantes de función por cada combinación de tipos.
+
+\subsection{Layout de instancias, despacho polimórfico e identificación de tipos}
+
+Para cada clase se construye un \texttt{llvm::StructType} siguiendo el principio de prefijo común: si una clase tiene una clase base, la función primero garantiza que el struct de la base esté construido y luego copia su lista de campos como prefijo antes de añadir los campos propios. El primer campo de toda clase raíz es un campo especial que almacena el tipo en tiempo de ejecución de la instancia como un puntero al nombre de la clase registrado una sola vez como constante global. Como las subclases heredan este campo, toda instancia tiene su tipo dinámico siempre en el mismo desplazamiento, lo que permite implementar \texttt{is}, \texttt{as} y el despacho polimórfico sin una tabla de métodos virtuales.
+
+El despacho polimórfico se implementa como una cadena de comparaciones de tipo en tiempo de ejecución construida en el propio punto de llamada: para cada clase del programa que implementa el método solicitado, se emite una comparación del tipo dinámico de la instancia contra el nombre de esa clase, y si coincide, se invoca la versión específica de esa clase. Todos los caminos exitosos confluyen mediante una instrucción \texttt{phi}. Esta estrategia logra el mismo efecto observable que una vtable pero es considerablemente más simple de implementar y de depurar, pagando el costo con comparaciones lineales en la cantidad de clases candidatas en lugar de una sola indirección de puntero.
+
+\subsection{Estructuras de control como expresiones y el runtime de C}
+
+Al igual que en el analizador semántico, las construcciones \texttt{if}, \texttt{unless}, \texttt{case} y \texttt{with} deben producir un valor LLVM combinado de todas sus ramas. La herramienta estándar de LLVM para esto es la instrucción \texttt{phi}: se crean los bloques básicos necesarios, se emite la condición y un salto condicional, cada rama termina con un salto al bloque de confluencia, y en ese bloque una instrucción \texttt{phi} selecciona el resultado correcto según desde qué bloque se llegó. Los bucles \texttt{while}, \texttt{repeat} y \texttt{loop...while} no pueden usar \texttt{phi} directamente porque la cantidad de iteraciones no se conoce en tiempo de compilación; en su lugar, reservan celdas de pila que acumulan el último valor producido y se actualizan en cada iteración.
+
+Los operadores lógicos con cortocircuito tampoco se traducen como instrucciones binarias simples: el cortocircuito debe quedar codificado explícitamente como control de flujo dentro del IR, con un bloque que solo se genera si el operando izquierdo no determina el resultado por sí solo.
+
+Una parte deliberada del comportamiento del programa compilado se delega a una pequeña biblioteca de soporte en C, \texttt{runtime.c}, que se compila y enlaza junto con el IR generado. Esta biblioteca cubre el empaquetado y desempaquetado de valores, las operaciones sobre cadenas (concatenación, comparación de igualdad), las funciones de impresión y el reporte de errores en tiempo de ejecución. La separación mantiene el generador de código enfocado en la traducción estructural del AST mientras que la lógica de manejo de memoria y formato de cadenas se escribe una sola vez en un lenguaje más simple de mantener.
+
+% ==============================================================
+\section{Cumplimiento de los requisitos del proyecto}
+% ==============================================================
+
+\subsection{Requisitos técnicos}
+
+El compilador cumple las restricciones del enunciado en los siguientes términos:
+
+\begin{itemize}
+  \item Lenguaje de implementación: C++17. La lógica del evaluador y del flujo principal evita excepciones para reportar errores; se usan banderas y códigos de salida.
+  \item Fase frontal: analizador léxico generado con Flex (\texttt{Lexer/hulk\_lexer.l}) y analizador sintáctico LL(1) con gramática en \texttt{Parser/grammar/grammar.ll1}.
+  \item Generación de código principal: salida nativa mediante representación intermedia de LLVM y \texttt{clang}.
+  \item Motor de ejecución adicional: intérprete que recorre el árbol sintáctico abstracto (\texttt{Evaluator/evaluator.cpp}), activable con \texttt{--interpret} y usado como referencia en las pruebas.
+  \item Entrega: repositorio con \texttt{make build} $\rightarrow$ \texttt{./hulk}, diagnósticos \texttt{(línea,col) TIPO: mensaje} y generación de \texttt{./output}.
+\end{itemize}
+
+\subsection{Extensión propia y originalidad}
+
+El requisito de al menos una característica adicional con cambios de sintaxis y semántica se cumple con un conjunto coherente de cuatro extensiones de control de flujo e iteración. La extensión principal ---y la que introduce verificación estática nueva--- es \texttt{for (x : T in expr)}, que añade anotación de tipo opcional en la cabecera del bucle. Las tres restantes (\texttt{repeat}, \texttt{unless}, \texttt{loop\ldots while}) amplían la expresividad sin modificar el modelo computacional.
+
+Para diferenciar el trabajo respecto a otros equipos que implementen construcciones similares, el diseño destaca: (i) anotación de tipo opcional en el \texttt{for}, coherente con el tipado gradual; (ii) sintaxis \texttt{loop expr while (cond)} en lugar de \texttt{do\ldots while}; (iii) integración directa en gramática LL(1), árbol sintáctico abstracto y tres motores de ejecución (verificación semántica, intérprete y LLVM) sin colisión con identificadores del lenguaje base.
+
+% ==============================================================
+\section{Extensiones de control de flujo e iteración}
+% ==============================================================
+
+\subsection{Contexto y criterios de selección}
+
+Antes de las extensiones, el compilador ya soportaba \texttt{if-elif-else}, \texttt{while}, \texttt{for} sobre \texttt{range} y sobre objetos con métodos \texttt{next()} y \texttt{current()}, además de \texttt{let-in}, bloques y el sistema de tipos con herencia. La gramática LL(1) en \texttt{grammar.ll1} impone que toda nueva producción sea desambiguada con un solo símbolo de anticipación.
+
+Las extensiones se eligieron por reutilización de infraestructura, coherencia temática (control de flujo e iteración), gradación de complejidad (una extensión principal y tres secundarias) y comparabilidad con lenguajes conocidos (Ruby, Kotlin, C\#, C).
+
+\subsection{Definición formal frente a implementación}
+
+Es importante distinguir dos niveles:
+
+\begin{enumerate}
+  \item Semántica formal: cada extensión se define por equivalencia con construcciones base (\texttt{if}, \texttt{while}, \texttt{let}). Estas equivalencias son la referencia para razonar sobre el comportamiento.
+  \item Implementación en el compilador: el flujo de compilación no incluye una fase de desazucarado del árbol sintáctico abstracto. Las extensiones producen nodos dedicados (\texttt{UnlessExpr}, \texttt{RepeatExpr}, \texttt{LoopWhileExpr}, \texttt{ForExpr} con \texttt{declared\_type} opcional) que se procesan mediante visitas en el analizador semántico, el evaluador y el generador LLVM.
+\end{enumerate}
+
+Esta decisión mantiene el árbol legible en diagnósticos (\texttt{--ast}), permite optimizaciones específicas (por ejemplo, \texttt{for} sobre \texttt{range}) y conserva paridad entre intérprete y código nativo.
+
+% ==============================================================
+\subsection{Extensión principal: \texttt{for} tipado con iteradores}
+% ==============================================================
+
+\subsubsection{Motivación y sintaxis}
+
+El lenguaje ya disponía de una forma básica de \texttt{for} que permitía iterar sobre cualquier expresión que implementase el protocolo \texttt{Iterable}, pero en esa forma original la variable de iteración no podía recibir una anotación de tipo explícita: el programador dependía completamente de la inferencia o recurría a conversiones manuales con \texttt{as}. La motivación de la extensión tiene además una dimensión semántica: al admitir la anotación, el verificador de tipos puede comprobar estáticamente que el tipo devuelto por \texttt{current()} del iterador conforma al tipo declarado, en lugar de diferir esa verificación.
+
+La forma base \texttt{for (x in expr) body} ya existía. La extensión añade la variante opcional:
+
+\begin{center}
+\texttt{for (x : T in expr) body}
+\end{center}
+
+La anotación permite legibilidad explícita y verificación estática de que el elemento iterable conforma al tipo declarado, sin obligar al programador a abandonar la inferencia cuando no la necesita.
+
+\subsubsection{Cambios en gramática y AST}
+
+En \texttt{grammar.ll1}:
+
+\begin{lstlisting}[language={},numbers=none,frame=none,backgroundcolor=\color{white}]
+ForExpr   -> FOR LPAREN IDENTIFIER ForTypeOpt IN Expr RPAREN ForBody
+ForTypeOpt -> COLON IDENTIFIER | epsilon
+\end{lstlisting}
+
+El nodo \texttt{ForExpr} almacena \texttt{variable}, \texttt{declared\_type} (opcional), \texttt{iterable} y \texttt{body}. La conversión del árbol concreto al abstracto está en \texttt{Parser/ast/cst\_to\_ast.cpp}.
+
+\subsubsection{Semántica formal (equivalencia)}
+
+La referencia del lenguaje transpila el \texttt{for} a un \texttt{while} con iterador auxiliar:
+
+\begin{center}
+\small
+\texttt{let \_iter = expr in while (\_iter.next()) let x [: T] = \_iter.current() in body}
+\end{center}
+
+\subsubsection{Implementación}
+
+\texttt{Phase2Analyzer::visit(ForExpr)} (\texttt{SemanticCheck/phase2\_checker.cpp}):
+\begin{itemize}
+  \item verifica que el iterable sea \texttt{range} o un objeto con \texttt{next()} que devuelve \texttt{Boolean} y \texttt{current()};
+  \item infiere el tipo del elemento; si hay \texttt{declared\_type}, exige que el tipo del elemento conforme al declarado;
+  \item declara la variable de iteración en un ámbito hijo y analiza el cuerpo.
+\end{itemize}
+
+El evaluador distingue \texttt{RangeValue}/\texttt{RangeIterator} (camino optimizado) de iteradores definidos por el usuario (llamadas a \texttt{next()}/\texttt{current()}). LLVM emite un bucle numérico directo para \texttt{range} y un bucle con llamadas a métodos para iteradores personalizados (\texttt{Codegen/llvm\_codegen.cpp}).
+
+Ejemplo de uso:
+
+\begin{lstlisting}[language={},numbers=none]
+for (x: Number in range(0, 3)) print(x);
+for (w: String in new WordIter()) print(w);
+\end{lstlisting}
+
+\paragraph{Justificación del diseño.} Mantener la anotación como optativa, en lugar de obligatoria, responde a la filosofía de tipado gradual de HULK: un programador que confía en la inferencia no necesita cambiar nada, mientras que quien trabaja con jerarquías de tipos complejas puede ser explícito sin coste adicional. Representar el tipo anotado como campo opcional en \texttt{ForExpr} evita añadir complejidad estructural al verificador: cuando el campo es nulo, el tipo del elemento se infiere normalmente; cuando está presente, se añade únicamente una comprobación de conformidad que reutiliza la infraestructura ya existente (\texttt{conformsTo}).
+
+% ==============================================================
+\subsection{Extensión secundaria: \texttt{repeat (n) expr}}
+% ==============================================================
+
+\subsubsection{Sintaxis y comportamiento}
+
+Uno de los patrones más frecuentes en programación es repetir una acción un número fijo y conocido de veces. En HULK base esto se expresaba mediante un \texttt{while} con contador explícito o un \texttt{for} sobre un rango; ambas formas son correctas pero ninguna expresa directamente la intención de \emph{``que algo suceda $n$ veces''}. \texttt{repeat} cubre ese caso de uso con una sintaxis directa e inmediatamente legible.
+
+\begin{center}
+\texttt{repeat (n) expr}
+\end{center}
+
+Donde \texttt{n} debe ser de tipo \texttt{Number}. El cuerpo se evalúa un número de veces igual a la parte entera de \texttt{n} (truncación hacia cero). Si \texttt{n} $\leq$ 0, el resultado es \texttt{Null} sin ejecutar el cuerpo; en caso contrario, el valor de la expresión es el de la última ejecución del cuerpo.
+
+\subsubsection{Equivalencia formal}
+
+\begin{center}
+\small
+\texttt{let \_total = n in while (\_total > 0) \{ \_total := \_total - 1; expr \}}
+\end{center}
+
+\subsubsection{Implementación}
+
+Gramática: \texttt{RepeatExpr -> REPEAT LPAREN Expr RPAREN Expr}. Nodo \texttt{RepeatExpr\{count, body\}}. Palabra clave \texttt{repeat} en \texttt{hulk\_lexer.l}. Visitas dedicadas en \texttt{phase2\_checker.cpp}, \texttt{evaluator.cpp} (bucle con contador entero) y \texttt{llvm\_codegen.cpp} (contador \texttt{i32} con rama para valores no positivos).
+
+\paragraph{Justificación del diseño.} Modelar \texttt{repeat} con referencia semántica a \texttt{while} en lugar de a \texttt{for} sobre un rango obedece a que la intención es distinta: \texttt{repeat} no itera sobre elementos, sino que cuenta ejecuciones. Usar \texttt{for} introduciría una variable de iteración que el programador no necesita y que podría inducir confusión; el contador descendente en \texttt{while} es más fiel a la intención de la construcción.
+
+% ==============================================================
+\subsection{Extensión secundaria: \texttt{unless (cond) expr}}
+% ==============================================================
+
+\subsubsection{Sintaxis}
+
+La construcción condicional negada es un patrón frecuente en código imperativo: ejecutar algo si y solo si una condición \emph{no} se cumple. La forma canónica \texttt{if (!cond) expr} reduce la legibilidad cuando la condición es larga o compleja, obligando al lector a invertir mentalmente la negación; \texttt{unless} elimina ese salto y expresa directamente la intención.
+
+\begin{center}
+\texttt{unless (cond) expr} \qquad \texttt{unless (cond) expr else alt}
+\end{center}
+
+Semánticamente equivalente a \texttt{if (!cond) expr [else alt]}. No admite \texttt{elif} por diseño: casos complejos deben usar \texttt{if}.
+
+\subsubsection{Implementación}
+
+Terminal \texttt{UNLESS} en el analizador léxico. Nodo \texttt{UnlessExpr\{condition, then\_branch, else\_branch\}}. El verificador semántico exige condición \texttt{Boolean} y unifica tipos de ramas mediante el mínimo ancestro común. En LLVM se genera un grafo de flujo de control propio con bloques \texttt{unless.then}/\texttt{unless.else} y fusión de valores. Caso límite: sin \texttt{else} y condición verdadera, el evaluador produce \texttt{0} (comportamiento verificado en \texttt{unless\_no\_else\_true.hulk}).
+
+\paragraph{Justificación del diseño.} La decisión más relevante en el diseño de \texttt{unless} fue no admitir \texttt{elif}. Esta restricción evita que \texttt{unless} se convierta en un duplicado complejo de \texttt{if} con lógica invertida; la construcción se mantiene simple y de propósito único, mientras que cualquier lógica condicional más elaborada sigue siendo territorio de \texttt{if}.
+
+% ==============================================================
+\subsection{Extensión secundaria: \texttt{loop expr while (cond)}}
+% ==============================================================
+
+\subsubsection{Sintaxis y semántica}
+
+Los bucles \texttt{while} tradicionales evalúan la condición antes de ejecutar el cuerpo: si es falsa desde el inicio, el cuerpo nunca se ejecuta. Hay, sin embargo, situaciones —lectura de entradas, procesamiento de flujos de datos, algoritmos que siempre realizan al menos una iteración— donde se desea ejecutar el cuerpo al menos una vez antes de comprobar la condición. \texttt{loop expr while (cond)} cubre ese patrón postcondicional de forma clara y declarativa.
+
+\begin{center}
+\texttt{loop expr while (cond)}
+\end{center}
+
+Bucle postcondicional (equivalente al \texttt{do\ldots while} de C): el cuerpo se ejecuta al menos una vez; mientras \texttt{cond} sea verdadera, se repite. El valor resultante es el de la última ejecución del cuerpo. La condición debe ser \texttt{Boolean}.
+
+\subsubsection{Implementación}
+
+Gramática: \texttt{LoopWhileExpr -> LOOP Expr WHILE LPAREN Expr RPAREN}. Nodo \texttt{LoopWhileExpr\{body, condition\}}. El evaluador ejecuta el cuerpo y luego evalúa la condición en un bucle; LLVM usa bloques \texttt{loopwhile.body} y \texttt{loopwhile.cond}.
+
+\paragraph{Justificación del diseño.} La elección de la palabra clave \texttt{loop} en lugar de la forma \texttt{do\ldots while} de C y Java fue deliberada: \texttt{do\ldots while} introduce dos palabras clave y rompe la convención visual de HULK, donde los bloques se identifican por llaves o por la posición del cuerpo respecto a la condición. \texttt{loop\ldots while} es más uniforme con la gramática existente y sitúa la condición al final, de modo que el lector sabe desde el inicio que está ante un bucle cuyo cuerpo precede a su condición de corte.
+
+% ==============================================================
+\section{Integración técnica de las extensiones}
+% ==============================================================
+
+\subsection{Archivos modificados}
+
+\begin{itemize}
+  \item Análisis léxico: \texttt{Lexer/hulk\_lexer.l} (palabras clave \texttt{repeat}, \texttt{unless}, \texttt{loop}).
+  \item Gramática: \texttt{Parser/grammar/grammar.ll1}.
+  \item Árbol sintáctico abstracto y conversión: \texttt{Parser/ast/expr.hpp}, \texttt{cst\_to\_ast.cpp}.
+  \item Verificación semántica: \texttt{SemanticCheck/phase2\_checker.cpp}.
+  \item Intérprete: \texttt{Evaluator/evaluator.cpp}.
+  \item Generación de código: \texttt{Codegen/llvm\_codegen.cpp}.
+  \item Pruebas: \texttt{tests/extensions/}, \texttt{tests/eval/}, \texttt{tests/llvm/}, \texttt{tests/semantic/}.
+\end{itemize}
+
+\subsection{Verificaciones semánticas específicas}
+
+\begin{itemize}
+  \item \texttt{unless}: condición booleana; tipo del resultado = mínimo ancestro común de las ramas.
+  \item \texttt{repeat}: contador de tipo \texttt{Number}; tipo del resultado = tipo del cuerpo.
+  \item \texttt{loop\ldots while}: condición booleana; tipo del resultado = tipo del cuerpo.
+  \item \texttt{for} tipado: iterable válido; \texttt{current()} compatible con \texttt{T} si se anota.
+\end{itemize}
+
+La gramática LL(1) resultante no presenta conflictos predictivos (verificado por pruebas del generador de tablas).
+
+% ==============================================================
+\section{Comparativa con otros lenguajes}
+% ==============================================================
+
+\subsection{\texttt{for} con anotación de tipo}
+
+Kotlin (\texttt{for (x: T in xs)}) y C\# (\texttt{foreach (T x in collection)}) son los precedentes más cercanos. Python y Rust infieren el tipo en la cabecera; en Rust el compilador lo hace con precisión gracias a su sistema de rasgos, conceptualmente similar al sistema de protocolos de HULK. La diferencia principal frente a C\# es la optatividad: en C\# la anotación es obligatoria (o reemplazable por \texttt{var} para inferencia), mientras que en HULK la anotación es siempre opcional, preservando la flexibilidad del tipado gradual.
+
+\subsection{\texttt{repeat}}
+
+Ruby usa \texttt{n.times \{ \ldots \}} como método del número; HULK adopta \texttt{repeat} como palabra clave de primer orden del lenguaje en lugar de un método sobre un objeto numérico, lo cual evita comprometerse con la idea de que los enteros sean objetos con métodos. Pascal y bucles \texttt{for} numéricos cubren el mismo caso con más verbosidad. Lua tiene un \texttt{repeat\ldots until} con semántica distinta (postcondicional, opuesta al \texttt{while}), que no debe confundirse con la construcción de HULK. En lenguajes educativos como Logo o Scratch, la repetición acotada directa es casi ubicua y suele ser la primera estructura de control que aprenden los estudiantes, lo que refuerza su valor pedagógico en un lenguaje didáctico como HULK.
+
+\subsection{\texttt{unless}}
+
+Ruby popularizó \texttt{unless} como ciudadano de primera clase, y su adopción amplia entre programadores Ruby evidencia que mejora genuinamente la legibilidad en los casos para los que fue diseñada. Perl admite además una forma postfija (p. ej. \texttt{print(x) unless (x == 0)}), descartada en HULK porque exigiría que el cuerpo apareciera antes que la palabra clave, lo cual introduce dificultades en una gramática LL(1). Swift (con \emph{guard statements}) y Kotlin ofrecen guardas más potentes que permiten salir anticipadamente de una función; son más expresivas que \texttt{unless} pero también más complejas. HULK mantiene una construcción deliberadamente más modesta —solo invierte la condición, sin semántica de salida anticipada—, coherente con su naturaleza de lenguaje basado en expresiones con un único valor de retorno por bloque.
+
+\subsection{\texttt{loop\ldots while}}
+
+Equivalente al \texttt{do\ldots while} de C/C++/Java en semántica, con orden léxico distinto: \texttt{do\ldots while} introduce dos palabras clave y rompe la convención visual de HULK, mientras que \texttt{loop\ldots while} sitúa la condición al final con una sola palabra clave adicional. Pascal usa \texttt{repeat\ldots until}, donde la condición de terminación es la negación lógica de la condición de continuación —el bucle termina cuando la condición es \emph{verdadera}—, lo cual puede confundir a programadores acostumbrados al paradigma de C; HULK opta por conservar ``continuar mientras \texttt{cond}'' para alinearse con el \texttt{while} precondicional ya existente. En lenguajes funcionales con rasgos imperativos como Scala o Groovy, los bucles postcondicionales son menos frecuentes porque el paradigma favorece la recursión y las comprensiones de listas sobre la iteración explícita; HULK, al ser orientado a objetos con raíces imperativas claras, encaja naturalmente con la tradición de C.
+
+% ==============================================================
+\section{Decisiones de diseño y compromisos}
+% ==============================================================
+
+\subsection{Azúcar sintáctica con implementación nativa}
+
+Las tres extensiones secundarias no añaden poder computacional: expresan patrones ya posibles con \texttt{if} y \texttt{while}. El \texttt{for} tipado añade verificación estática explícita. El valor académico está en la expresividad y en la integración completa en el compilador, no en nuevas primitivas.
+
+Implementar nodos nativos en lugar de desazucarar el árbol implica más código en tres visitantes, pero evita una fase extra, permite optimizar \texttt{range} y facilita pruebas de extremo a extremo comparando intérprete y ejecutable nativo.
+
+\subsection{Compatibilidad y uniformidad}
+
+Todas las extensiones son compatibles con programas HULK previos: las palabras clave nuevas no colisionan con identificadores existentes y la forma \texttt{for (x in expr)} se conserva. Las construcciones siguen el patrón visual del lenguaje: condiciones entre paréntesis, cuerpos como expresiones o bloques.
+
+\subsection{Principio de menor sorpresa}
+
+\texttt{unless} invierte la condición; \texttt{repeat} repite; \texttt{loop\ldots while} ejecuta el cuerpo antes de comprobar; \texttt{for : T} solo restringe tipos cuando el programador lo indica.
+
+% ==============================================================
+\section{Validación y pruebas}
+% ==============================================================
+
+\subsection{Estrategia general}
+
+El criterio principal de corrección para la generación de código es:
+
+\begin{center}
+\texttt{./hulk programa.hulk \&\& ./output} $\equiv$ \texttt{./hulk programa.hulk --interpret}
+\end{center}
+
+\subsection{Conjuntos de prueba de las extensiones}
+
+\begin{itemize}
+  \item Pruebas de extremo a extremo: \texttt{tests/extensions/manifest.tsv} (por ejemplo \texttt{for\_typed.hulk}, \texttt{repeat\_zero.hulk}, \texttt{unless\_else.hulk}, \texttt{loop\_while\_once.hulk}).
+  \item Evaluación: \texttt{tests/eval/valid/43\_v9\_unless.hulk}, \texttt{44\_v9\_repeat.hulk}, \texttt{45\_v9\_loop\_while.hulk}.
+  \item Generación LLVM: \texttt{tests/llvm/valid/83\_l8\_unless.hulk}--\texttt{92\_l9\_loop\_while\_multi.hulk}.
+  \item Verificación semántica: \texttt{72\_i7\_for\_typed.hulk} (válido), \texttt{64\_i7\_for\_type\_mismatch.hulk} (inválido), \texttt{54\_t\_unless\_non\_boolean.hulk}, \texttt{61\_g\_repeat\_non\_string.hulk}.
+\end{itemize}
+
+Los casos anteriores cubren tanto usos esperados como casos límite. Para el \texttt{for} tipado se valida la iteración sobre rangos numéricos con y sin anotación, la iteración sobre colecciones personalizadas que implementan \texttt{Iterable}, y el caso de error en que el tipo anotado no conforma al devuelto por \texttt{current()} (\texttt{64\_i7\_for\_type\_mismatch.hulk}). Para \texttt{repeat} se prueba la repetición con argumento positivo, cero y negativo, y la anidación dentro de otras construcciones de control de flujo. Para \texttt{unless} se cubren las cuatro combinaciones de forma sin/con \texttt{else} y condición verdadera/falsa, verificando en cada caso que el tipo de retorno se infiere como el ancestro común más bajo de ambas ramas. Para \texttt{loop\ldots while} se prueba el caso en que la condición es falsa desde el inicio (el cuerpo igualmente se ejecuta una vez), el caso de múltiples iteraciones, y la anidación con otras construcciones.
+
+\subsection{Objetivos del Makefile}
+
+\texttt{make test\_semantic}, \texttt{make test\_eval}, \texttt{make test\_llvm} y \texttt{make test\_llvm\_fixtures} automatizan la regresión. La integración continua del repositorio en MatCom ejecutará además las pruebas estándar del curso cuando se publiquen.
+
+% ==============================================================
+\section{Limitaciones y trabajo futuro}
+% ==============================================================
+
+\begin{itemize}
+  \item \texttt{repeat} no expone índice de iteración al programador.
+  \item \texttt{unless} no admite \texttt{elif}.
+  \item No hay \texttt{break}/\texttt{continue} en HULK (limitación del lenguaje base).
+  \item El \texttt{for} tipado verifica conformidad de tipos, no igualdad exacta con \texttt{current()}.
+  \item Características posteriores a la verificación de tipos en la documentación oficial (protocolos formales, vectores, funciones anónimas, macros) quedan fuera del alcance actual.
+  \item Una fase opcional de desazucarado del árbol sintáctico abstracto podría unificar la implementación en el futuro, pero no es necesaria para la semántica actual.
+\end{itemize}
+
+% ==============================================================
+\section{Conclusiones}
+% ==============================================================
+
+Hemos construido un compilador HULK completo que recorre análisis léxico (Flex), análisis sintáctico LL(1), verificación semántica con inferencia multipasada, generación LLVM y un intérprete de validación. El compilador implementa el núcleo del lenguaje hasta verificación de tipos y añade un conjunto coherente de cuatro extensiones de control de flujo e iteración.
+
+Técnicamente, las extensiones muestran cómo enriquecer la expresividad de un lenguaje didáctico integrando cambios en léxico, gramática, árbol sintáctico abstracto, semántica y ambos motores de ejecución. La semántica formal se expresa por equivalencia con construcciones base; la implementación mantiene nodos dedicados y visitas equivalentes en el verificador semántico, el evaluador y LLVM.
+
+Desde el diseño de lenguajes, el trabajo ilustra compatibilidad regresiva, tipado gradual opcional en el \texttt{for}, y comparación con construcciones de Ruby, Kotlin, C\# y C. El informe, junto con el repositorio y los conjuntos de prueba, documenta tanto la arquitectura del compilador como el análisis detallado de las extensiones exigido por el proyecto de Compilación.
+
+\end{document}
