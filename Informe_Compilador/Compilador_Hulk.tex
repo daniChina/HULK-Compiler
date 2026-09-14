@@ -123,7 +123,7 @@ El pipeline del compilador HULK sigue un flujo lineal y ordenado. El punto de en
 
 El lenguaje HULK incluye expresiones aritméticas, lógicas y de comparación, estructuras de control como \texttt{if/elif/else}, \texttt{while}, \texttt{for}, \texttt{with} y \texttt{case}, declaración de funciones con y sin tipo de retorno, un sistema de tipos orientado a objetos con herencia, expresiones de ligadura con \texttt{let\ldots in}, bloques de expresiones, operadores de verificación de tipo (\texttt{is}) y conversión (\texttt{as}), y asignación destructiva con el operador \texttt{:=}. Además, el compilador incorpora un conjunto de cuatro extensiones de control de flujo e iteración ---\texttt{for} tipado, \texttt{repeat}, \texttt{unless} y \texttt{loop\ldots while}--- que constituyen el aporte propio del proyecto.
 
-Las secciones 2 a 9 describen la arquitectura del compilador siguiendo el orden del flujo de compilación. Las secciones 10 en adelante documentan el cumplimiento de los requisitos del proyecto, el diseño de las extensiones, su integración técnica en el repositorio y la validación experimental.
+Las secciones 2 a 9 describen la arquitectura del compilador siguiendo el orden del flujo de compilación. Las secciones 10 a 13 documentan las extensiones, su integración y la comparativa con otros lenguajes. Las secciones 14 y 15 examinan HULK como diseño: qué estrecha el lenguaje, y por qué el \texttt{if} no es operando directo de una suma.
 
 % ==============================================================
 \section{Orquestación del Pipeline y Diagnóstico de Errores}
@@ -570,11 +570,228 @@ Ruby usa \texttt{n.times \{ \ldots \}} como método del número; HULK adopta \te
 
 \subsection{\texttt{unless}}
 
-Ruby popularizó \texttt{unless} como ciudadano de primera clase, y su adopción amplia entre programadores Ruby evidencia que mejora genuinamente la legibilidad en los casos para los que fue diseñada. Perl admite además una forma postfija (p. ej. \texttt{print(x) unless (x == 0)}), descartada en HULK porque exigiría que el cuerpo apareciera antes que la palabra clave, lo cual introduce dificultades en una gramática LL(1). Swift (con \emph{guard statements}) y Kotlin ofrecen guardas más potentes que permiten salir anticipadamente de una función; son más expresivas que \texttt{unless} pero también más complejas. HULK mantiene una construcción deliberadamente más modesta —solo invierte la condición, sin semántica de salida anticipada—, coherente con su naturaleza de lenguaje basado en expresiones con un único valor de retorno por bloque.
+Ruby popularizó \texttt{unless} como ciudadano de primera clase, y su adopción amplia entre programadores Ruby evidencia que mejora genuinamente la legibilidad en los casos para los que fue diseñada. Perl admite además una forma postfija (p. ej. \texttt{print(x) unless (x == 0)}), descartada porque el cuerpo aparecería antes que la palabra clave y el límite del condicional respecto a lo que lo rodea quedaría sin marcar. Swift (con \emph{guard statements}) y Kotlin ofrecen guardas más potentes que permiten salir anticipadamente de una función; son más expresivas que \texttt{unless} pero también más complejas. HULK mantiene una construcción deliberadamente más modesta —solo invierte la condición, sin semántica de salida anticipada—, coherente con su naturaleza de lenguaje basado en expresiones con un único valor de retorno por bloque.
 
 \subsection{\texttt{loop\ldots while}}
 
 Equivalente al \texttt{do\ldots while} de C/C++/Java en semántica, con orden léxico distinto: \texttt{do\ldots while} introduce dos palabras clave y rompe la convención visual de HULK, mientras que \texttt{loop\ldots while} sitúa la condición al final con una sola palabra clave adicional. Pascal usa \texttt{repeat\ldots until}, donde la condición de terminación es la negación lógica de la condición de continuación —el bucle termina cuando la condición es \emph{verdadera}—, lo cual puede confundir a programadores acostumbrados al paradigma de C; HULK opta por conservar ``continuar mientras \texttt{cond}'' para alinearse con el \texttt{while} precondicional ya existente. En lenguajes funcionales con rasgos imperativos como Scala o Groovy, los bucles postcondicionales son menos frecuentes porque el paradigma favorece la recursión y las comprensiones de listas sobre la iteración explícita; HULK, al ser orientado a objetos con raíces imperativas claras, encaja naturalmente con la tradición de C.
+
+% ==============================================================
+\section{Crítica de HULK como diseño de lenguaje}
+% ==============================================================
+
+HULK se vende como lenguaje de expresiones con objetos y tipos opcionales. Esa mezcla deja huecos: el \texttt{if} no dice cómo se junta con \texttt{+}, las funciones no ven el \texttt{let} que las rodea, y un \texttt{if} con ramas distintas acaba en \texttt{Object}. Hay un solo tipo numérico, y dos signos de ``igual'' que no hacen lo mismo.
+
+\subsection{Una orientación a expresiones que no está cerrada}
+
+El \texttt{if}, el \texttt{while}, el \texttt{for} y el \texttt{let} producen un valor: el \texttt{if} entero \emph{vale} algo, no solo dirige el flujo. La especificación muestra \texttt{print(if (a \% 2 == 0) "even" else "odd")} y lo compara con el ternario de C\#, \texttt{a \% 2 == 0 ? "even" : "odd"}. En ambos casos el condicional cabe dentro de \texttt{print} porque el resultado es una cadena.
+
+Eso ya lo distingue de una \emph{sentencia} como el \texttt{if} de Java o de C. Allí el \texttt{if} hace algo y no se puede usar como número:
+
+\begin{lstlisting}[language={},numbers=none]
+int y = 1 + if (c) 2 else 3;   // ilegal en Java
+\end{lstlisting}
+
+En HULK sí hay valor: \texttt{let y = if (c) 2 else 3 in print(y)} imprime 2 o 3. El \texttt{if} tampoco es un \emph{primario} ---un átomo de expresión, como \texttt{3} o \texttt{f()}--- con precedencia escrita frente a \texttt{+} y \texttt{*}. \texttt{2 + 3 * 4} es \texttt{2 + (3 * 4)} porque \texttt{*} está más apretado que \texttt{+}; si el \texttt{if} fuera primario, \texttt{1 + if (c) 2 else 3} se agruparía igual que \texttt{1 + f()}. No es el caso: hay que escribir \texttt{1 + (if (c) 2 else 3)}.
+
+Tampoco es un condicional \emph{cerrado}. Ruby marca el borde derecho con \texttt{end}:
+
+\begin{lstlisting}[language={},numbers=none]
+1 + if c then 2 else 3 end
+\end{lstlisting}
+
+El \texttt{end} tapa el grupo; no hay duda de dónde acaba. En HULK no hay \texttt{end}: el \texttt{if} queda abierto a la derecha. Las dos lecturas ``naturales'' piden reglas opuestas. En una, el \texttt{+} vive \emph{dentro} del \texttt{else}:
+
+\begin{lstlisting}[language={},numbers=none]
+if (c) 1 else 2 + 3    //  if (c) 1 else (2 + 3)   vale 1 o 5
+\end{lstlisting}
+
+En la otra, el \texttt{+} vive \emph{fuera} y el \texttt{if} es el operando:
+
+\begin{lstlisting}[language={},numbers=none]
+1 + if (c) 2 else 3    //  1 + (if (c) 2 else 3)   vale 3 o 4
+\end{lstlisting}
+
+Un solo \texttt{if} abierto no puede ser a la vez la caja que contiene al \texttt{+} y la caja que el \texttt{+} contiene. El lenguaje tendría que elegir una regla para todos los casos; la otra exigiría paréntesis. HULK no elige.
+
+Python evita el choque con otra forma, \texttt{x if c else y}, y un lugar fijo en la tabla de operadores (precedencia propia: el \texttt{if} expresión es más flojo que \texttt{+}). Así \texttt{1 + 2 if c else 3} es \texttt{(1 + 2) if c else 3}; si se quiere el condicional como operando hay que escribir \texttt{1 + (2 if c else 3)}. No hay dos lecturas en disputa: una gana siempre.
+
+Una jerarquía de infijos es esa escalera de operadores que van en medio de dos operandos (\texttt{+}, \texttt{*}, \texttt{@}): \texttt{2 + 3 * 4} se arma bajándola. Haskell y ML no meten su \texttt{if} en esa escalera. El condicional es sintaxis propia (\texttt{if c then e1 else e2}), no un peldaño entre \texttt{+} y \texttt{*}; \texttt{if c then 1 else 2 + 3} deja la suma en el \texttt{else}, y el \texttt{if} como operando de un \texttt{+} se agrupa con paréntesis. No mezclan un \texttt{if} de C abierto a la derecha con la tabla de infijos.
+
+HULK sí mezcla esas dos ideas: forma del \texttt{if} de C ---sin \texttt{end}--- y valor como el ternario, sin decir cómo se junta con \texttt{+}, \texttt{*} o \texttt{@}. Esa omisión es el defecto: cada implementación inventa la asociación. La nuestra ---el control encabeza; anidarlo en un operador exige paréntesis--- se justifica en la sección siguiente.
+
+\subsection{Funciones globales, sin anidamiento ni cierre}
+
+Todas las funciones viven en un único espacio de nombres global. No hay funciones anidadas. Una función no captura variables de un \texttt{let} exterior: el cuerpo solo ve parámetros, otras funciones globales y constantes predefinidas. Eso obliga a pasar como argumento cualquier dato que, en un lenguaje con cierres, la función vería sola por estar escrita dentro de ese \texttt{let}. El patrón \texttt{let x = \ldots in function f() => x} no existe; hay que escribir \texttt{function f(x) => \ldots} y pasar \texttt{x} como argumento en cada llamada.
+
+Python, JavaScript y Scheme definen una función dentro de otra y ven las variables del \texttt{let} (o de la función) que las envuelve. En Python, \texttt{n} no es parámetro de \texttt{sumar}; la función la ve porque está escrita dentro de \texttt{hacer}:
+
+\begin{lstlisting}[language={},numbers=none]
+def hacer(n):
+    def sumar(x):
+        return x + n
+    return sumar
+f = hacer(10)
+f(3)            # 13: n viaja con sumar
+\end{lstlisting}
+
+C también prohíbe el anidamiento, pero no pretende ser un lenguaje de expresiones con \texttt{let}: las variables viven en bloques \texttt{\{\}}, no en un \texttt{let} que produce un valor. HULK toma de C el modelo de funciones (todas globales) y de ML el \texttt{let} como expresión, y no define cómo conviven. Esto no existe:
+
+\begin{lstlisting}[language={},numbers=none]
+let n = 10 in
+    function f() => n;    // f no ve n
+\end{lstlisting}
+
+Hay que convertir \texttt{n} en parámetro y pasarlo en cada llamada:
+
+\begin{lstlisting}[language={},numbers=none]
+function f(n) => n;
+let n = 10 in print(f(n));
+\end{lstlisting}
+
+El resultado es un \texttt{let} que no puede abstraerse: si una expresión usa una variable local, o se copia el cuerpo donde haga falta, o esa variable se vuelve parámetro.
+
+Haríamos distinto permitir \emph{funciones locales} ---una \texttt{function} escrita dentro de un \texttt{let}, no solo al tope del archivo--- con \emph{captura léxica}: el cuerpo usa las variables que lo rodean, no solo sus parámetros. Aunque fuera solo de variables que no se reasignan con \texttt{:=}, para no pelear con valores que cambian. No hace falta un sistema de lambdas completo (funciones anónimas que son valores, como \texttt{(x) => x + n} en JavaScript). Basta con que \texttt{function} pueda aparecer donde hoy solo cabe una expresión ---el cuerpo tras \texttt{in}, una rama de un \texttt{if}--- y que vea el \texttt{let} que la envuelve:
+
+\begin{lstlisting}[language={},numbers=none]
+let n = 10 in
+    function f(x) => x + n in
+        print(f(3));    // 13: f ve n
+\end{lstlisting}
+
+Hoy ese hueco solo acepta cosas como \texttt{n + 1} o \texttt{print(...)}, no una \texttt{function}. El costo es guardar, junto a \texttt{f}, la tablita de nombres del \texttt{let} (un \emph{entorno}). El evaluador ya encadena marcos ---cajones \texttt{x = 3} $\rightarrow$ \texttt{n = 10} $\rightarrow$ globales---; lo que falta es no tirar el marco si \texttt{f} se usa después de que el \texttt{let} ``terminó'', y una regla para ese caso.
+
+\subsection{Control de flujo: bucles sin salida y huecos de intención}
+
+HULK no define \texttt{break} ni \texttt{continue}. Un \texttt{while} o un \texttt{for} corre hasta que la condición falla o el iterable se agota. Como ambas construcciones son expresiones, el valor es el del cuerpo (o el de la última iteración), no hay un tipo unidad con el que declarar ``este bucle existe por su efecto'', y no hay forma de salir desde un bloque interior antes de que falle la condición de la cabecera, salvo reescribir esa condición.
+
+En C, Java o Python esa salida anticipada es trivial: \texttt{break} sale del bucle aunque esté dentro de un \texttt{if}.
+
+\begin{lstlisting}[language={},numbers=none]
+while (true) {
+    if (x == 0) break;   // Python/Java/C: sale del while
+    x := x - 1;
+}
+\end{lstlisting}
+
+En HULK hay que meter esa salida en la condición, porque no existe \texttt{break}:
+
+\begin{lstlisting}[language={},numbers=none]
+while (x != 0) {
+    x := x - 1;
+}
+\end{lstlisting}
+
+En Rust el bucle también es expresión, y \texttt{break} puede \emph{llevar un valor} ---el resultado de todo el \texttt{loop}:
+
+\begin{lstlisting}[language={},numbers=none]
+let n = loop {
+    if listo { break 42; }   // el loop vale 42
+};
+\end{lstlisting}
+
+HULK toma la tesis ``el bucle es expresión'' y descarta la operación que, en lenguajes que también la sostienen, permite que esa expresión termine: no hay \texttt{break}, con valor ni sin él.
+
+El lenguaje base tampoco nombra la repetición acotada ni la condicional invertida. ``Ejecuta esto $n$ veces'' se escribe como \texttt{while} con contador o como \texttt{for} sobre \texttt{range}; ``hazlo si no se cumple $p$'' se escribe \texttt{if (!$p$)}. Ninguna de las dos formas dice lo que el programador quiere decir. Ruby, Pascal y Logo tienen esas formas como parte del idioma; HULK no: hay que armarlas con \texttt{if} y \texttt{while}. Las extensiones \texttt{repeat} y \texttt{unless} de la sección~11 existen porque el lenguaje base no las nombra, no porque el compilador no supiera implementar un \texttt{while}.
+
+El \texttt{for} del lenguaje base itera sobre un protocolo de \texttt{next}/\texttt{current} (o sobre \texttt{range}) sin permitir anotar el tipo del iterador en la cabecera. El programador depende de la inferencia o de un \texttt{as} posterior. En un lenguaje de tipado gradual, la cabecera de un bucle es exactamente el sitio donde una anotación es útil: nombra el elemento y permite comprobar estáticamente que el iterable lo produce. Kotlin y C\# lo hacen; HULK, en su forma base, no. La variante \texttt{for (x : T in expr)} que añadimos no inventa un problema: lo nombra.
+
+\subsection{El tipo de un \texttt{if} y el polimorfismo por herencia}
+
+Las ramas de un \texttt{if} se unifican por el ancestro común más bajo. Si ambas producen \texttt{Number}, el \texttt{if} es \texttt{Number}. Si una produce \texttt{Number} y la otra \texttt{String}, el resultado degenera a \texttt{Object}:
+
+\begin{lstlisting}[language={},numbers=none]
+if (c) 1 else "hola"    // en HULK: Object, no Number ni String
+\end{lstlisting}
+
+A partir de ahí, cualquier uso que no sea \texttt{print} o un \texttt{as} exige una prueba de tipo. El lenguaje no tiene uniones (\texttt{Number | String}) ni un tipo unidad. Una unión nombra las alternativas sin subir a \texttt{Object}; TypeScript:
+
+\begin{lstlisting}[language={},numbers=none]
+let x: number | string = c ? 1 : "hola";
+if (typeof x === "number") x + 1; else x.length;
+\end{lstlisting}
+
+Un tipo unidad (\texttt{()} en ML/Rust) es un tipo de un solo valor, ``no hay resultado'': las dos ramas de un \texttt{if} que solo imprimen pueden valer \texttt{()} y no tienen que compartir un \texttt{Number} o un \texttt{String}. Haskell usa un tipo suma con etiquetas:
+
+\begin{lstlisting}[language={},numbers=none]
+data NumOTexto = UnNum Double | UnTexto String
+valor = if c then UnNum 1 else UnTexto "hola"
+\end{lstlisting}
+
+HULK tiene herencia \emph{nominal} ---un tipo es subtipo de otro solo si se escribió \texttt{inherits}--- y un \texttt{Object} en la cima. Lo que no comparte un padre más específico se empuja a ese tope: \texttt{Number} y \texttt{String} solo coinciden en \texttt{Object}.
+
+Eso encaja con el otro rasgo del lenguaje base orientado a objetos: el único polimorfismo es por herencia. Los métodos son virtuales siempre: se ejecuta el de la clase \emph{real} del objeto, no el del tipo con el que se declaró. No hay el \texttt{foo} no virtual de C++, pegado al tipo estático.
+
+\begin{lstlisting}[language={},numbers=none]
+type Animal { foo() => print("animal"); }
+type Perro inherits Animal { foo() => print("perro"); }
+let a: Animal = new Perro() in a.foo();    // "perro"
+\end{lstlisting}
+
+No hay un protocolo estructural en el subconjunto hasta verificación de tipos: no basta con \emph{tener} \texttt{next} y \texttt{current} para ganar un nombre \texttt{Iterable}. Dos tipos que los implementan son iterables de hecho, pero el lenguaje no les da un nombre común a menos que el programador fabrique un padre (\texttt{inherits Iterable}). Java exige declararlo (\texttt{class Cola implements Iterable \{\ldots\}}); si no escribes \texttt{implements}, no es \texttt{Iterable} aunque tenga los métodos. Go no lo exige: si \texttt{Cola} tiene \texttt{Next} y \texttt{Current}, ya es \texttt{Iter}.
+
+\begin{lstlisting}[language={},numbers=none]
+type Iter interface { Next() bool; Current() any }  // Go: implicito
+\end{lstlisting}
+
+HULK espera a una capa posterior (protocolos) para decirlo, y hasta entonces obliga a la jerarquía.
+
+Haríamos distinto unificar las ramas del \texttt{if} con un tipo unión cuando no hay ancestro útil, y tratar el protocolo de iteración como parte del lenguaje base ---no como documentación informal de dos métodos--- para que \texttt{for} no dependa de un padre inventado. El \texttt{Object} como cajón de un \texttt{if} heterogéneo es la decisión que más ruido introduce en programas que, por lo demás, son de expresiones pequeñas.
+
+\subsection{Un solo \texttt{Number}}
+
+HULK no distingue entero de flotante. El literal \texttt{1}, el resultado de \texttt{1 / 2} y el contador de un \texttt{for} sobre \texttt{range} son el mismo tipo. La división no es la de C (\texttt{1/2} $\rightarrow$ \texttt{0}): aquí \texttt{1 / 2} es \texttt{0.5}. Un índice de bucle y una medida continua no se pueden separar en el sistema de tipos.
+
+\begin{lstlisting}[language={},numbers=none]
+let i = 0 in          // indice? o medida?
+    1 / 2             // 0.5, no 0
+for (k in range(0, 3))
+    print(k);         // k es Number, como 0.5
+\end{lstlisting}
+
+Python 3 y JavaScript también unifican. C y Rust no: \texttt{int} frente a \texttt{double}, \texttt{i32} frente a \texttt{f64}. Lo que se gana es un lenguaje chico: una aritmética, sin conversiones de índice a flotante. Lo que se pierde es poder decir ``esta variable es un índice'': no hay desbordamiento de entero aparte del error de flotante, \texttt{0.1 + 0.2} no es \texttt{0.3}, y \texttt{range} cuenta con el mismo tipo con el que se divide. Un \texttt{Integer} aparte ---aunque solo para cabeceras de \texttt{for} y tamaños--- cerraría el hueco sin complicar el resto. Para un lenguaje didáctico la simplicidad se defiende; como diseño de tipos, queda abierto.
+
+\subsection{\texttt{=} y \texttt{:=}}
+
+El \texttt{let} introduce un nombre con \texttt{=}. Reasignar usa \texttt{:=}: el nombre ya existía. Fuera de un \texttt{let}, \texttt{x = 1} es un error. El tropiezo habitual es escribir la reasignación con el signo del \texttt{let}:
+
+\begin{lstlisting}[language={},numbers=none]
+let x = 1 in {
+    x := x + 1;       // bien: cambia el valor
+    x = x + 1;        // ilegal: parece let, no lo es
+}
+\end{lstlisting}
+
+Python usa \texttt{=} para las dos cosas (\texttt{x = 1} declara o cambia el valor). C también, y no tiene \texttt{let}. ML parece al \texttt{let} de HULK y reserva otra forma para mutar. HULK toma las dos ideas y las deja en el mismo programa, con dos signos fáciles de mezclar. El compilador puede explicar el error; el diseño obliga a recordarlo en cada línea. Un solo \texttt{=} según el contexto ---el nombre es nuevo o ya existe---, o prohibir la reasignación, cerraría el hueco. No es una extensión: es el idioma base.
+
+% ==============================================================
+\section{El \texttt{if} y la cadena de operadores}
+% ==============================================================
+
+La omisión anterior hay que cerrarla en una gramática concreta. Sin un \texttt{end}, las dos lecturas naturales del \texttt{if} frente a \texttt{+} no caben a la vez. Elegimos una: el control encabeza. \texttt{if (c) 1 else 2 + 3} significa \texttt{if (c) 1 else (2 + 3)}. En cambio \texttt{1 + if (c) 2 else 3} no se acepta; hay que escribir \texttt{1 + (if (c) 2 else 3)}. Un \texttt{if} sí puede ser argumento de una llamada ---\texttt{print(if (c) 2 else 3)}--- porque los argumentos son expresiones plenas, no operandos de un infijo. La especificación no impone esa frontera: muestra el \texttt{if} dentro de \texttt{print} y nunca como operando de una suma, y no obliga a aceptar la segunda forma. La frontera es nuestra.
+
+\subsection{Qué se descartó}
+
+La alternativa inmediata es colocar \texttt{IfExpr} en \texttt{Primary}. Entonces \texttt{1 + if (c) 2 else 3} parsearía, y \texttt{if (c) 1 else 2 + 3} se agruparía como \texttt{(if (c) 1 else 2) + 3}. Eso invierte la asociación que privilegiamos. Si \texttt{IfExpr} siguiera siendo además alternativa de \texttt{Expr}, el token \texttt{IF} estaría en \texttt{FIRST(IfExpr)} y en \texttt{FIRST(AssignExpr)}, y habría un conflicto FIRST/FIRST en \texttt{Expr}, no en la producción de la suma. Dejar el \texttt{if} únicamente como primario elimina el conflicto y cambia el \texttt{else}. Mantenerlo en \texttt{Expr} y exigir paréntesis conserva la asociación. LL(1) admite las dos gramáticas; no es que la clase del parser ``no pueda'' aceptar el operando.
+
+Tampoco tomamos el camino de Ruby (añadir un cerrador) ni el de C (otra construcción, \texttt{?:}, cuya precedencia es más baja que la de \texttt{+}: \texttt{1 + c ? 2 : 3} no agrupa como \texttt{1 + (c ? 2 : 3)}). El \texttt{if} de HULK sigue siendo \texttt{if}; los paréntesis no cambian su semántica, cambian el agrupamiento visible. \texttt{x + if (c) a else b} obliga a decidir, hacia atrás desde el \texttt{+}, dónde termina la suma. \texttt{x + (if (c) a else b)} no.
+
+El mismo criterio ya había descartado la forma postfija de Perl al diseñar \texttt{unless}. Perl admite \texttt{print(x) unless (x == 0)}: el cuerpo aparece antes que la palabra clave y el límite con lo que rodea al condicional queda sin marcar. No la adoptamos. Aquí ocurre lo mismo: no se admite una construcción de control cuyo borde respecto a los operadores vecinos no esté delimitado. En un caso el marcador que faltaría es un \texttt{end} o un paréntesis; en el otro, el orden palabra clave--cuerpo. No se compra una comodidad sintáctica que mezcle el control con los infijos sin delimitador.
+
+En la gramática esa decisión se lee así. \texttt{Expr} admite el \texttt{if}, el \texttt{let}, el \texttt{while}, el \texttt{with}, el \texttt{case} y las extensiones \texttt{unless}, \texttt{repeat} y \texttt{loop\ldots while} como alternativas, junto a la cadena que baja desde la asignación hasta los literales. Los operandos de \texttt{+} no son \texttt{Expr}: \texttt{AddExprTail} exige \texttt{MulExpr}. Por eso el operando derecho de una suma no puede empezar por \texttt{if}. El anidamiento explícito es \texttt{Primary -> LPAREN Expr RPAREN}.
+
+\subsection{Cómo se hace visible el rechazo}
+
+El parser no emite un \textit{syntax error} genérico. Si tras \texttt{+} llega \texttt{if} (o \texttt{let}, \texttt{while}, \texttt{with}, \ldots) el mensaje, escrito en \texttt{Parser/syntax/ll1\_parser.cpp}, es:
+
+\begin{quote}
+\small
+El operador \texttt{'+'} solo combina expresiones multiplicativas (literales, identificadores, llamadas, agrupacion con parentesis, etc.); \texttt{'if'} inicia una expresion de otro tipo y no puede usarse como operando aqui
+\end{quote}
+
+Nombra el operador, la categoría que sí combina y la palabra clave que no es operando. Los paréntesis aparecen como forma válida de operando, que es la corrección. Las pruebas en \texttt{Parser/tests/expr\_precedence\_invalid\_smoke.cpp} rechazan \texttt{x + if (a) b else c} y los análogos con \texttt{let}, \texttt{while} y \texttt{with}. El caso \texttt{let} exige además el fragmento ``solo combina expresiones multiplicativas''; los de \texttt{if}, \texttt{while} y \texttt{with} exigen que el análisis falle. No pertenecen al esqueleto del curso: si se relajara la frontera, dejarían de pasar.
+
+El costo es un par de paréntesis en \texttt{print(1 + (if (x > 0) x else 0))}. El beneficio es una sola convención, un \texttt{else} con asociación estable, y un diagnóstico que dice qué está mal en lugar de un token inesperado.
 
 % ==============================================================
 \section{Decisiones de diseño y compromisos}
@@ -642,6 +859,6 @@ Hemos construido un compilador HULK completo que recorre análisis léxico (Flex
 
 Técnicamente, las extensiones muestran cómo enriquecer la expresividad de un lenguaje didáctico integrando cambios en léxico, gramática, árbol sintáctico abstracto, semántica y ambos motores de ejecución. La semántica formal se expresa por equivalencia con construcciones base; la implementación mantiene nodos dedicados y visitas equivalentes en el verificador semántico, el evaluador y LLVM.
 
-Desde el diseño de lenguajes, el trabajo ilustra compatibilidad regresiva, tipado gradual opcional en el \texttt{for}, y comparación con construcciones de Ruby, Kotlin, C\# y C. El informe, junto con el repositorio y los conjuntos de prueba, documenta tanto la arquitectura del compilador como el análisis detallado de las extensiones exigido por el proyecto de Compilación.
+Desde el diseño de lenguajes, el trabajo ilustra compatibilidad regresiva, tipado gradual opcional en el \texttt{for}, y comparación con construcciones de Ruby, Kotlin, C\# y C. HULK, mirado como lenguaje y no como compilador, deja sin cerrar cómo se compone el control con los operadores, no da entorno léxico a las funciones y unifica ramas heterogéneas de un \texttt{if} empujándolas a \texttt{Object}; la asociación que adoptamos para el \texttt{if} frente a \texttt{+} es una convención nuestra, no un mandato de la especificación. El informe, junto con el repositorio y los conjuntos de prueba, documenta la arquitectura del compilador, las extensiones y esa crítica.
 
 \end{document}
